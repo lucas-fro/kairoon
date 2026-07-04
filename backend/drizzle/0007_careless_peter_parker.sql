@@ -1,0 +1,3 @@
+ALTER TABLE "appointments" ADD COLUMN "discount_cents" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "appointments" ADD COLUMN "payments" jsonb;--> statement-breakpoint
+ALTER TABLE "establishments" ADD COLUMN "payment_settings" jsonb DEFAULT '{"cash":true,"pix":true,"debit":true,"credit":{"enabled":true,"brands":[{"name":"Visa","maxInstallments":12},{"name":"Mastercard","maxInstallments":12}]}}'::jsonb NOT NULL;

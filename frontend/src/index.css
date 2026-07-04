@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-background font-sans text-ink antialiased;
+}
+
+/* Transição sutil entre etapas de wizards (aplicar com key={step}) */
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.step-enter {
+  animation: step-in 0.22s ease-out;
+}
+
+/* Entrada suave de dialogs */
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.dialog-enter {
+  animation: dialog-in 0.16s ease-out;
+}
+
+/* Scrollbar discreta para grids e tabs */
+.thin-scrollbar::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  @apply rounded-lg bg-line;
+}
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
