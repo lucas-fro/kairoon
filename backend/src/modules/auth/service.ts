@@ -26,6 +26,14 @@ function sanitizeUser(user: typeof users.$inferSelect) {
   }
 }
 
+export async function isSlugAvailable(slug: string) {
+  const existing = await db.query.establishments.findFirst({
+    columns: { id: true },
+    where: eq(establishments.slug, slug),
+  })
+  return { available: !existing }
+}
+
 export async function registerOwner(input: RegisterInput) {
   const email = input.email.toLowerCase().trim()
 
@@ -42,7 +50,7 @@ export async function registerOwner(input: RegisterInput) {
   return db.transaction(async (tx) => {
     const [user] = await tx
       .insert(users)
-      .values({ name: input.name.trim(), email, passwordHash, cpf: input.cpf })
+      .values({ name: input.name.trim(), email, passwordHash, cpf: input.cpf, phone: input.phone })
       .returning()
 
     const [establishment] = await tx

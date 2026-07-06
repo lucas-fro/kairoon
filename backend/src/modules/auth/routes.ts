@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { loginSchema, registerSchema, updateProfileSchema } from './schemas'
+import { loginSchema, registerSchema, slugAvailabilitySchema, updateProfileSchema } from './schemas'
 import * as authService from './service'
 
 export async function authRoutes(app: FastifyInstance) {
@@ -9,6 +9,17 @@ export async function authRoutes(app: FastifyInstance) {
     const token = app.jwt.sign({ sub: user.id, establishmentId: establishment.id })
     return reply.status(201).send({ token, user, establishment })
   })
+
+  // Checagem de disponibilidade do link público durante o cadastro.
+  // Rate limit: sem ele, dá para enumerar quais slugs existem em massa.
+  app.get(
+    '/slug-available',
+    { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    async (request) => {
+      const { slug } = slugAvailabilitySchema.parse(request.query)
+      return authService.isSlugAvailable(slug)
+    },
+  )
 
   app.post('/login', async (request) => {
     const input = loginSchema.parse(request.body)

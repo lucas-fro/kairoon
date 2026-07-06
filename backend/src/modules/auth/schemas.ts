@@ -13,6 +13,14 @@ const cnpjSchema = z
   .trim()
   .refine((value) => digitsOnly(value).length === 14, 'Informe um CNPJ válido (14 dígitos)')
 
+const phoneSchema = z
+  .string()
+  .trim()
+  .refine(
+    (value) => [10, 11].includes(digitsOnly(value).length),
+    'Informe um telefone válido (DDD + número)',
+  )
+
 const emptyToNull = <T extends z.ZodTypeAny>(schema: T) =>
   schema
     .or(z.literal(''))
@@ -24,6 +32,7 @@ export const registerSchema = z.object({
   email: z.string().email('E-mail inválido'),
   password: z.string().min(6, 'A senha deve ter no mínimo 6 caracteres'),
   cpf: cpfSchema,
+  phone: phoneSchema,
   establishment: z.object({
     name: z.string().min(2, 'Nome do negócio muito curto'),
     slug: z
@@ -45,6 +54,10 @@ export const registerSchema = z.object({
 export const loginSchema = z.object({
   email: z.string().email('E-mail inválido'),
   password: z.string().min(1, 'Informe a senha'),
+})
+
+export const slugAvailabilitySchema = z.object({
+  slug: z.string().trim().min(1, 'Informe o link'),
 })
 
 export const updateProfileSchema = z.object({

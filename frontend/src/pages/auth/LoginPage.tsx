@@ -59,7 +59,7 @@ export function LoginPage() {
               A plataforma que transforma tempo em crescimento.
             </h2>
             <p className="mt-6 text-lg leading-relaxed text-white/80">
-              Centralize agendamentos, operação, clientes e gestão em um único sistema — para sua
+              Centralize agendamentos, operação, clientes e gestão em um único sistema para sua
               empresa operar com mais precisão, controle e previsibilidade.
             </p>
           </div>
@@ -71,7 +71,7 @@ export function LoginPage() {
       </aside>
 
       {/* Painel do formulário */}
-      <div className="relative flex w-full flex-col items-center justify-center px-4 py-12 lg:w-1/2 lg:bg-surface xl:w-[45%]">
+      <div className="relative flex w-full flex-col items-center justify-center px-4 py-12 lg:w-1/2 lg:bg-background xl:w-[45%]">
         {/* Fundo com foto + filtro navy — só no mobile */}
         <img
           src="/imgTelaLogin.webp"
@@ -83,8 +83,8 @@ export function LoginPage() {
         {/* Logo sobre o fundo — só no mobile */}
         <KairoonLogotype className="relative z-10 mb-8 h-14 w-auto text-white lg:hidden" />
 
-        {/* Card do form (fica transparente no desktop) */}
-        <div className="relative z-10 w-full max-w-md rounded-2xl bg-surface p-6 shadow-floating sm:p-8 lg:rounded-none lg:bg-transparent lg:p-0 lg:shadow-none">
+        {/* Card do form — branco com sombra flutuante em todas as telas */}
+        <div className="relative z-10 w-full max-w-md rounded-2xl bg-surface p-6 shadow-floating sm:p-8">
           <h1 className="font-display text-2xl font-semibold text-ink">Bem-vindo de volta</h1>
           <p className="mt-1.5 text-sm text-ink-secondary">Entre para gerenciar sua agenda.</p>
 

@@ -6,6 +6,7 @@ export interface RegisterPayload {
   email: string
   password: string
   cpf: string
+  phone: string
   establishment: {
     name: string
     slug: string
@@ -36,6 +37,12 @@ export function login(email: string, password: string) {
 
 export function register(payload: RegisterPayload) {
   return api<AuthResponse>('/auth/register', { method: 'POST', body: payload, auth: false })
+}
+
+export function checkSlugAvailability(slug: string) {
+  return api<{ available: boolean }>(`/auth/slug-available?slug=${encodeURIComponent(slug)}`, {
+    auth: false,
+  })
 }
 
 export function getMe() {
