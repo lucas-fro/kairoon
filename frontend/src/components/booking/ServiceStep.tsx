@@ -34,7 +34,9 @@ export function ServiceStep({ services, onSelect }: ServiceStepProps) {
   }
 
   return (
-    <div className="space-y-3">
+    // Altura limitada + scroll interno para a lista não empurrar a página
+    // (evita scroll vertical na página inteira quando há muitos serviços).
+    <div className="thin-scrollbar -mx-1 max-h-[calc(100vh-17rem)] space-y-3 overflow-y-auto px-1 py-1">
       {services.map((service) => (
         <button
           key={service.id}

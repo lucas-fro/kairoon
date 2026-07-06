@@ -32,6 +32,11 @@ export const updateEstablishmentSchema = z.object({
     .union([z.string().url('URL do logo inválida'), z.literal('')])
     .transform((value) => (value === '' ? null : value))
     .optional(),
+  bannerImageUrl: z
+    .union([z.string().url('URL do banner inválida'), z.literal('')])
+    .transform((value) => (value === '' ? null : value))
+    .optional(),
+  footerMessage: optionalText(120, 'Mensagem muito longa'),
   businessType: z.enum(['barbearia', 'salao', 'clinica', 'outro']).optional(),
   autoConfirm: z.boolean().optional(),
   paymentSettings: z

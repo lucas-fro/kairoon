@@ -32,9 +32,27 @@ export async function updateEstablishment(
   const hasChanges = Object.values(input).some((value) => value !== undefined)
   if (!hasChanges) throw new AppError('Nenhum dado para atualizar', 400)
 
+  // Gate de escrita (defesa em profundidade): personalização visual só vale no
+  // plano pago. A aplicação real é na leitura (getPublicEstablishment); aqui
+  // apenas ignoramos silenciosamente para não persistir dados de plano grátis.
+  const current = await db.query.establishments.findFirst({
+    columns: { plan: true },
+    where: eq(establishments.id, establishmentId),
+  })
+  if (!current) throw new AppError('Estabelecimento não encontrado', 404)
+  const data = { ...input }
+  if (current.plan === 'free') {
+    delete data.themeColor
+    delete data.bannerImageUrl
+    delete data.footerMessage
+  }
+
+  const stillHasChanges = Object.values(data).some((value) => value !== undefined)
+  if (!stillHasChanges) return getEstablishment(establishmentId)
+
   const [updated] = await db
     .update(establishments)
-    .set(input)
+    .set(data)
     .where(eq(establishments.id, establishmentId))
     .returning()
   if (!updated) throw new AppError('Estabelecimento não encontrado', 404)

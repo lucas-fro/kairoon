@@ -19,8 +19,12 @@ import {
 import { AppError } from '../../lib/errors'
 import { publish } from '../../lib/events'
 import { lockEmployeeDay } from '../../lib/locks'
-import { computeAvailableSlots, normalizePhone, timesOverlap } from '../../lib/slots'
+import { computeAvailableSlots, isValidPhone, normalizePhone, timesOverlap } from '../../lib/slots'
 import type { AvailabilityQuery, CreateBookingInput } from './schemas'
+
+// Cor primária do design system (tailwind `primary`). É a cor da página pública
+// no plano grátis, independente do themeColor guardado (que pode ter default legado).
+const SYSTEM_PRIMARY = '#1E2F5E'
 
 async function findEstablishmentBySlug(slug: string) {
   const establishment = await db.query.establishments.findFirst({
@@ -84,6 +88,17 @@ export async function getPublicEstablishment(slug: string) {
   const priceById = new Map(allServices.map((s) => [s.id, s.priceCents]))
   const activeServices = allServices.filter((s) => s.active)
 
+  // Branding efetivo: o gate de plano é resolvido aqui (no servidor), o front
+  // apenas renderiza. Plano grátis usa a cor do sistema e a marca Kairoon;
+  // plano pago aplica cor/banner/mensagem próprios.
+  const isPaid = establishment.plan !== 'free'
+  const branding = {
+    brandColor: isPaid ? establishment.themeColor : SYSTEM_PRIMARY,
+    bannerImageUrl: isPaid ? establishment.bannerImageUrl : null,
+    showKairoonWatermark: !isPaid,
+    footerMessage: isPaid ? establishment.footerMessage : null,
+  }
+
   return {
     establishment: {
       id: establishment.id,
@@ -96,6 +111,7 @@ export async function getPublicEstablishment(slug: string) {
       businessType: establishment.businessType,
       socials: establishment.socials,
     },
+    branding,
     services: activeServices.map((s) => {
       const fullPrice =
         s.isPackage && s.packageServiceIds
@@ -244,8 +260,8 @@ export async function createPublicBooking(slug: string, input: CreateBookingInpu
     throw new AppError('Não é possível agendar em um horário que já passou', 400)
   }
 
+  if (!isValidPhone(input.client.phone)) throw new AppError('Telefone inválido', 400)
   const phone = normalizePhone(input.client.phone)
-  if (phone.length < 10 || phone.length > 13) throw new AppError('Telefone inválido', 400)
   const email = input.client.email?.trim() || null
   const birthDate = input.client.birthDate || null
   const gender = input.client.gender || null

@@ -1,8 +1,11 @@
 import { useEffect, useReducer } from 'react'
+import type { CSSProperties } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, SearchX } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { ApiError } from '../../api/client'
+import { readableTextColor } from '../../lib/color'
+import { cn } from '../../lib/format'
 import { getPublicEstablishment } from '../../api/public'
 import { ClientStep } from '../../components/booking/ClientStep'
 import { ConfirmStep } from '../../components/booking/ConfirmStep'
@@ -55,7 +58,6 @@ type WizardAction =
   | { type: 'back'; to: WizardStep }
   | { type: 'backToTime' }
   | { type: 'succeed'; result: BookingResult }
-  | { type: 'restart' }
 
 const initialState: WizardState = {
   step: 'welcome',
@@ -105,31 +107,24 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
       return { ...state, time: null, step: 'time' }
     case 'succeed':
       return { ...state, result: action.result, step: 'success' }
-    case 'restart':
-      return {
-        ...state,
-        service: null,
-        employee: null,
-        date: null,
-        time: null,
-        result: null,
-        step: 'service',
-      }
   }
 }
 
 function buildSocialLinks(
   socials: { instagram?: string; whatsapp?: string } | null,
-): { name: string; url: string; icon: string }[] {
+): { name: string; url: string; icon: string; label?: string }[] {
   if (!socials) return []
   const handle = (value: string) => value.replace(/^@+/, '')
-  const links: { name: string; url: string; icon: string }[] = []
-  if (socials.instagram)
+  const links: { name: string; url: string; icon: string; label?: string }[] = []
+  if (socials.instagram) {
+    const user = handle(socials.instagram)
     links.push({
       name: 'Instagram',
-      url: `https://instagram.com/${handle(socials.instagram)}`,
+      url: `https://instagram.com/${user}`,
       icon: '/instagram.svg',
+      label: `@${user}`,
     })
+  }
   if (socials.whatsapp)
     links.push({
       name: 'WhatsApp',
@@ -200,7 +195,7 @@ export function PublicBookingPage() {
     )
   }
 
-  const { establishment, services, employees, workingHours } = data
+  const { establishment, services, employees, workingHours, branding } = data
   const socialLinks = buildSocialLinks(establishment.socials)
   const hasEmployeeStep = employees.length > 1
   const soleEmployee = employees.length === 1 ? employees[0] : null
@@ -234,17 +229,13 @@ export function PublicBookingPage() {
     dispatch({ type: 'backToTime' })
   }
 
-  function handleRestart() {
-    queryClient.invalidateQueries({ queryKey: ['availability', slug] })
-    dispatch({ type: 'restart' })
-  }
-
   function renderStep() {
     switch (state.step) {
       case 'welcome':
         return (
           <WelcomeStep
             establishment={establishment}
+            branding={branding}
             onStart={() => dispatch({ type: 'start' })}
           />
         )
@@ -324,7 +315,9 @@ export function PublicBookingPage() {
         )
       case 'success':
         if (!state.result) return null
-        return <SuccessStep result={state.result} onNewBooking={handleRestart} />
+        return (
+          <SuccessStep result={state.result} establishment={establishment} branding={branding} />
+        )
     }
   }
 
@@ -332,33 +325,54 @@ export function PublicBookingPage() {
   const isBareStep = state.step === 'welcome' || state.step === 'success'
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <header className="sticky top-0 z-10 bg-surface/95 shadow-card backdrop-blur">
-        <div className="mx-auto flex w-full max-w-md items-center gap-3 px-4 py-3">
-          {establishment.logoUrl ? (
-            <img
-              src={establishment.logoUrl}
-              alt={establishment.name}
-              className="h-9 w-9 shrink-0 rounded-xl object-cover"
+    <div
+      className={cn(
+        'flex flex-col bg-background',
+        // No passo final, fixa a altura na viewport para a página não rolar
+        // (o miolo da confirmação rola internamente se não couber).
+        state.step === 'success' ? 'h-[100dvh]' : 'min-h-screen',
+      )}
+      style={{ '--brand': branding.brandColor } as CSSProperties}
+    >
+      {/* Nas telas "bare" (boas-vindas/sucesso) o banner carrega a identidade;
+          nas etapas internas mantemos um header compacto para economizar altura. */}
+      {!isBareStep && (
+        <header className="sticky top-0 z-10 bg-surface/95 shadow-card backdrop-blur">
+          <div className="mx-auto flex w-full max-w-md items-center gap-3 px-4 py-3">
+            {establishment.logoUrl ? (
+              <img
+                src={establishment.logoUrl}
+                alt={establishment.name}
+                className="h-9 w-9 shrink-0 rounded-xl object-cover"
+              />
+            ) : (
+              <div
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-display text-sm font-semibold"
+                style={{
+                  backgroundColor: branding.brandColor,
+                  color: readableTextColor(branding.brandColor),
+                }}
+              >
+                {establishment.name.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <p className="min-w-0 truncate font-display text-sm font-semibold text-ink">
+              {establishment.name}
+            </p>
+          </div>
+          <div className="h-1 w-full bg-line-divider">
+            <div
+              className="h-full transition-all duration-200"
+              style={{ width: `${progress}%`, backgroundColor: 'var(--brand)' }}
             />
-          ) : (
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary font-display text-sm font-semibold text-white">
-              {establishment.name.charAt(0).toUpperCase()}
-            </div>
-          )}
-          <p className="min-w-0 truncate font-display text-sm font-semibold text-ink">
-            {establishment.name}
-          </p>
-        </div>
-        <div className="h-1 w-full bg-line-divider">
-          <div
-            className="h-full bg-primary transition-all duration-200"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-      </header>
+          </div>
+        </header>
+      )}
 
-      <main key={state.step} className="step-enter mx-auto flex w-full max-w-md flex-1 flex-col px-4">
+      <main
+        key={state.step}
+        className="step-enter mx-auto flex w-full min-h-0 max-w-md flex-1 flex-col px-4"
+      >
         {isBareStep || !title ? (
           renderStep()
         ) : (
@@ -371,7 +385,6 @@ export function PublicBookingPage() {
       <footer className="mx-auto w-full max-w-md px-4 pb-6 pt-5">
         {socialLinks.length > 0 && (
           <div className="mb-4 border-t border-line-divider pt-4">
-            <p className="mb-3 text-center text-xs font-medium text-ink-secondary">Nossas redes</p>
             <div className="flex flex-wrap items-center justify-center gap-3">
               {socialLinks.map((social) => (
                 <a
@@ -380,20 +393,31 @@ export function PublicBookingPage() {
                   target="_blank"
                   rel="noreferrer"
                   title={social.name}
-                  aria-label={social.name}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-surface transition-colors duration-150 hover:border-secondary hover:bg-surface-hover"
+                  aria-label={social.label ? `${social.name} ${social.label}` : social.name}
+                  className={cn(
+                    'inline-flex h-10 items-center justify-center rounded-lg border border-line bg-surface transition-colors duration-150 hover:border-secondary hover:bg-surface-hover',
+                    social.label ? 'gap-2 px-3' : 'w-10',
+                  )}
                 >
                   <img src={social.icon} alt="" className="h-5 w-5" />
+                  {social.label && (
+                    <span className="text-sm font-medium text-ink-secondary">{social.label}</span>
+                  )}
                 </a>
               ))}
             </div>
           </div>
         )}
-        <p className="flex items-center justify-center gap-1.5 text-center text-xs text-ink-tertiary">
-          Agendamento online ·
-          <KairoonMark className="h-3.5 w-auto text-ink-tertiary" />
-          Kairoon
-        </p>
+        {branding.footerMessage && (
+          <p className="mb-2 text-center text-xs text-ink-secondary">{branding.footerMessage}</p>
+        )}
+        {branding.showKairoonWatermark && (
+          <p className="flex items-center justify-center gap-1.5 text-center text-xs text-ink-tertiary">
+            Agendamento feito pela
+            <KairoonMark className="h-3.5 w-auto text-ink-tertiary" />
+            Kairoon
+          </p>
+        )}
       </footer>
     </div>
   )

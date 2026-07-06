@@ -17,6 +17,8 @@ export function updateEstablishment(data: {
   welcomeMessage?: string
   themeColor?: string
   logoUrl?: string
+  bannerImageUrl?: string
+  footerMessage?: string
   businessType?: string
 }) {
   return api<Establishment>('/establishment', { method: 'PUT', body: data })

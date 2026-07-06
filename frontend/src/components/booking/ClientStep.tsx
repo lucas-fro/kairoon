@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Cake, Mail, Phone, User } from 'lucide-react'
+import { Cake, Mail, Pencil, Phone, User } from 'lucide-react'
 import { identifyClient } from '../../api/public'
 import { formatPhone, isValidPhone, onlyDigits } from '../../lib/format'
 import { Button } from '../ui/Button'
@@ -9,6 +9,8 @@ import { Select } from '../ui/Select'
 import { useToast } from '../ui/Toast'
 
 const EMAIL_REGEX = /^\S+@\S+\.\S+$/
+
+type Phase = 'phone' | 'details'
 
 interface ClientStepProps {
   slug: string
@@ -35,17 +37,15 @@ export function ClientStep({
   initialGender,
   onContinue,
 }: ClientStepProps) {
+  const [phase, setPhase] = useState<Phase>('phone')
   const [name, setName] = useState(initialName)
   const [phone, setPhone] = useState(initialPhone)
   const [email, setEmail] = useState(initialEmail)
   const [birthDate, setBirthDate] = useState(initialBirthDate)
   const [gender, setGender] = useState(initialGender)
   const [phoneTouched, setPhoneTouched] = useState(false)
-  const [greetingName, setGreetingName] = useState<string | null>(null)
+  const [checking, setChecking] = useState(false)
   const toast = useToast()
-
-  const lastIdentifiedRef = useRef<string | null>(null)
-  const autoFilledNameRef = useRef<string | null>(null)
 
   const digits = onlyDigits(phone)
   const phoneValid = isValidPhone(phone)
@@ -53,69 +53,101 @@ export function ClientStep({
   const emailValid = email.trim() === '' || EMAIL_REGEX.test(email.trim())
   const showPhoneError = phoneTouched && phone.length > 0 && !phoneValid
 
-  // Identifica o cliente pelo telefone (com debounce) para preencher o nome
-  useEffect(() => {
-    if (digits.length < 10 || digits === lastIdentifiedRef.current) return
-
-    let active = true
-    const timer = setTimeout(async () => {
-      try {
-        const { client } = await identifyClient(slug, digits)
-        if (!active) return
-        lastIdentifiedRef.current = digits
-        if (client) {
-          setGreetingName(client.name.split(' ')[0])
-          setName((current) => {
-            if (current.trim() === '' || current === autoFilledNameRef.current) {
-              autoFilledNameRef.current = client.name
-              return client.name
-            }
-            return current
-          })
-        } else {
-          setGreetingName(null)
-        }
-      } catch {
-        // Identificação é apenas conveniência — falha silenciosa
-      }
-    }, 500)
-
-    return () => {
-      active = false
-      clearTimeout(timer)
+  // Etapa 1: pede só o telefone e checa se o cliente já existe. Se sim, vai
+  // direto para a confirmação; se não, abre o formulário de cadastro.
+  async function handleCheckPhone(event: FormEvent) {
+    event.preventDefault()
+    if (!phoneValid) {
+      setPhoneTouched(true)
+      return
     }
-  }, [digits, slug])
+    setChecking(true)
+    try {
+      const { client } = await identifyClient(slug, digits)
+      if (client) {
+        toast.info(`Que bom te ver de novo, ${client.name.split(' ')[0]}!`)
+        onContinue(client.name, phone, '', '', '')
+        return
+      }
+      setPhase('details')
+    } catch {
+      // Falha na checagem não bloqueia o agendamento: trata como cliente novo.
+      setPhase('details')
+    } finally {
+      setChecking(false)
+    }
+  }
 
-  function handleSubmit(event: FormEvent) {
+  // Etapa 2 (cliente novo): completa os dados e segue para a confirmação.
+  function handleSubmitDetails(event: FormEvent) {
     event.preventDefault()
     if (!nameValid || !phoneValid || !emailValid) return
-    if (greetingName) toast.info(`Que bom te ver de novo, ${greetingName}!`)
     onContinue(name.trim(), phone, email.trim(), birthDate, gender)
   }
 
+  if (phase === 'phone') {
+    return (
+      <form onSubmit={handleCheckPhone} className="flex flex-1 flex-col gap-4">
+        <Input
+          label="Telefone / WhatsApp"
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          autoFocus
+          placeholder="(11) 98765-4321"
+          leftIcon={<Phone className="h-4 w-4" />}
+          value={phone}
+          onChange={(e) => setPhone(formatPhone(e.target.value))}
+          onBlur={() => setPhoneTouched(true)}
+          error={showPhoneError ? 'Informe um telefone válido com DDD' : undefined}
+          hint="Vamos usar para confirmar seu cadastro e enviar avisos"
+        />
+
+        <div className="mt-auto pt-4">
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full"
+            isLoading={checking}
+            disabled={!phoneValid}
+          >
+            Continuar
+          </Button>
+        </div>
+      </form>
+    )
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-4">
+    <form onSubmit={handleSubmitDetails} className="flex flex-1 flex-col gap-4">
+      <div className="rounded-lg bg-secondary-light/40 px-4 py-3 text-sm text-ink-secondary">
+        Seu primeiro agendamento aqui! Complete seus dados para confirmar.
+      </div>
+
+      {/* Telefone já informado, com opção de alterar */}
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-background px-3 py-2.5">
+        <div className="min-w-0">
+          <p className="text-xs text-ink-tertiary">Telefone</p>
+          <p className="truncate text-sm font-medium text-ink">{formatPhone(phone)}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setPhase('phone')}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium text-primary transition-colors hover:bg-surface"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+          Alterar
+        </button>
+      </div>
+
       <Input
         label="Nome"
         autoComplete="name"
+        autoFocus
         placeholder="Seu nome completo"
         leftIcon={<User className="h-4 w-4" />}
         value={name}
         onChange={(e) => setName(e.target.value)}
-      />
-
-      <Input
-        label="Telefone / WhatsApp"
-        type="tel"
-        inputMode="tel"
-        autoComplete="tel"
-        placeholder="(11) 98765-4321"
-        leftIcon={<Phone className="h-4 w-4" />}
-        value={phone}
-        onChange={(e) => setPhone(formatPhone(e.target.value))}
-        onBlur={() => setPhoneTouched(true)}
-        error={showPhoneError ? 'Informe um telefone válido com DDD' : undefined}
-        hint="Necessário para receber confirmações e avisos"
       />
 
       <Input
