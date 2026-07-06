@@ -4,18 +4,17 @@ import {
   Boxes,
   Calendar,
   LayoutDashboard,
-  LogOut,
-  Menu,
   Settings,
   Users,
   Wallet,
   X,
 } from 'lucide-react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { cn } from '../../lib/format'
 import { KairoonMark } from '../brand/Logo'
 import { PendingBookingsListener } from '../realtime/PendingBookingsListener'
+import { AppHeader } from './AppHeader'
 
 const NAV_GROUPS = [
   {
@@ -41,8 +40,7 @@ const NAV_GROUPS = [
 ]
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
-  const { user, establishment, logout } = useAuth()
-  const navigate = useNavigate()
+  const { establishment } = useAuth()
 
   return (
     <div className="flex h-full flex-col p-4">
@@ -91,37 +89,12 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           </div>
         ))}
       </nav>
-
-      <div className="mt-4 border-t border-white/10 pt-4">
-        <div className="flex items-center gap-3 rounded-lg px-2 py-1.5">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15 text-sm font-semibold text-white">
-            {user?.name?.charAt(0).toUpperCase() ?? 'U'}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-white">{user?.name}</p>
-            <p className="truncate text-xs text-white/50">{user?.email}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              logout()
-              navigate('/login')
-            }}
-            className="rounded-lg p-2 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
-            aria-label="Sair"
-            title="Sair"
-          >
-            <LogOut className="h-[18px] w-[18px]" strokeWidth={1.9} />
-          </button>
-        </div>
-      </div>
     </div>
   )
 }
 
 export function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
-  const { establishment } = useAuth()
 
   return (
     <div className="min-h-screen bg-background">
@@ -164,27 +137,13 @@ export function AppLayout() {
         </aside>
       </div>
 
-      {/* Topbar mobile */}
-      <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-line-divider bg-surface px-4 lg:hidden">
-        <button
-          type="button"
-          onClick={() => setMobileOpen(true)}
-          className="rounded-lg p-2 text-ink-secondary hover:bg-background"
-          aria-label="Abrir menu"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
-        <div className="flex items-center gap-2">
-          <KairoonMark className="h-6 w-auto shrink-0 text-primary" />
-          <span className="truncate text-sm font-semibold text-ink">
-            {establishment?.name ?? 'Kairoon'}
-          </span>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:ml-[280px] lg:px-8 lg:py-8">
-        <Outlet />
-      </main>
+      {/* Coluna de conteúdo (deslocada pela sidebar no desktop) */}
+      <div className="lg:ml-[280px]">
+        <AppHeader onOpenMenu={() => setMobileOpen(true)} />
+        <main className="mx-auto max-w-[1600px] px-4 py-3 sm:px-6 lg:px-8 lg:py-4">
+          <Outlet />
+        </main>
+      </div>
 
       {/* Popup em tempo real de agendamentos pendentes do link público */}
       <PendingBookingsListener />
