@@ -99,7 +99,7 @@ export function AppLayout() {
   return (
     <div className="min-h-screen bg-background">
       {/* Sidebar desktop */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[280px] bg-primary lg:block">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[240px] bg-primary lg:block">
         <SidebarContent />
       </aside>
 
@@ -138,9 +138,9 @@ export function AppLayout() {
       </div>
 
       {/* Coluna de conteúdo (deslocada pela sidebar no desktop) */}
-      <div className="lg:ml-[280px]">
+      <div className="lg:ml-[240px]">
         <AppHeader onOpenMenu={() => setMobileOpen(true)} />
-        <main className="mx-auto max-w-[1600px] px-4 py-3 sm:px-6 lg:px-8 lg:py-4">
+        <main className="isolate mx-auto max-w-[1760px] px-4 py-3 sm:px-6 lg:px-8 lg:py-4">
           <Outlet />
         </main>
       </div>

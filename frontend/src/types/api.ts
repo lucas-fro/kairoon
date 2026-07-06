@@ -49,6 +49,10 @@ export interface Establishment {
   phone: string | null
   document: string | null
   address: string | null
+  addressNumber: string | null
+  neighborhood: string | null
+  city: string | null
+  state: string | null
   cep: string | null
   socials: Socials | null
   autoConfirm: boolean
@@ -180,6 +184,7 @@ export interface ClientListItem {
   id: string
   name: string
   phone: string
+  birthDate: string | null
   createdAt: string
   appointmentsCount: number
   lastVisit: string | null

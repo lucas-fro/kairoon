@@ -16,6 +16,10 @@ export const updateEstablishmentSchema = z.object({
   phone: z.string().min(1, 'Informe o telefone').optional(),
   document: optionalText(20, 'Documento inválido'),
   address: optionalText(200, 'Endereço muito longo'),
+  addressNumber: optionalText(20, 'Número inválido'),
+  neighborhood: optionalText(100, 'Bairro muito longo'),
+  city: optionalText(100, 'Cidade muito longa'),
+  state: optionalText(2, 'UF inválida'),
   cep: optionalText(12, 'CEP inválido'),
   socials: z
     .object({

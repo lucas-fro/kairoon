@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { CheckCircle2, Copy, ExternalLink, Plus, Save, Trash2, XCircle } from 'lucide-react'
+import { CheckCircle2, Copy, ExternalLink, Plus, Save, Search, Trash2, XCircle } from 'lucide-react'
 import { ApiError } from '../../api/client'
 import { checkSlugAvailability, updateEstablishment, updateSlug } from '../../api/establishment'
 import { useAuth } from '../../contexts/AuthContext'
@@ -15,6 +15,7 @@ import {
   isValidPhone,
   onlyDigits,
 } from '../../lib/format'
+import { fetchAddressByCep } from '../../lib/viacep'
 import type { Establishment, PaymentSettings } from '../../types/api'
 import { Button } from '../ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
@@ -69,6 +70,12 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
   const [document, setDocument] = useState(formatCnpj(establishment.document ?? ''))
   const [cep, setCep] = useState(formatCep(establishment.cep ?? ''))
   const [address, setAddress] = useState(establishment.address ?? '')
+  const [addressNumber, setAddressNumber] = useState(establishment.addressNumber ?? '')
+  const [neighborhood, setNeighborhood] = useState(establishment.neighborhood ?? '')
+  const [city, setCity] = useState(establishment.city ?? '')
+  const [uf, setUf] = useState(establishment.state ?? '')
+  const [cepStatus, setCepStatus] = useState<'idle' | 'loading' | 'notfound'>('idle')
+  const cepDirty = useRef(false)
   const [welcomeMessage, setWelcomeMessage] = useState(establishment.welcomeMessage ?? '')
   const [logoUrl, setLogoUrl] = useState(establishment.logoUrl ?? '')
   const [autoConfirm, setAutoConfirm] = useState(establishment.autoConfirm)
@@ -85,6 +92,37 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
   )
 
   const [errors, setErrors] = useState<{ name?: string; phone?: string; document?: string; cep?: string }>({})
+
+  // Autopreenchimento de endereço pelo CEP (ViaCEP). Só dispara quando o
+  // usuário edita o CEP — não sobrescreve os dados salvos ao abrir a tela.
+  useEffect(() => {
+    if (!cepDirty.current) return
+    const digits = onlyDigits(cep)
+    if (digits.length !== 8) {
+      setCepStatus('idle')
+      return
+    }
+    let cancelled = false
+    setCepStatus('loading')
+    const timer = setTimeout(() => {
+      fetchAddressByCep(digits).then((addr) => {
+        if (cancelled) return
+        if (!addr) {
+          setCepStatus('notfound')
+          return
+        }
+        setCepStatus('idle')
+        setAddress(addr.street)
+        setNeighborhood(addr.neighborhood)
+        setCity(addr.city)
+        setUf(addr.state)
+      })
+    }, 400)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [cep])
 
   // Link público
   const currentSlug = establishment.slug
@@ -226,6 +264,10 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
       document: document.trim(),
       cep: cep.trim(),
       address: address.trim(),
+      addressNumber: addressNumber.trim(),
+      neighborhood: neighborhood.trim(),
+      city: city.trim(),
+      state: uf.trim(),
       welcomeMessage: welcomeMessage.trim(),
       logoUrl: logoUrl.trim(),
       socials: {
@@ -301,19 +343,58 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
               <Input
                 label="CEP"
                 inputMode="numeric"
+                leftIcon={<Search className="h-4 w-4" />}
                 value={cep}
-                onChange={(e) => setCep(formatCep(e.target.value))}
+                onChange={(e) => {
+                  cepDirty.current = true
+                  setCep(formatCep(e.target.value))
+                }}
                 placeholder="00000-000"
-                error={errors.cep}
+                error={errors.cep ?? (cepStatus === 'notfound' ? 'CEP não encontrado' : undefined)}
+                hint={
+                  cepStatus === 'loading'
+                    ? 'Buscando endereço…'
+                    : 'Preenche o endereço automaticamente'
+                }
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_8rem]">
+              <Input
+                label="Endereço"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Rua, avenida…"
+              />
+              <Input
+                label="Número"
+                value={addressNumber}
+                onChange={(e) => setAddressNumber(e.target.value)}
+                placeholder="Nº"
               />
             </div>
 
             <Input
-              label="Endereço"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="Rua, número — bairro, cidade/UF"
+              label="Bairro"
+              value={neighborhood}
+              onChange={(e) => setNeighborhood(e.target.value)}
+              placeholder="Bairro"
             />
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_6rem]">
+              <Input
+                label="Cidade"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="Cidade"
+              />
+              <Input
+                label="Estado"
+                value={uf}
+                onChange={(e) => setUf(e.target.value.toUpperCase().slice(0, 2))}
+                placeholder="UF"
+              />
+            </div>
 
             <Textarea
               label="Mensagem de boas-vindas"

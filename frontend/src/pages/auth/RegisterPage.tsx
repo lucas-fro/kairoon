@@ -39,7 +39,9 @@ import {
   isValidCnpj,
   isValidCpf,
   isValidPhone,
+  onlyDigits,
 } from '../../lib/format'
+import { fetchAddressByCep } from '../../lib/viacep'
 import type { BusinessType } from '../../types/api'
 
 const EMAIL_REGEX = /^\S+@\S+\.\S+$/
@@ -224,7 +226,12 @@ export function RegisterPage() {
   const [businessType, setBusinessType] = useState<BusinessType | null>(null)
   const [document, setDocument] = useState('')
   const [address, setAddress] = useState('')
+  const [addressNumber, setAddressNumber] = useState('')
+  const [neighborhood, setNeighborhood] = useState('')
+  const [city, setCity] = useState('')
+  const [uf, setUf] = useState('')
   const [cep, setCep] = useState('')
+  const [cepStatus, setCepStatus] = useState<'idle' | 'loading' | 'notfound'>('idle')
   const [phone, setPhone] = useState('')
   const [slug, setSlug] = useState('')
   const [slugTouched, setSlugTouched] = useState(false)
@@ -236,6 +243,35 @@ export function RegisterPage() {
 
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Autopreenchimento de endereço pelo CEP (ViaCEP) ao completar os 8 dígitos.
+  useEffect(() => {
+    const digits = onlyDigits(cep)
+    if (digits.length !== 8) {
+      setCepStatus('idle')
+      return
+    }
+    let cancelled = false
+    setCepStatus('loading')
+    const timer = setTimeout(() => {
+      fetchAddressByCep(digits).then((addr) => {
+        if (cancelled) return
+        if (!addr) {
+          setCepStatus('notfound')
+          return
+        }
+        setCepStatus('idle')
+        setAddress(addr.street)
+        setNeighborhood(addr.neighborhood)
+        setCity(addr.city)
+        setUf(addr.state)
+      })
+    }, 400)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [cep])
 
   // Verifica a disponibilidade do link em tempo real (debounce) enquanto o usuário digita.
   useEffect(() => {
@@ -294,7 +330,7 @@ export function RegisterPage() {
     businessType !== null &&
     slugUsable &&
     isValidCnpj(document) &&
-    address.trim().length >= 5 &&
+    address.trim().length >= 3 &&
     (cep === '' || isValidCep(cep)) &&
     (phone === '' || isValidPhone(phone))
 
@@ -333,6 +369,10 @@ export function RegisterPage() {
           businessType,
           document,
           address: address.trim(),
+          ...(addressNumber.trim() ? { addressNumber: addressNumber.trim() } : {}),
+          ...(neighborhood.trim() ? { neighborhood: neighborhood.trim() } : {}),
+          ...(city.trim() ? { city: city.trim() } : {}),
+          ...(uf.trim() ? { state: uf.trim() } : {}),
           ...(cep ? { cep } : {}),
           ...(phone ? { phone } : {}),
         },
@@ -575,19 +615,56 @@ export function RegisterPage() {
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <Input
-                        label="Endereço"
-                        placeholder="Rua, número — bairro, cidade/UF"
+                        label="CEP"
+                        inputMode="numeric"
+                        placeholder="00000-000"
                         leftIcon={<MapPin className="h-4 w-4" />}
+                        value={cep}
+                        onChange={(e) => setCep(formatCep(e.target.value))}
+                        error={
+                          cepError ?? (cepStatus === 'notfound' ? 'CEP não encontrado' : undefined)
+                        }
+                        hint={
+                          cepStatus === 'loading'
+                            ? 'Buscando endereço…'
+                            : 'Preenche o endereço automaticamente'
+                        }
+                      />
+                      <Input
+                        label="Número"
+                        placeholder="Nº"
+                        value={addressNumber}
+                        onChange={(e) => setAddressNumber(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <Input
+                        label="Endereço"
+                        placeholder="Rua, avenida…"
                         value={address}
                         onChange={(e) => setAddress(e.target.value)}
                       />
                       <Input
-                        label="CEP (opcional)"
-                        inputMode="numeric"
-                        placeholder="00000-000"
-                        value={cep}
-                        onChange={(e) => setCep(formatCep(e.target.value))}
-                        error={cepError}
+                        label="Bairro"
+                        placeholder="Bairro"
+                        value={neighborhood}
+                        onChange={(e) => setNeighborhood(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <Input
+                        label="Cidade"
+                        placeholder="Cidade"
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                      />
+                      <Input
+                        label="Estado"
+                        placeholder="UF"
+                        value={uf}
+                        onChange={(e) => setUf(e.target.value.toUpperCase().slice(0, 2))}
                       />
                     </div>
 

@@ -56,7 +56,13 @@ export const establishments = pgTable('establishments', {
   phone: text('phone'),
   // CNPJ da empresa (armazenado formatado como digitado)
   document: text('document'),
+  // Endereço estruturado (logradouro + número + bairro + cidade + UF).
+  // Preenchido pelo CEP via ViaCEP.
   address: text('address'),
+  addressNumber: text('address_number'),
+  neighborhood: text('neighborhood'),
+  city: text('city'),
+  state: text('state'),
   cep: text('cep'),
   socials: jsonb('socials').$type<{
     instagram?: string

@@ -14,6 +14,10 @@ export interface RegisterPayload {
     phone?: string
     document: string
     address: string
+    addressNumber?: string
+    neighborhood?: string
+    city?: string
+    state?: string
     cep?: string
   }
   quiz?: Record<string, string>

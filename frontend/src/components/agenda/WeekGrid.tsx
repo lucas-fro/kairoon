@@ -10,9 +10,12 @@ const PX_PER_MINUTE = SLOT_HEIGHT_PX / SLOT_MINUTES
 
 const statusClasses: Record<AppointmentStatus, string> = {
   confirmed: 'bg-success-light text-success-dark hover:shadow-soft',
-  completed: 'bg-primary/10 text-primary hover:shadow-soft',
+  completed: 'bg-info-light text-info-dark hover:shadow-soft',
   pending: 'bg-warning-light text-warning-dark hover:shadow-soft',
-  cancelled: 'bg-error-light/60 text-error-dark line-through opacity-70 hover:opacity-90',
+  // Opaco: o "apagado" do cancelado vem do tachado + texto fraco, não de
+  // opacidade no card (que deixaria o vizinho vazar no overlap). O texto
+  // volta ao cheio no hover.
+  cancelled: 'bg-error-light text-error-dark/70 line-through hover:text-error-dark hover:shadow-soft',
 }
 
 /** Padrão sutil (hachura) para colunas fechadas, só com tokens */
@@ -240,7 +243,12 @@ export function WeekGrid({
                       title={`${appointment.startTime} · ${appointment.client.name} · ${appointment.service.name}`}
                       className={cn(
                         'group absolute z-[1] flex h-[var(--block-h)] flex-col overflow-hidden px-2 text-left leading-tight shadow-card',
-                        'transition-all duration-200 ease-out hover:z-30 hover:h-[var(--block-hh)] hover:shadow-soft',
+                        // Altura/sombra animam em 200ms; o z-index sobe na hora ao
+                        // passar o mouse e só volta 200ms depois de sair — assim o
+                        // card fica por cima dos vizinhos durante toda a expansão E
+                        // o recolhimento, sem "piscar" atrás deles.
+                        'ease-out [transition-property:height,box-shadow,z-index] [transition-duration:200ms,200ms,0ms] [transition-delay:0ms,0ms,200ms]',
+                        'hover:z-30 hover:h-[var(--block-hh)] hover:shadow-soft hover:[transition-delay:0ms]',
                         isShort ? 'justify-center py-0 hover:justify-start hover:py-1' : 'py-1',
                         statusClasses[appointment.status],
                       )}

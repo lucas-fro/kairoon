@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { CalendarClock, Plus, Trash2, UserCheck } from 'lucide-react'
 import { ApiError } from '../../api/client'
 import { createWaitlistEntry, deleteWaitlistEntry, listWaitlist } from '../../api/waitlist'
 import { ClientPicker, type SelectedClient } from '../clients/ClientPicker'
 import { Button } from '../ui/Button'
+import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { Dialog } from '../ui/Dialog'
 import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
@@ -30,6 +32,7 @@ export function WaitlistDialog({
 }: WaitlistDialogProps) {
   const toast = useToast()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
 
   const activeServices = services.filter((s) => s.active)
   const activeEmployees = employees.filter((e) => e.active)
@@ -93,6 +96,7 @@ export function WaitlistDialog({
   }
 
   const entries = waitlistQuery.data ?? []
+  const confirmingEntry = entries.find((e) => e.id === confirmingId)
 
   return (
     <Dialog
@@ -192,70 +196,69 @@ export function WaitlistDialog({
         ) : (
           <div className="space-y-2">
             {entries.map((entry) => (
-              <div key={entry.id} className="rounded-lg border border-line p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-ink">{entry.client.name}</p>
-                    <p className="truncate text-xs text-ink-tertiary">
-                      {formatPhone(entry.client.phone)} · {entry.service.name}
-                    </p>
-                    <p className="mt-0.5 text-xs text-ink-secondary">
-                      {formatDate(entry.targetDate)} ·{' '}
-                      {entry.preferredEmployee?.name ?? 'Qualquer profissional'}
-                    </p>
-                    {entry.note && (
-                      <p className="mt-0.5 text-xs text-ink-tertiary">Obs.: {entry.note}</p>
-                    )}
-                  </div>
-                  <div className="flex shrink-0 flex-col gap-1.5">
-                    <Button
-                      size="sm"
-                      leftIcon={<UserCheck className="h-4 w-4" />}
-                      onClick={() => onPromote(entry)}
-                    >
-                      Encaixar
-                    </Button>
-                  </div>
+              <div
+                key={entry.id}
+                className="flex items-start justify-between gap-3 rounded-lg border border-line p-3"
+              >
+                <div className="min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/app/clientes/${entry.client.id}`)}
+                    className="block max-w-full truncate text-left text-sm font-medium text-ink transition-colors hover:text-primary hover:underline"
+                    title="Ver detalhes do cliente"
+                  >
+                    {entry.client.name}
+                  </button>
+                  <p className="truncate text-xs text-ink-tertiary">
+                    {formatPhone(entry.client.phone)} · {entry.service.name}
+                  </p>
+                  <p className="mt-0.5 text-xs text-ink-secondary">
+                    {formatDate(entry.targetDate)} ·{' '}
+                    {entry.preferredEmployee?.name ?? 'Qualquer profissional'}
+                  </p>
+                  {entry.note && (
+                    <p className="mt-0.5 text-xs text-ink-tertiary">Obs.: {entry.note}</p>
+                  )}
                 </div>
-
-                {confirmingId === entry.id ? (
-                  <div className="mt-2 flex items-center justify-end gap-2 border-t border-line-divider pt-2">
-                    <span className="mr-auto text-xs text-ink-secondary">Remover da fila?</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setConfirmingId(null)}
-                      disabled={removeMutation.isPending}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => removeMutation.mutate(entry.id)}
-                      isLoading={removeMutation.isPending}
-                    >
-                      Remover
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="mt-2 flex justify-end border-t border-line-divider pt-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="px-2 text-error-dark hover:bg-error-light hover:text-error-dark"
-                      onClick={() => setConfirmingId(entry.id)}
-                      leftIcon={<Trash2 className="h-4 w-4" />}
-                    >
-                      Remover
-                    </Button>
-                  </div>
-                )}
+                <div className="flex shrink-0 flex-col gap-1.5">
+                  <Button
+                    size="sm"
+                    leftIcon={<UserCheck className="h-4 w-4" />}
+                    onClick={() => onPromote(entry)}
+                  >
+                    Encaixar
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-error-dark hover:bg-error-light hover:text-error-dark"
+                    leftIcon={<Trash2 className="h-4 w-4" />}
+                    onClick={() => setConfirmingId(entry.id)}
+                  >
+                    Remover
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={Boolean(confirmingId)}
+        onClose={() => setConfirmingId(null)}
+        onConfirm={() => confirmingId && removeMutation.mutate(confirmingId)}
+        title="Remover da fila?"
+        description={
+          confirmingEntry
+            ? `${confirmingEntry.client.name} sairá da fila de espera.`
+            : undefined
+        }
+        confirmLabel="Remover"
+        cancelLabel="Cancelar"
+        danger
+        isLoading={removeMutation.isPending}
+      />
     </Dialog>
   )
 }

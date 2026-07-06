@@ -43,7 +43,11 @@ export const registerSchema = z.object({
     businessType: z.enum(['barbearia', 'salao', 'clinica', 'outro']),
     phone: z.string().optional(),
     document: cnpjSchema,
-    address: z.string().trim().min(5, 'Informe o endereço do estabelecimento'),
+    address: z.string().trim().min(3, 'Informe o endereço do estabelecimento'),
+    addressNumber: emptyToNull(z.string().trim().max(20, 'Número inválido')),
+    neighborhood: emptyToNull(z.string().trim().max(100, 'Bairro muito longo')),
+    city: emptyToNull(z.string().trim().max(100, 'Cidade muito longa')),
+    state: emptyToNull(z.string().trim().max(2, 'UF inválida')),
     cep: emptyToNull(
       z.string().refine((value) => digitsOnly(value).length === 8, 'CEP inválido (8 dígitos)'),
     ),

@@ -10,6 +10,10 @@ export function updateEstablishment(data: {
   phone?: string
   document?: string
   address?: string
+  addressNumber?: string
+  neighborhood?: string
+  city?: string
+  state?: string
   cep?: string
   socials?: import('../types/api').Socials
   autoConfirm?: boolean
