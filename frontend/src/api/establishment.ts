@@ -8,6 +8,7 @@ export function getEstablishment() {
 export function updateEstablishment(data: {
   name?: string
   phone?: string
+  email?: string
   document?: string
   address?: string
   addressNumber?: string

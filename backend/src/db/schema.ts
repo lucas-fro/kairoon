@@ -54,6 +54,7 @@ export const establishments = pgTable('establishments', {
   welcomeMessage: text('welcome_message'),
   businessType: text('business_type').notNull().default('outro'),
   phone: text('phone'),
+  email: text('email'),
   // CNPJ da empresa (armazenado formatado como digitado)
   document: text('document'),
   // Endereço estruturado (logradouro + número + bairro + cidade + UF).

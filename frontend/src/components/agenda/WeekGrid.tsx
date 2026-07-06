@@ -8,14 +8,16 @@ import { SLOT_MINUTES } from './timeOptions'
 const SLOT_HEIGHT_PX = 24
 const PX_PER_MINUTE = SLOT_HEIGHT_PX / SLOT_MINUTES
 
+// Fundos "vivos" (~nível 200 do Tailwind) em valor direto. O dev server não
+// recarrega tokens novos do config via HMR, então o hex aqui garante que a cor
+// aplique na hora; o texto usa a variante -dark do design system (contraste ok).
 const statusClasses: Record<AppointmentStatus, string> = {
-  confirmed: 'bg-success-light text-success-dark hover:shadow-soft',
-  completed: 'bg-info-light text-info-dark hover:shadow-soft',
-  pending: 'bg-warning-light text-warning-dark hover:shadow-soft',
-  // Opaco: o "apagado" do cancelado vem do tachado + texto fraco, não de
-  // opacidade no card (que deixaria o vizinho vazar no overlap). O texto
-  // volta ao cheio no hover.
-  cancelled: 'bg-error-light text-error-dark/70 line-through hover:text-error-dark hover:shadow-soft',
+  confirmed: 'bg-[#BBF7D0] text-success-dark hover:shadow-soft',
+  completed: 'bg-[#BAE6FD] text-info-dark hover:shadow-soft',
+  pending: 'bg-[#FDE68A] text-warning-dark hover:shadow-soft',
+  // Cancelado opaco: o "apagado" vem do tachado + texto fraco (não de opacidade
+  // no card, que deixaria o vizinho vazar no overlap). Texto volta ao cheio no hover.
+  cancelled: 'bg-[#FECACA] text-error-dark/70 line-through hover:text-error-dark hover:shadow-soft',
 }
 
 /** Padrão sutil (hachura) para colunas fechadas, só com tokens */
@@ -220,9 +222,9 @@ export function WeekGrid({
                   const position = lanes.get(appointment.id) ?? { lane: 0, lanes: 1 }
                   const widthPercent = 100 / position.lanes
                   const blockHeight = (end - start) * PX_PER_MINUTE - 2
-                  // Blocos curtos (ex.: 15min) não comportam as duas linhas; nesse
-                  // caso mostramos só horário+nome centralizado e revelamos o
-                  // serviço no hover, quando o bloco cresce.
+                  // Blocos curtos (ex.: 15min) não comportam as linhas de serviço
+                  // e profissional; nesse caso mostramos só horário+nome centralizado
+                  // e revelamos o restante no hover, quando o bloco cresce.
                   const isShort = blockHeight < 44
                   // Ao passar o mouse, blocos curtos crescem para baixo até
                   // caber todo o conteúdo (sem afetar blocos já altos).
@@ -240,7 +242,9 @@ export function WeekGrid({
                       key={appointment.id}
                       type="button"
                       onClick={() => onAppointmentClick(appointment)}
-                      title={`${appointment.startTime} · ${appointment.client.name} · ${appointment.service.name}`}
+                      title={`${appointment.startTime} · ${appointment.client.name} · ${appointment.service.name}${
+                        showEmployee ? ` · ${appointment.employee.name}` : ''
+                      }`}
                       className={cn(
                         'group absolute z-[1] flex h-[var(--block-h)] flex-col overflow-hidden px-2 text-left leading-tight shadow-card',
                         // Altura/sombra animam em 200ms; o z-index sobe na hora ao
@@ -249,7 +253,7 @@ export function WeekGrid({
                         // o recolhimento, sem "piscar" atrás deles.
                         'ease-out [transition-property:height,box-shadow,z-index] [transition-duration:200ms,200ms,0ms] [transition-delay:0ms,0ms,200ms]',
                         'hover:z-30 hover:h-[var(--block-hh)] hover:shadow-soft hover:[transition-delay:0ms]',
-                        isShort ? 'justify-center py-0 hover:justify-start hover:py-1' : 'py-1',
+                        isShort ? 'justify-center py-0 hover:justify-start hover:py-0.5' : 'py-0.5',
                         statusClasses[appointment.status],
                       )}
                       style={blockStyle}
@@ -260,13 +264,22 @@ export function WeekGrid({
                       </span>
                       <span
                         className={cn(
-                          'w-full truncate text-[11px] opacity-80',
+                          'w-full truncate text-[10px] opacity-80',
                           isShort && 'hidden group-hover:block',
                         )}
                       >
                         {appointment.service.name}
-                        {showEmployee && ` · ${appointment.employee.name}`}
                       </span>
+                      {showEmployee && (
+                        <span
+                          className={cn(
+                            'w-full truncate text-[10px] opacity-70',
+                            isShort && 'hidden group-hover:block',
+                          )}
+                        >
+                          {appointment.employee.name}
+                        </span>
+                      )}
                     </button>
                   )
                 })}

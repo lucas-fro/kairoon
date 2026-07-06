@@ -29,12 +29,14 @@ const LOW_STOCK = 5
 
 type Tone = 'warning' | 'info' | 'error' | 'success' | 'brand'
 
+// Fundos vivos em valor direto (ver nota em WeekGrid: tokens novos do config não
+// recarregam via HMR; o hex garante a cor na hora). Texto na variante -dark.
 const toneClasses: Record<Tone, string> = {
-  warning: 'bg-warning-light text-warning-dark',
-  info: 'bg-secondary-light text-primary',
-  error: 'bg-error-light text-error-dark',
-  success: 'bg-success-light text-success-dark',
-  brand: 'bg-primary/10 text-primary',
+  warning: 'bg-[#FDE68A] text-warning-dark',
+  info: 'bg-[#BAE6FD] text-info-dark',
+  error: 'bg-[#FECACA] text-error-dark',
+  success: 'bg-[#BBF7D0] text-success-dark',
+  brand: 'bg-primary text-white',
 }
 
 interface NotificationItem {

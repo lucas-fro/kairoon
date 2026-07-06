@@ -47,6 +47,7 @@ export interface Establishment {
   welcomeMessage: string | null
   businessType: BusinessType | string
   phone: string | null
+  email: string | null
   document: string | null
   address: string | null
   addressNumber: string | null

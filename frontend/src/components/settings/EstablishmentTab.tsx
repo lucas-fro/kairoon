@@ -34,6 +34,7 @@ const BUSINESS_TYPE_OPTIONS = [
 ]
 
 const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 type Availability = 'idle' | 'checking' | 'available' | 'taken'
 
 const DEFAULT_PAYMENTS: PaymentSettings = {
@@ -66,6 +67,7 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
   // Dados
   const [name, setName] = useState(establishment.name)
   const [phone, setPhone] = useState(formatPhone(establishment.phone ?? ''))
+  const [email, setEmail] = useState(establishment.email ?? '')
   const [businessType, setBusinessType] = useState<string>(establishment.businessType)
   const [document, setDocument] = useState(formatCnpj(establishment.document ?? ''))
   const [cep, setCep] = useState(formatCep(establishment.cep ?? ''))
@@ -91,7 +93,13 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
     establishment.paymentSettings ?? DEFAULT_PAYMENTS,
   )
 
-  const [errors, setErrors] = useState<{ name?: string; phone?: string; document?: string; cep?: string }>({})
+  const [errors, setErrors] = useState<{
+    name?: string
+    phone?: string
+    email?: string
+    document?: string
+    cep?: string
+  }>({})
 
   // Autopreenchimento de endereço pelo CEP (ViaCEP). Só dispara quando o
   // usuário edita o CEP — não sobrescreve os dados salvos ao abrir a tela.
@@ -140,6 +148,16 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
     onSuccess: (res) => {
       setEstablishment(res)
       toast.success('Dados do estabelecimento atualizados!')
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : 'Erro inesperado'),
+  })
+
+  // Mensagem de boas-vindas do link público (salva sozinha, na seção do link)
+  const welcomeMutation = useMutation({
+    mutationFn: (value: string) => updateEstablishment({ welcomeMessage: value }),
+    onSuccess: (res) => {
+      setEstablishment(res)
+      toast.success('Mensagem de boas-vindas salva!')
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : 'Erro inesperado'),
   })
@@ -252,6 +270,7 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
     const next: typeof errors = {}
     if (!name.trim()) next.name = 'Informe o nome do estabelecimento'
     if (phone.trim() && !isValidPhone(phone)) next.phone = 'Telefone inválido'
+    if (email.trim() && !EMAIL_REGEX.test(email.trim())) next.email = 'E-mail inválido'
     if (document.trim() && !isValidCnpj(document)) next.document = 'CNPJ inválido'
     if (cep.trim() && !isValidCep(cep)) next.cep = 'CEP inválido'
     setErrors(next)
@@ -260,6 +279,7 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
     mutation.mutate({
       name: name.trim(),
       phone: onlyDigits(phone),
+      email: email.trim(),
       businessType,
       document: document.trim(),
       cep: cep.trim(),
@@ -268,7 +288,6 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
       neighborhood: neighborhood.trim(),
       city: city.trim(),
       state: uf.trim(),
-      welcomeMessage: welcomeMessage.trim(),
       logoUrl: logoUrl.trim(),
       socials: {
         instagram: instagram.trim() || undefined,
@@ -300,7 +319,8 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {/* Linha 1 (PC): nome, telefone, e-mail */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <Input
                 label="Nome"
                 value={name}
@@ -317,21 +337,29 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
                 placeholder="(11) 98765-4321"
                 error={errors.phone}
               />
+              <Input
+                label="E-mail"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="contato@exemplo.com"
+                error={errors.email}
+              />
             </div>
 
-            <Select
-              label="Tipo de negócio"
-              value={businessType}
-              onChange={(e) => setBusinessType(e.target.value)}
-            >
-              {BUSINESS_TYPE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {/* Linha 2 (PC): tipo de negócio, CNPJ, CEP */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <Select
+                label="Tipo de negócio"
+                value={businessType}
+                onChange={(e) => setBusinessType(e.target.value)}
+              >
+                {BUSINESS_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
               <Input
                 label="CNPJ"
                 inputMode="numeric"
@@ -359,7 +387,8 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_8rem]">
+            {/* Linha 3 (PC): endereço, número, bairro, cidade, UF */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1.6fr_0.6fr_1.1fr_1.1fr_0.5fr]">
               <Input
                 label="Endereço"
                 value={address}
@@ -372,16 +401,12 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
                 onChange={(e) => setAddressNumber(e.target.value)}
                 placeholder="Nº"
               />
-            </div>
-
-            <Input
-              label="Bairro"
-              value={neighborhood}
-              onChange={(e) => setNeighborhood(e.target.value)}
-              placeholder="Bairro"
-            />
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_6rem]">
+              <Input
+                label="Bairro"
+                value={neighborhood}
+                onChange={(e) => setNeighborhood(e.target.value)}
+                placeholder="Bairro"
+              />
               <Input
                 label="Cidade"
                 value={city}
@@ -395,14 +420,6 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
                 placeholder="UF"
               />
             </div>
-
-            <Textarea
-              label="Mensagem de boas-vindas"
-              value={welcomeMessage}
-              onChange={(e) => setWelcomeMessage(e.target.value)}
-              placeholder="Ex.: Bem-vindo! Escolha um horário e até já."
-              hint="Aparece no seu link público."
-            />
 
             <Input
               label="URL do logo (opcional)"
@@ -523,6 +540,27 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
               </Button>
             </div>
           )}
+
+          {/* Mensagem de boas-vindas exibida no topo do link público */}
+          <div className="space-y-3 border-t border-line-divider pt-4">
+            <Textarea
+              label="Mensagem de boas-vindas"
+              value={welcomeMessage}
+              onChange={(e) => setWelcomeMessage(e.target.value)}
+              placeholder="Ex.: Bem-vindo! Escolha um horário e até já."
+              hint="Aparece no topo do seu link público."
+            />
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                onClick={() => welcomeMutation.mutate(welcomeMessage.trim())}
+                isLoading={welcomeMutation.isPending}
+                leftIcon={<Save className="h-4 w-4" />}
+              >
+                Salvar mensagem
+              </Button>
+            </div>
+          </div>
 
           {/* Confirmação de agendamentos do link público */}
           <div className="flex items-start justify-between gap-4 border-t border-line-divider pt-4">

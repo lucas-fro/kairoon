@@ -14,6 +14,10 @@ const optionalText = (max: number, message: string) =>
 export const updateEstablishmentSchema = z.object({
   name: z.string().min(1, 'Informe o nome do estabelecimento').optional(),
   phone: z.string().min(1, 'Informe o telefone').optional(),
+  email: z
+    .union([z.string().email('E-mail inválido'), z.literal('')])
+    .transform((value) => (value === '' ? null : value))
+    .optional(),
   document: optionalText(20, 'Documento inválido'),
   address: optionalText(200, 'Endereço muito longo'),
   addressNumber: optionalText(20, 'Número inválido'),
