@@ -111,6 +111,7 @@ export function DashboardPage() {
           <p className="text-sm text-ink-secondary">Não foi possível carregar o resumo do dia.</p>
           <Button
             variant="outline"
+            size="sm"
             leftIcon={<RefreshCw className="h-4 w-4" />}
             isLoading={isRefetching}
             onClick={() => refetch()}

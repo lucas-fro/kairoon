@@ -19,7 +19,7 @@ export function Tabs({ tabs, active, onChange, className }: TabsProps) {
   return (
     <div
       className={cn(
-        'thin-scrollbar flex gap-1 overflow-x-auto border-b border-line-divider',
+        'thin-scrollbar flex gap-1 overflow-x-auto overflow-y-hidden border-b border-line-divider',
         className,
       )}
       role="tablist"

@@ -194,7 +194,7 @@ export function ClientsPage() {
   const errorBlock = (
     <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
       <p className="text-sm text-ink-secondary">Não foi possível carregar os clientes.</p>
-      <Button variant="outline" onClick={() => refetch()}>
+      <Button variant="outline" size="sm" onClick={() => refetch()}>
         Tentar novamente
       </Button>
     </div>
@@ -207,6 +207,7 @@ export function ClientsPage() {
   const emptyAction = hasSearch ? undefined : (
     <Button
       variant="outline"
+      size="sm"
       leftIcon={<Plus className="h-4 w-4" />}
       onClick={() => setDialogOpen(true)}
     >
@@ -220,7 +221,7 @@ export function ClientsPage() {
         title="Clientes"
         description={description}
         actions={
-          <Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => setDialogOpen(true)}>
+          <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setDialogOpen(true)}>
             Novo cliente
           </Button>
         }

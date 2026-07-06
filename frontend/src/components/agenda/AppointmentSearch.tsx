@@ -50,7 +50,7 @@ export function AppointmentSearch({ onSelect }: AppointmentSearchProps) {
           }}
           onFocus={() => setOpen(true)}
           placeholder="Buscar agendamento…"
-          className="h-10 w-full rounded-lg border border-line bg-surface pl-10 pr-9 text-sm text-ink placeholder:text-ink-tertiary focus:border-secondary focus:outline-none focus:ring-[3px] focus:ring-secondary-light"
+          className="h-8 w-full rounded-lg border border-line bg-surface pl-9 pr-8 text-[13px] text-ink placeholder:text-ink-tertiary focus:border-secondary focus:outline-none focus:ring-[3px] focus:ring-secondary-light"
         />
         {input && (
           <button

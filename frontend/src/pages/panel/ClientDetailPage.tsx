@@ -253,6 +253,7 @@ export function ClientDetailPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
+              size="sm"
               leftIcon={<Pencil className="h-4 w-4" />}
               onClick={() => setEditOpen(true)}
             >
@@ -262,7 +263,7 @@ export function ClientDetailPage() {
               href={`https://wa.me/55${onlyDigits(client.phone)}`}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line bg-surface px-4 text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/40"
+              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[13px] font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/40"
             >
               <img src="/whatsapp.svg" alt="" className="h-4 w-4" />
               WhatsApp
