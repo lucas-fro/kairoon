@@ -52,3 +52,16 @@ export function timesOverlap(startA: string, endA: string, startB: string, endB:
 export function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, '')
 }
+
+/**
+ * Valida um telefone celular brasileiro (aceita código do país 55 opcional).
+ * Exige 11 dígitos (DDD + 9 + 8 dígitos), com o 3º dígito (após o DDD) igual a
+ * 9. Não aceita telefone fixo. Rejeita celulares incompletos (10 dígitos).
+ */
+export function isValidPhone(value: string): boolean {
+  let digits = normalizePhone(value)
+  if (digits.length === 13 && digits.startsWith('55')) digits = digits.slice(2)
+  if (digits.length !== 11) return false
+  if (Number(digits.slice(0, 2)) < 11) return false // DDD válido começa em 11
+  return digits[2] === '9'
+}

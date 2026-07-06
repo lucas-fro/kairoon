@@ -26,9 +26,17 @@ export function formatPhone(value: string): string {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
 }
 
+/**
+ * Valida um telefone celular brasileiro (aceita código do país 55 opcional).
+ * Exige 11 dígitos (DDD + 9 + 8 dígitos), com o 3º dígito igual a 9. Não aceita
+ * telefone fixo.
+ */
 export function isValidPhone(value: string): boolean {
-  const digits = onlyDigits(value)
-  return digits.length === 10 || digits.length === 11
+  let digits = onlyDigits(value)
+  if (digits.length === 13 && digits.startsWith('55')) digits = digits.slice(2)
+  if (digits.length !== 11) return false
+  if (Number(digits.slice(0, 2)) < 11) return false // DDD válido começa em 11
+  return digits[2] === '9'
 }
 
 /** Formata como CPF (000.000.000-00) ou CNPJ (00.000.000/0000-00) pelo tamanho */
@@ -93,6 +101,12 @@ export function isValidCep(value: string): boolean {
 export function formatDate(dateStr: string): string {
   const [year, month, day] = dateStr.split('-')
   return `${day}/${month}/${year}`
+}
+
+/** 'YYYY-MM' → 'julho de 2026' */
+export function formatMonthLabel(month: string): string {
+  const [year, m] = month.split('-').map(Number)
+  return new Date(year, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
 }
 
 /** 'YYYY-MM-DD' → 'quinta-feira, 2 de julho' */

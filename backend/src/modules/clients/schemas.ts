@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { DATE_REGEX, isValidDateStr } from '../../lib/datetime'
-import { normalizePhone } from '../../lib/slots'
+import { isValidPhone, normalizePhone } from '../../lib/slots'
 
 const nameSchema = z.string().trim().min(2, 'Nome deve ter no mínimo 2 caracteres')
 
@@ -8,8 +8,8 @@ const phoneSchema = z
   .string()
   .min(1, 'Informe o telefone')
   .transform((value) => normalizePhone(value))
-  .refine((value) => value.length >= 10, {
-    message: 'Telefone deve ter no mínimo 10 dígitos',
+  .refine(isValidPhone, {
+    message: 'Celular inválido (informe DDD + número com 11 dígitos)',
   })
 
 const emptyToNull = <T extends z.ZodTypeAny>(schema: T) =>
