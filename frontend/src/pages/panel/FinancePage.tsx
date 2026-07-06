@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDownCircle, ArrowUpCircle, Plus, Trash2, Wallet } from 'lucide-react'
+import { ArrowDownCircle, ArrowUpCircle, Percent, Plus, Trash2, Wallet } from 'lucide-react'
 import { ApiError } from '../../api/client'
+import { getCommissionsReport } from '../../api/commissions'
 import { createTransaction, deleteTransaction, listTransactions } from '../../api/transactions'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
@@ -57,6 +58,89 @@ function StatCard({
         {value}
       </p>
     </Card>
+  )
+}
+
+/**
+ * Comissões apuradas no período, agregadas por profissional. Consulta própria
+ * (independente do fluxo de caixa) usando o mesmo intervalo de datas da página.
+ */
+function CommissionsSection({ from, to }: { from: string; to: string }) {
+  const query = useQuery({
+    queryKey: ['commissions', from, to],
+    queryFn: () => getCommissionsReport({ from, to }),
+    placeholderData: keepPreviousData,
+  })
+
+  const report = query.data
+
+  return (
+    <section className="mt-8">
+      <div className="mb-4 flex items-center gap-2">
+        <Percent className="h-[18px] w-[18px] text-ink-tertiary" strokeWidth={1.9} />
+        <h2 className="font-display text-lg font-bold text-ink">Comissões</h2>
+      </div>
+
+      {query.isPending ? (
+        <SkeletonList rows={4} />
+      ) : query.isError ? (
+        <Card className="p-8 text-center">
+          <p className="text-sm text-ink-secondary">{errorMessage(query.error)}</p>
+          <Button variant="outline" className="mt-4" onClick={() => query.refetch()}>
+            Tentar novamente
+          </Button>
+        </Card>
+      ) : !report || report.byEmployee.length === 0 ? (
+        <EmptyState
+          icon={Percent}
+          title="Nenhuma comissão no período"
+          description="Atendimentos concluídos de profissionais com comissão configurada aparecem aqui."
+        />
+      ) : (
+        <Card>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-4">
+            <p className="text-[13px] text-ink-secondary">
+              {report.summary.count}{' '}
+              {report.summary.count === 1 ? 'atendimento comissionado' : 'atendimentos comissionados'}
+            </p>
+            <p className="text-sm text-ink-secondary">
+              Total a pagar:{' '}
+              <span className="font-semibold tabular-nums text-ink">
+                {formatBRL(report.summary.totalCents)}
+              </span>
+            </p>
+          </div>
+          <Table>
+            <THead>
+              <tr>
+                <Th>Profissional</Th>
+                <Th className="w-32 text-right">Atendimentos</Th>
+                <Th className="w-40 text-right">Base</Th>
+                <Th className="w-40 text-right">Comissão</Th>
+              </tr>
+            </THead>
+            <TBody>
+              {report.byEmployee.map((row) => (
+                <Tr key={row.employeeId}>
+                  <Td className="font-medium text-ink">{row.employeeName}</Td>
+                  <Td className="whitespace-nowrap text-right tabular-nums text-ink-secondary">
+                    {row.count}
+                  </Td>
+                  <Td className="whitespace-nowrap text-right tabular-nums text-ink-secondary">
+                    {formatBRL(row.baseCents)}
+                  </Td>
+                  <Td className="whitespace-nowrap text-right">
+                    <span className="font-semibold tabular-nums text-ink">
+                      {formatBRL(row.commissionCents)}
+                    </span>
+                  </Td>
+                </Tr>
+              ))}
+            </TBody>
+          </Table>
+        </Card>
+      )}
+    </section>
   )
 }
 
@@ -316,6 +400,9 @@ export function FinancePage() {
           )}
         </>
       )}
+
+      {/* Comissões apuradas no período */}
+      <CommissionsSection from={from} to={to} />
 
       {/* Dialog: novo lançamento */}
       <Dialog

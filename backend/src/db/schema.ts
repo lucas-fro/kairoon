@@ -283,6 +283,43 @@ export const transactions = pgTable(
   (t) => [index('transactions_establishment_date_idx').on(t.establishmentId, t.date)],
 )
 
+// Comissão apurada de um agendamento concluído. Guarda um snapshot da regra
+// aplicada (tipo + valor) e do valor calculado, para preservar o histórico
+// mesmo que a configuração do profissional mude depois. Uma linha por
+// agendamento; ao reabrir/cancelar o atendimento, a linha é removida.
+export const commissionEntries = pgTable(
+  'commission_entries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    establishmentId: uuid('establishment_id')
+      .notNull()
+      .references(() => establishments.id, { onDelete: 'cascade' }),
+    appointmentId: uuid('appointment_id')
+      .notNull()
+      .references(() => appointments.id, { onDelete: 'cascade' }),
+    employeeId: uuid('employee_id')
+      .notNull()
+      .references(() => employees.id, { onDelete: 'cascade' }),
+    serviceId: uuid('service_id')
+      .notNull()
+      .references(() => services.id, { onDelete: 'cascade' }),
+    date: date('date', { mode: 'string' }).notNull(),
+    // Base de cálculo: preço do serviço no fechamento (centavos)
+    baseCents: integer('base_cents').notNull(),
+    // Snapshot da regra: 'percent' | 'fixed' e o valor (0–100 ou centavos)
+    commissionType: text('commission_type').notNull(),
+    commissionValue: integer('commission_value').notNull(),
+    // Valor apurado da comissão (centavos)
+    commissionCents: integer('commission_cents').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('commission_entries_appointment_idx').on(t.appointmentId),
+    index('commission_entries_establishment_date_idx').on(t.establishmentId, t.date),
+    index('commission_entries_employee_idx').on(t.employeeId),
+  ],
+)
+
 export const usersRelations = relations(users, ({ many }) => ({
   establishments: many(establishments),
 }))
@@ -375,5 +412,24 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
   appointment: one(appointments, {
     fields: [transactions.appointmentId],
     references: [appointments.id],
+  }),
+}))
+
+export const commissionEntriesRelations = relations(commissionEntries, ({ one }) => ({
+  establishment: one(establishments, {
+    fields: [commissionEntries.establishmentId],
+    references: [establishments.id],
+  }),
+  appointment: one(appointments, {
+    fields: [commissionEntries.appointmentId],
+    references: [appointments.id],
+  }),
+  employee: one(employees, {
+    fields: [commissionEntries.employeeId],
+    references: [employees.id],
+  }),
+  service: one(services, {
+    fields: [commissionEntries.serviceId],
+    references: [services.id],
   }),
 }))

@@ -226,6 +226,22 @@ export interface TransactionsResponse {
   }
 }
 
+export interface CommissionByEmployee {
+  employeeId: string
+  employeeName: string
+  /** quantidade de atendimentos concluídos que geraram comissão */
+  count: number
+  /** soma da base de cálculo (preço dos serviços) em centavos */
+  baseCents: number
+  /** total de comissão apurada em centavos */
+  commissionCents: number
+}
+
+export interface CommissionsReport {
+  summary: { totalCents: number; count: number }
+  byEmployee: CommissionByEmployee[]
+}
+
 export interface DashboardSummary {
   todayAppointments: number
   todayRevenueCents: number

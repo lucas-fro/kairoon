@@ -173,6 +173,8 @@ async function main() {
   if (commissionRows.length > 0) {
     await db.insert(schema.employeeCommissions).values(commissionRows)
   }
+  // Valor da comissão do Carlos por serviço, para apurar os atendimentos abaixo
+  const carlosCommissionByServiceId = new Map(commissionRows.map((r) => [r.serviceId, r.value]))
 
   // Pacote de exemplo: Corte + Barba + Sobrancelha com 15% de desconto
   const comboItems = ['Corte Masculino', 'Barba Completa', 'Sobrancelha']
@@ -304,6 +306,23 @@ async function main() {
         type: 'income',
         date,
       })
+
+      // Comissão apurada (Carlos, percentual). Serviços sem regra (ex.: Luzes)
+      // não geram comissão, replicando o comportamento do fechamento real.
+      const commissionValue = carlosCommissionByServiceId.get(service.id)
+      if (employee.commissionEnabled && commissionValue && commissionValue > 0) {
+        await db.insert(schema.commissionEntries).values({
+          establishmentId: establishment.id,
+          appointmentId: appointment.id,
+          employeeId: employee.id,
+          serviceId: service.id,
+          date,
+          baseCents: service.priceCents,
+          commissionType: employee.commissionType,
+          commissionValue,
+          commissionCents: Math.round((service.priceCents * commissionValue) / 100),
+        })
+      }
     }
   }
 

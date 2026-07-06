@@ -1,6 +1,15 @@
 import { and, asc, desc, eq, gte, ilike, inArray, like, lte, ne, or } from 'drizzle-orm'
 import { db } from '../../db'
-import { appointments, clients, employees, products, services, transactions } from '../../db/schema'
+import {
+  appointments,
+  clients,
+  commissionEntries,
+  employeeCommissions,
+  employees,
+  products,
+  services,
+  transactions,
+} from '../../db/schema'
 import { addMinutesToTime } from '../../lib/datetime'
 import { lockEmployeeDay } from '../../lib/locks'
 import { normalizePhone, timesOverlap } from '../../lib/slots'
@@ -85,6 +94,52 @@ async function buildSaleSnapshot(
       unitPriceCents: product.priceCents,
     }
   })
+}
+
+type ComputedCommission = {
+  baseCents: number
+  commissionType: string
+  commissionValue: number
+  commissionCents: number
+}
+
+/**
+ * Calcula a comissão do profissional pelo serviço executado. Base = preço do
+ * serviço (mesma lógica da prévia exibida no cadastro do profissional; não
+ * considera desconto nem produtos). Retorna null quando o profissional está
+ * sem comissão habilitada ou não há regra cadastrada para o serviço.
+ */
+async function computeCommission(
+  tx: DbTransaction,
+  employeeId: string,
+  service: { id: string; priceCents: number },
+): Promise<ComputedCommission | null> {
+  const employee = await tx.query.employees.findFirst({
+    where: eq(employees.id, employeeId),
+    columns: { commissionEnabled: true, commissionType: true },
+  })
+  if (!employee?.commissionEnabled) return null
+
+  const rule = await tx.query.employeeCommissions.findFirst({
+    where: and(
+      eq(employeeCommissions.employeeId, employeeId),
+      eq(employeeCommissions.serviceId, service.id),
+    ),
+  })
+  if (!rule || rule.value <= 0) return null
+
+  const baseCents = service.priceCents
+  const commissionCents =
+    employee.commissionType === 'percent'
+      ? Math.round((baseCents * rule.value) / 100)
+      : rule.value
+
+  return {
+    baseCents,
+    commissionType: employee.commissionType,
+    commissionValue: rule.value,
+    commissionCents,
+  }
 }
 
 async function assertNoConflict(
@@ -424,6 +479,31 @@ export async function updateAppointment(
             eq(transactions.establishmentId, establishmentId),
           ),
         )
+    }
+
+    // Sincronização da comissão: atendimento concluído gera (ou recalcula) a
+    // comissão do profissional pelo serviço; reabrir/cancelar remove a
+    // apuração. Recalcular via delete+insert cobre troca de profissional,
+    // remarcação (nova data) e mudança da regra desde a última conclusão.
+    await tx.delete(commissionEntries).where(eq(commissionEntries.appointmentId, id))
+    if (newStatus === 'completed') {
+      const commission = await computeCommission(tx, newEmployeeId, {
+        id: appointment.serviceId,
+        priceCents: appointment.service.priceCents,
+      })
+      if (commission) {
+        await tx.insert(commissionEntries).values({
+          establishmentId,
+          appointmentId: id,
+          employeeId: newEmployeeId,
+          serviceId: appointment.serviceId,
+          date: updated.date,
+          baseCents: commission.baseCents,
+          commissionType: commission.commissionType,
+          commissionValue: commission.commissionValue,
+          commissionCents: commission.commissionCents,
+        })
+      }
     }
   })
 

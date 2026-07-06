@@ -8,6 +8,7 @@ import { authPlugin } from './plugins/auth'
 import { appointmentsRoutes } from './modules/appointments/routes'
 import { authRoutes } from './modules/auth/routes'
 import { clientsRoutes } from './modules/clients/routes'
+import { commissionsRoutes } from './modules/commissions/routes'
 import { dashboardRoutes } from './modules/dashboard/routes'
 import { employeesRoutes } from './modules/employees/routes'
 import { establishmentRoutes } from './modules/establishment/routes'
@@ -65,6 +66,7 @@ export async function buildApp() {
   await app.register(transactionsRoutes, { prefix: '/transactions' })
   await app.register(dashboardRoutes, { prefix: '/dashboard' })
   await app.register(reportsRoutes, { prefix: '/reports' })
+  await app.register(commissionsRoutes, { prefix: '/commissions' })
   await app.register(publicRoutes, { prefix: '/public' })
   await app.register(realtimeRoutes, { prefix: '/realtime' })
 
