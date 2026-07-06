@@ -12,7 +12,7 @@ import {
 } from '../../db/schema'
 import { addMinutesToTime } from '../../lib/datetime'
 import { lockEmployeeDay } from '../../lib/locks'
-import { normalizePhone, timesOverlap } from '../../lib/slots'
+import { isValidPhone, normalizePhone, timesOverlap } from '../../lib/slots'
 import { AppError } from '../../lib/errors'
 import type {
   CreateAppointmentInput,
@@ -142,7 +142,8 @@ async function computeCommission(
   }
 }
 
-async function assertNoConflict(
+// Exportada para reuso pelo módulo de fila de espera (promoção → agendamento).
+export async function assertNoConflict(
   tx: DbTransaction,
   params: {
     establishmentId: string
@@ -269,8 +270,8 @@ export async function createAppointment(establishmentId: string, input: CreateAp
       if (!input.clientName || !input.clientPhone) {
         throw new AppError('Informe o nome e telefone do cliente', 400)
       }
+      if (!isValidPhone(input.clientPhone)) throw new AppError('Telefone inválido', 400)
       const phone = normalizePhone(input.clientPhone)
-      if (phone.length < 10 || phone.length > 13) throw new AppError('Telefone inválido', 400)
 
       let client = await tx.query.clients.findFirst({
         where: and(eq(clients.establishmentId, establishmentId), eq(clients.phone, phone)),

@@ -15,9 +15,11 @@ import { establishmentRoutes } from './modules/establishment/routes'
 import { productsRoutes } from './modules/products/routes'
 import { publicRoutes } from './modules/public/routes'
 import { realtimeRoutes } from './modules/realtime/routes'
+import { recurringExpensesRoutes } from './modules/recurringExpenses/routes'
 import { reportsRoutes } from './modules/reports/routes'
 import { servicesRoutes } from './modules/services/routes'
 import { transactionsRoutes } from './modules/transactions/routes'
+import { waitlistRoutes } from './modules/waitlist/routes'
 
 export async function buildApp() {
   const app = Fastify({ logger: true })
@@ -63,7 +65,9 @@ export async function buildApp() {
   await app.register(employeesRoutes, { prefix: '/employees' })
   await app.register(clientsRoutes, { prefix: '/clients' })
   await app.register(appointmentsRoutes, { prefix: '/appointments' })
+  await app.register(waitlistRoutes, { prefix: '/waitlist' })
   await app.register(transactionsRoutes, { prefix: '/transactions' })
+  await app.register(recurringExpensesRoutes, { prefix: '/recurring-expenses' })
   await app.register(dashboardRoutes, { prefix: '/dashboard' })
   await app.register(reportsRoutes, { prefix: '/reports' })
   await app.register(commissionsRoutes, { prefix: '/commissions' })
