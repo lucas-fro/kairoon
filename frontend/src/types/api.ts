@@ -42,6 +42,8 @@ export interface Establishment {
   slug: string
   logoUrl: string | null
   themeColor: string
+  bannerImageUrl: string | null
+  footerMessage: string | null
   welcomeMessage: string | null
   businessType: BusinessType | string
   phone: string | null
@@ -89,6 +91,7 @@ export interface Product {
   stockQuantity: number
   active: boolean
   brand: string | null
+  supplier: string | null
   description: string | null
   sku: string | null
   barcode: string | null
@@ -131,7 +134,26 @@ export interface Employee {
   commissionEnabled: boolean
   commissionType: CommissionType
   commissions: EmployeeCommission[]
+  // Folha de pagamento (opcional)
+  salaryCents: number | null
+  bonuses: EmployeeBonus[]
+  vrCents: number | null
+  vtCents: number | null
+  vaCents: number | null
+  paymentDays: EmployeePaymentDay[]
   createdAt: string
+}
+
+export interface EmployeeBonus {
+  label: string
+  amountCents: number
+}
+
+export interface EmployeePaymentDay {
+  /** dia do mês (1–31) */
+  day: number
+  /** valor pago neste dia (centavos) */
+  amountCents: number
 }
 
 export interface TimeBlock {
@@ -205,6 +227,19 @@ export interface Appointment {
   employee: { id: string; name: string }
 }
 
+export type WaitlistStatus = 'waiting' | 'scheduled'
+
+export interface WaitlistEntry {
+  id: string
+  targetDate: string
+  note: string | null
+  status: WaitlistStatus
+  createdAt: string
+  client: { id: string; name: string; phone: string }
+  service: { id: string; name: string; durationMinutes: number; priceCents: number }
+  preferredEmployee: { id: string; name: string } | null
+}
+
 export type TransactionType = 'income' | 'expense'
 
 export interface Transaction {
@@ -214,7 +249,49 @@ export interface Transaction {
   type: TransactionType
   date: string
   appointmentId: string | null
+  recurringExpenseId?: string | null
   createdAt: string
+}
+
+export interface RecurringExpense {
+  id: string
+  description: string
+  amountCents: number
+  /** dia do vencimento (1–31) */
+  dayOfMonth: number
+  active: boolean
+  createdAt: string
+}
+
+export interface RecurringExpenseForecastItem {
+  /** 'expense' = custo fixo manual; 'payroll' = pagamento (folha) de um profissional */
+  kind: 'expense' | 'payroll'
+  /** id do custo fixo ('expense') ou sintético 'employeeId:day' ('payroll') */
+  id: string
+  employeeId: string | null
+  description: string
+  amountCents: number
+  dayOfMonth: number
+  /** vencimento no mês consultado ('YYYY-MM-DD') */
+  dueDate: string
+  /** true quando já foi baixado (lançado no caixa) no mês */
+  posted: boolean
+  transactionId: string | null
+  paidDate: string | null
+  /** só em payroll: comissão do profissional no mês (informativo) */
+  commissionCents: number | null
+}
+
+export interface RecurringExpenseForecast {
+  month: string
+  items: RecurringExpenseForecastItem[]
+  summary: {
+    totalCents: number
+    postedCents: number
+    pendingCents: number
+    count: number
+    pendingCount: number
+  }
 }
 
 export interface TransactionsResponse {
@@ -291,6 +368,16 @@ export interface AuthResponse {
   establishment: Establishment
 }
 
+export interface PublicBranding {
+  /** Cor de marca efetiva (sistema no grátis, personalizada no pago) */
+  brandColor: string
+  bannerImageUrl: string | null
+  /** true no plano grátis: mostra "Agendamento feito pela Kairoon" */
+  showKairoonWatermark: boolean
+  /** mensagem de rodapé personalizada (plano pago) */
+  footerMessage: string | null
+}
+
 export interface PublicEstablishment {
   establishment: {
     id: string
@@ -303,6 +390,7 @@ export interface PublicEstablishment {
     businessType: string
     socials: Socials | null
   }
+  branding: PublicBranding
   services: {
     id: string
     name: string

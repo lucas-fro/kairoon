@@ -1,0 +1,1 @@
+ALTER TABLE "transactions" ADD COLUMN "payroll_day" integer;

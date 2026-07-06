@@ -24,6 +24,9 @@ export const createdViaEnum = pgEnum('created_via', ['panel', 'public'])
 
 export const transactionTypeEnum = pgEnum('transaction_type', ['income', 'expense'])
 
+// Fila de espera: 'waiting' aguardando encaixe; 'scheduled' já virou agendamento.
+export const waitlistStatusEnum = pgEnum('waitlist_status', ['waiting', 'scheduled'])
+
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
@@ -45,6 +48,9 @@ export const establishments = pgTable('establishments', {
   slug: text('slug').notNull().unique(),
   logoUrl: text('logo_url'),
   themeColor: text('theme_color').notNull().default('#0F4C5C'),
+  // Personalização da página pública (plano pago). Imagens são URLs (sem upload).
+  bannerImageUrl: text('banner_image_url'),
+  footerMessage: text('footer_message'),
   welcomeMessage: text('welcome_message'),
   businessType: text('business_type').notNull().default('outro'),
   phone: text('phone'),
@@ -144,6 +150,22 @@ export const employees = pgTable('employees', {
   // como interpretar os valores por serviço em employee_commissions.
   commissionEnabled: boolean('commission_enabled').notNull().default(false),
   commissionType: text('commission_type').notNull().default('percent'),
+  // Folha de pagamento — usada na previsão de custos fixos e na futura folha
+  // salarial. Valores em centavos; bônus é uma lista de itens nomeados.
+  salaryCents: integer('salary_cents'),
+  bonuses: jsonb('bonuses')
+    .$type<{ label: string; amountCents: number }[]>()
+    .notNull()
+    .default([]),
+  vrCents: integer('vr_cents'),
+  vtCents: integer('vt_cents'),
+  vaCents: integer('va_cents'),
+  // 1 ou 2 dias de pagamento no mês; cada um com o valor pago naquele dia
+  // (ex.: bônus no dia 20 e salário no dia 5). Vazio = não entra na folha.
+  paymentDays: jsonb('payment_days')
+    .$type<{ day: number; amountCents: number }[]>()
+    .notNull()
+    .default([]),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -179,6 +201,7 @@ export const products = pgTable('products', {
   active: boolean('active').notNull().default(true),
   // Campos opcionais do produto
   brand: text('brand'),
+  supplier: text('supplier'),
   description: text('description'),
   sku: text('sku'),
   barcode: text('barcode'),
@@ -264,6 +287,46 @@ export const appointments = pgTable(
   (t) => [index('appointments_establishment_date_idx').on(t.establishmentId, t.date)],
 )
 
+// Fila de espera (dia cheio): o dono enfileira o cliente e, ao abrir vaga,
+// "encaixa" (promove) a entrada em um agendamento. Só no painel.
+export const waitlistEntries = pgTable(
+  'waitlist_entries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    establishmentId: uuid('establishment_id')
+      .notNull()
+      .references(() => establishments.id, { onDelete: 'cascade' }),
+    clientId: uuid('client_id')
+      .notNull()
+      .references(() => clients.id, { onDelete: 'cascade' }),
+    // cascade (não restrict): apagar um serviço não deve travar por causa de
+    // uma linha transitória na fila.
+    serviceId: uuid('service_id')
+      .notNull()
+      .references(() => services.id, { onDelete: 'cascade' }),
+    // Profissional preferido (opcional); null = qualquer um.
+    preferredEmployeeId: uuid('preferred_employee_id').references(() => employees.id, {
+      onDelete: 'set null',
+    }),
+    // Dia desejado ('YYYY-MM-DD'); default hoje no service.
+    targetDate: date('target_date', { mode: 'string' }).notNull(),
+    note: text('note'),
+    status: waitlistStatusEnum('status').notNull().default('waiting'),
+    // Preenchido ao promover para agendamento.
+    scheduledAppointmentId: uuid('scheduled_appointment_id').references(() => appointments.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('waitlist_entries_establishment_status_date_idx').on(
+      t.establishmentId,
+      t.status,
+      t.targetDate,
+    ),
+  ],
+)
+
 export const transactions = pgTable(
   'transactions',
   {
@@ -274,13 +337,48 @@ export const transactions = pgTable(
     appointmentId: uuid('appointment_id').references(() => appointments.id, {
       onDelete: 'set null',
     }),
+    // Preenchido quando a saída é a "baixa" de um custo fixo recorrente do mês.
+    // set null: apagar o custo fixo mantém o lançamento histórico no caixa.
+    recurringExpenseId: uuid('recurring_expense_id').references(() => recurringExpenses.id, {
+      onDelete: 'set null',
+    }),
+    // Preenchido quando a saída é o pagamento (folha) de um profissional no mês.
+    employeeId: uuid('employee_id').references(() => employees.id, { onDelete: 'set null' }),
+    // Dia de pagamento configurado que originou esta baixa de folha (1–31).
+    // Identifica a parcela mesmo quando o vencimento "encurta" para o mesmo dia
+    // do mês (ex.: dias 30 e 31 em fevereiro caem ambos no último dia).
+    payrollDay: integer('payroll_day'),
     description: text('description').notNull(),
     amountCents: integer('amount_cents').notNull(),
     type: transactionTypeEnum('type').notNull(),
     date: date('date', { mode: 'string' }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index('transactions_establishment_date_idx').on(t.establishmentId, t.date)],
+  (t) => [
+    index('transactions_establishment_date_idx').on(t.establishmentId, t.date),
+    index('transactions_recurring_expense_idx').on(t.recurringExpenseId),
+    index('transactions_employee_idx').on(t.employeeId),
+  ],
+)
+
+// Custos fixos recorrentes (aluguel, energia, salários...). Servem para prever
+// as saídas do mês e gerar o lançamento no caixa quando "baixados" (uma
+// transação com recurring_expense_id apontando para a linha aqui).
+export const recurringExpenses = pgTable(
+  'recurring_expenses',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    establishmentId: uuid('establishment_id')
+      .notNull()
+      .references(() => establishments.id, { onDelete: 'cascade' }),
+    description: text('description').notNull(),
+    amountCents: integer('amount_cents').notNull(),
+    // Dia do vencimento (1–31). Em meses mais curtos é ajustado ao último dia.
+    dayOfMonth: integer('day_of_month').notNull().default(1),
+    active: boolean('active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('recurring_expenses_establishment_idx').on(t.establishmentId)],
 )
 
 // Comissão apurada de um agendamento concluído. Guarda um snapshot da regra
@@ -334,6 +432,7 @@ export const establishmentsRelations = relations(establishments, ({ one, many })
   transactions: many(transactions),
   timeBlocks: many(timeBlocks),
   products: many(products),
+  recurringExpenses: many(recurringExpenses),
 }))
 
 export const productsRelations = relations(products, ({ one }) => ({
@@ -413,6 +512,17 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
     fields: [transactions.appointmentId],
     references: [appointments.id],
   }),
+  recurringExpense: one(recurringExpenses, {
+    fields: [transactions.recurringExpenseId],
+    references: [recurringExpenses.id],
+  }),
+}))
+
+export const recurringExpensesRelations = relations(recurringExpenses, ({ one }) => ({
+  establishment: one(establishments, {
+    fields: [recurringExpenses.establishmentId],
+    references: [establishments.id],
+  }),
 }))
 
 export const commissionEntriesRelations = relations(commissionEntries, ({ one }) => ({
@@ -431,5 +541,22 @@ export const commissionEntriesRelations = relations(commissionEntries, ({ one })
   service: one(services, {
     fields: [commissionEntries.serviceId],
     references: [services.id],
+  }),
+}))
+
+export const waitlistEntriesRelations = relations(waitlistEntries, ({ one }) => ({
+  establishment: one(establishments, {
+    fields: [waitlistEntries.establishmentId],
+    references: [establishments.id],
+  }),
+  client: one(clients, { fields: [waitlistEntries.clientId], references: [clients.id] }),
+  service: one(services, { fields: [waitlistEntries.serviceId], references: [services.id] }),
+  preferredEmployee: one(employees, {
+    fields: [waitlistEntries.preferredEmployeeId],
+    references: [employees.id],
+  }),
+  scheduledAppointment: one(appointments, {
+    fields: [waitlistEntries.scheduledAppointmentId],
+    references: [appointments.id],
   }),
 }))
