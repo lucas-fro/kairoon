@@ -1,13 +1,6 @@
-import { useMemo } from 'react'
-import type { CSSProperties } from 'react'
-import {
-  WEEKDAY_LABELS_SHORT,
-  getDayOfWeek,
-  minutesToTime,
-  timeToMinutes,
-  todayStr,
-} from '../../lib/dates'
-import { cn, formatDate } from '../../lib/format'
+import type { CSSProperties, ReactNode } from 'react'
+import { minutesToTime, timeToMinutes } from '../../lib/dates'
+import { cn } from '../../lib/format'
 import type { Appointment, AppointmentStatus } from '../../types/api'
 import { SLOT_MINUTES } from './timeOptions'
 
@@ -22,7 +15,7 @@ const statusClasses: Record<AppointmentStatus, string> = {
   cancelled: 'bg-error-light/60 text-error-dark line-through opacity-70 hover:opacity-90',
 }
 
-/** Padrão sutil (hachura) para colunas de dias fechados, só com tokens */
+/** Padrão sutil (hachura) para colunas fechadas, só com tokens */
 const CLOSED_PATTERN_CLASS =
   'bg-[repeating-linear-gradient(135deg,transparent,transparent_6px,theme(colors.line.divider)_6px,theme(colors.line.divider)_7px)]'
 
@@ -33,7 +26,7 @@ interface LanePosition {
 
 /**
  * Distribui agendamentos que se sobrepõem em "faixas" lado a lado dentro da
- * coluna do dia, para nenhum bloco cobrir outro por completo.
+ * coluna, para nenhum bloco cobrir outro por completo.
  */
 function computeLanes(dayAppointments: Appointment[]): Map<string, LanePosition> {
   const result = new Map<string, LanePosition>()
@@ -83,46 +76,41 @@ function computeLanes(dayAppointments: Appointment[]): Map<string, LanePosition>
   return result
 }
 
-interface WeekGridProps {
-  /** Dias exibidos (1 = visão dia, 7 = visão semana), strings 'YYYY-MM-DD' */
-  weekDays: string[]
+/** Uma coluna da grade: um dia (visão semana) ou um profissional (visão dia). */
+export interface GridColumn {
+  key: string
+  /** Conteúdo do cabeçalho da coluna (dia+número, ou avatar+nome) */
+  header: ReactNode
   appointments: Appointment[]
-  /** Dias da semana fechados (0=domingo … 6=sábado) */
-  closedWeekdays: Set<number>
+  isClosed: boolean
+  /** Se é o dia de hoje: desenha a linha do horário atual nesta coluna */
+  isToday: boolean
+  /** Rótulo usado no aria-label dos slots clicáveis */
+  slotLabel: string
+  onSlotClick: (startTime: string) => void
+}
+
+interface WeekGridProps {
+  columns: GridColumn[]
   startMinutes: number
   endMinutes: number
-  /** Mostra o nome do profissional no bloco (filtro "Todos" com >1 funcionário) */
+  /** Mostra o nome do profissional no bloco (visão semana, filtro "Todos") */
   showEmployee: boolean
   /** Minuto atual do dia para a linha do tempo (null = não exibir) */
   nowMinutes: number | null
-  onSlotClick: (date: string, startTime: string) => void
   onAppointmentClick: (appointment: Appointment) => void
 }
 
 export function WeekGrid({
-  weekDays,
-  appointments,
-  closedWeekdays,
+  columns,
   startMinutes,
   endMinutes,
   showEmployee,
   nowMinutes,
-  onSlotClick,
   onAppointmentClick,
 }: WeekGridProps) {
-  const today = todayStr()
   const slotCount = Math.max(1, Math.ceil((endMinutes - startMinutes) / SLOT_MINUTES))
   const totalHeight = slotCount * SLOT_HEIGHT_PX
-
-  const appointmentsByDay = useMemo(() => {
-    const map = new Map<string, Appointment[]>()
-    for (const appointment of appointments) {
-      const list = map.get(appointment.date)
-      if (list) list.push(appointment)
-      else map.set(appointment.date, [appointment])
-    }
-    return map
-  }, [appointments])
 
   // Marcas de hora + o horário de fechamento no fim da grade
   const hourMarks: number[] = []
@@ -137,35 +125,22 @@ export function WeekGrid({
         <div
           className="grid"
           style={{
-            gridTemplateColumns: `3.5rem repeat(${weekDays.length}, minmax(0, 1fr))`,
-            minWidth: weekDays.length >= 4 ? 900 : undefined,
+            gridTemplateColumns: `3.5rem repeat(${columns.length}, minmax(0, 1fr))`,
+            minWidth: columns.length >= 4 ? 900 : undefined,
           }}
         >
           {/* Canto superior esquerdo */}
           <div className="sticky left-0 top-0 z-30 border-b border-line-divider bg-surface" />
 
-          {/* Cabeçalhos dos dias */}
-          {weekDays.map((date) => {
-            const isToday = date === today
-            return (
-              <div
-                key={date}
-                className="sticky top-0 z-20 border-b border-l border-line-divider bg-surface px-2 py-2 text-center"
-              >
-                <p className="text-[11px] font-medium text-ink-tertiary">
-                  {WEEKDAY_LABELS_SHORT[getDayOfWeek(date)]}
-                </p>
-                <span
-                  className={cn(
-                    'mx-auto mt-1 flex h-6 items-center justify-center text-sm font-semibold',
-                    isToday ? 'w-6 rounded-full bg-primary text-white' : 'text-ink',
-                  )}
-                >
-                  {Number(date.slice(8, 10))}
-                </span>
-              </div>
-            )
-          })}
+          {/* Cabeçalhos das colunas */}
+          {columns.map((column) => (
+            <div
+              key={column.key}
+              className="sticky top-0 z-20 border-b border-l border-line-divider bg-surface px-2 py-2 text-center"
+            >
+              {column.header}
+            </div>
+          ))}
 
           {/* Coluna de horários (fixa à esquerda) */}
           <div
@@ -190,18 +165,16 @@ export function WeekGrid({
             </div>
           </div>
 
-          {/* Colunas dos dias */}
-          {weekDays.map((date) => {
-            const isClosed = closedWeekdays.has(getDayOfWeek(date))
-            const dayAppointments = appointmentsByDay.get(date) ?? []
-            const lanes = computeLanes(dayAppointments)
+          {/* Colunas */}
+          {columns.map((column) => {
+            const lanes = computeLanes(column.appointments)
 
             return (
               <div
-                key={date}
+                key={column.key}
                 className={cn(
                   'relative border-b border-l border-line-divider',
-                  isClosed && cn('bg-background', CLOSED_PATTERN_CLASS),
+                  column.isClosed && cn('bg-background', CLOSED_PATTERN_CLASS),
                 )}
                 style={{ height: totalHeight }}
               >
@@ -213,12 +186,12 @@ export function WeekGrid({
                     <button
                       key={minutes}
                       type="button"
-                      disabled={isClosed}
-                      onClick={() => onSlotClick(date, time)}
+                      disabled={column.isClosed}
+                      onClick={() => column.onSlotClick(time)}
                       aria-label={
-                        isClosed
-                          ? `Fechado em ${formatDate(date)}`
-                          : `Novo agendamento em ${formatDate(date)} às ${time}`
+                        column.isClosed
+                          ? `Indisponível — ${column.slotLabel}`
+                          : `Novo agendamento — ${column.slotLabel} às ${time}`
                       }
                       className={cn(
                         'absolute inset-x-0 border-t transition-colors duration-150',
@@ -226,7 +199,7 @@ export function WeekGrid({
                           ? 'border-dashed border-line-divider'
                           : 'border-transparent',
                         index === 0 && 'border-transparent',
-                        isClosed ? 'cursor-default' : 'hover:bg-secondary-light/50',
+                        column.isClosed ? 'cursor-default' : 'hover:bg-secondary-light/50',
                       )}
                       style={{ top: index * SLOT_HEIGHT_PX, height: SLOT_HEIGHT_PX }}
                     />
@@ -234,7 +207,7 @@ export function WeekGrid({
                 })}
 
                 {/* Blocos de agendamento */}
-                {dayAppointments.map((appointment) => {
+                {column.appointments.map((appointment) => {
                   const rawStart = timeToMinutes(appointment.startTime)
                   const rawEnd = timeToMinutes(appointment.endTime)
                   const start = Math.max(rawStart, startMinutes)
@@ -244,6 +217,10 @@ export function WeekGrid({
                   const position = lanes.get(appointment.id) ?? { lane: 0, lanes: 1 }
                   const widthPercent = 100 / position.lanes
                   const blockHeight = (end - start) * PX_PER_MINUTE - 2
+                  // Blocos curtos (ex.: 15min) não comportam as duas linhas; nesse
+                  // caso mostramos só horário+nome centralizado e revelamos o
+                  // serviço no hover, quando o bloco cresce.
+                  const isShort = blockHeight < 44
                   // Ao passar o mouse, blocos curtos crescem para baixo até
                   // caber todo o conteúdo (sem afetar blocos já altos).
                   const expandedHeight = Math.max(blockHeight, showEmployee ? 60 : 46)
@@ -262,8 +239,9 @@ export function WeekGrid({
                       onClick={() => onAppointmentClick(appointment)}
                       title={`${appointment.startTime} · ${appointment.client.name} · ${appointment.service.name}`}
                       className={cn(
-                        'absolute z-[1] flex h-[var(--block-h)] flex-col overflow-hidden px-2 py-1 text-left leading-tight shadow-card',
+                        'group absolute z-[1] flex h-[var(--block-h)] flex-col overflow-hidden px-2 text-left leading-tight shadow-card',
                         'transition-all duration-200 ease-out hover:z-30 hover:h-[var(--block-hh)] hover:shadow-soft',
+                        isShort ? 'justify-center py-0 hover:justify-start hover:py-1' : 'py-1',
                         statusClasses[appointment.status],
                       )}
                       style={blockStyle}
@@ -272,7 +250,12 @@ export function WeekGrid({
                         <span className="font-semibold">{appointment.startTime}</span>{' '}
                         <span className="font-medium">{appointment.client.name}</span>
                       </span>
-                      <span className="w-full truncate text-[11px] opacity-80">
+                      <span
+                        className={cn(
+                          'w-full truncate text-[11px] opacity-80',
+                          isShort && 'hidden group-hover:block',
+                        )}
+                      >
                         {appointment.service.name}
                         {showEmployee && ` · ${appointment.employee.name}`}
                       </span>
@@ -280,8 +263,8 @@ export function WeekGrid({
                   )
                 })}
 
-                {/* Linha do horário atual (somente na coluna de hoje) */}
-                {date === today &&
+                {/* Linha do horário atual (nas colunas de hoje) */}
+                {column.isToday &&
                   nowMinutes !== null &&
                   nowMinutes >= startMinutes &&
                   nowMinutes <= endMinutes && (

@@ -1,21 +1,31 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarPlus, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CalendarPlus, ChevronLeft, ChevronRight, Clock, Zap } from 'lucide-react'
 import { listAppointments } from '../../api/appointments'
 import { listEmployees } from '../../api/employees'
 import { getWorkingHours } from '../../api/establishment'
 import { listServices } from '../../api/services'
+import { listWaitlist } from '../../api/waitlist'
 import { AppointmentDetailsDialog } from '../../components/agenda/AppointmentDetailsDialog'
 import { AppointmentSearch } from '../../components/agenda/AppointmentSearch'
 import { MonthGrid } from '../../components/agenda/MonthGrid'
 import { NewAppointmentDialog } from '../../components/agenda/NewAppointmentDialog'
-import { WeekGrid } from '../../components/agenda/WeekGrid'
+import { WaitlistDialog } from '../../components/agenda/WaitlistDialog'
+import { WaitlistPromoteDialog } from '../../components/agenda/WaitlistPromoteDialog'
+import { WalkInDialog } from '../../components/agenda/WalkInDialog'
+import { WeekGrid, type GridColumn } from '../../components/agenda/WeekGrid'
+import {
+  PendingAppointmentDialog,
+  toPendingView,
+} from '../../components/realtime/PendingAppointmentDialog'
+import type { PendingAppointmentView } from '../../components/realtime/PendingAppointmentDialog'
 import { Button } from '../../components/ui/Button'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Select } from '../../components/ui/Select'
 import { Skeleton } from '../../components/ui/Skeleton'
 import {
   MONTH_LABELS,
+  WEEKDAY_LABELS_SHORT,
   addDays,
   getDayOfWeek,
   getWeekDays,
@@ -23,8 +33,8 @@ import {
   timeToMinutes,
   todayStr,
 } from '../../lib/dates'
-import { cn, formatDateLong } from '../../lib/format'
-import type { Appointment } from '../../types/api'
+import { cn, formatDate, formatDateLong } from '../../lib/format'
+import type { Appointment, WaitlistEntry } from '../../types/api'
 
 type ViewMode = 'day' | 'week' | 'month'
 
@@ -77,7 +87,15 @@ export function AgendaPage() {
   const [refDate, setRefDate] = useState(() => todayStr())
   const [employeeFilter, setEmployeeFilter] = useState('')
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
-  const [newDialog, setNewDialog] = useState<{ date?: string; time?: string } | null>(null)
+  const [pendingAppt, setPendingAppt] = useState<PendingAppointmentView | null>(null)
+  const [walkInOpen, setWalkInOpen] = useState(false)
+  const [waitlistOpen, setWaitlistOpen] = useState(false)
+  const [promoteEntry, setPromoteEntry] = useState<WaitlistEntry | null>(null)
+  const [newDialog, setNewDialog] = useState<{
+    date?: string
+    time?: string
+    employeeId?: string
+  } | null>(null)
 
   // Minuto atual do dia para a linha do tempo, atualizado de 5 em 5 minutos
   const [nowMin, setNowMin] = useState(() => {
@@ -106,6 +124,11 @@ export function AgendaPage() {
   const workingHoursQuery = useQuery({ queryKey: ['working-hours'], queryFn: getWorkingHours })
   const employeesQuery = useQuery({ queryKey: ['employees'], queryFn: listEmployees })
   const servicesQuery = useQuery({ queryKey: ['services'], queryFn: listServices })
+  const waitlistQuery = useQuery({
+    queryKey: ['waitlist'],
+    queryFn: () => listWaitlist({ status: 'waiting' }),
+  })
+  const waitlistCount = waitlistQuery.data?.length ?? 0
 
   const appointmentsQuery = useQuery({
     queryKey: ['appointments', view, range.start, range.end, employeeFilter],
@@ -139,10 +162,85 @@ export function AgendaPage() {
   const activeEmployees = employees.filter((e) => e.active)
   const isLoading = workingHoursQuery.isPending || appointmentsQuery.isPending
 
+  // Colunas da grade: na visão semana, uma por dia; na visão dia, uma por
+  // profissional (com nome + avatar no topo) mostrando o dia selecionado.
+  const columns: GridColumn[] = useMemo(() => {
+    const appts = appointmentsQuery.data ?? []
+    const today = todayStr()
+    const active = (employeesQuery.data ?? []).filter((e) => e.active)
+
+    if (view === 'day') {
+      const cols = employeeFilter ? active.filter((e) => e.id === employeeFilter) : active
+      const weekday = getDayOfWeek(refDate)
+      const establishmentClosed = closedWeekdays.has(weekday)
+      return cols.map((emp) => ({
+        key: emp.id,
+        header: (
+          <div className="flex flex-col items-center gap-1">
+            {emp.photoUrl ? (
+              <img
+                src={emp.photoUrl}
+                alt={emp.name}
+                className="h-7 w-7 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-white">
+                {emp.name.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <span className="w-full truncate text-[11px] font-medium text-ink">{emp.name}</span>
+          </div>
+        ),
+        appointments: appts.filter((a) => a.employee.id === emp.id),
+        isClosed: establishmentClosed || !emp.workDays.includes(weekday),
+        isToday: refDate === today,
+        slotLabel: emp.name,
+        onSlotClick: (time: string) => setNewDialog({ date: refDate, time, employeeId: emp.id }),
+      }))
+    }
+
+    return range.days.map((date) => {
+      const isToday = date === today
+      return {
+        key: date,
+        header: (
+          <>
+            <p className="text-[11px] font-medium text-ink-tertiary">
+              {WEEKDAY_LABELS_SHORT[getDayOfWeek(date)]}
+            </p>
+            <span
+              className={cn(
+                'mx-auto mt-1 flex h-6 items-center justify-center text-sm font-semibold',
+                isToday ? 'w-6 rounded-full bg-primary text-white' : 'text-ink',
+              )}
+            >
+              {Number(date.slice(8, 10))}
+            </span>
+          </>
+        ),
+        appointments: appts.filter((a) => a.date === date),
+        isClosed: closedWeekdays.has(getDayOfWeek(date)),
+        isToday,
+        slotLabel: formatDate(date),
+        onSlotClick: (time: string) =>
+          setNewDialog({ date, time, employeeId: employeeFilter || undefined }),
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, range.days, appointmentsQuery.data, employeesQuery.data, employeeFilter, closedWeekdays, refDate])
+
+  const showEmployeeInBlock = view === 'week' && activeEmployees.length > 1 && !employeeFilter
+
   function navigate(delta: number) {
     if (view === 'day') setRefDate((d) => addDays(d, delta))
     else if (view === 'week') setRefDate((d) => addDays(d, delta * 7))
     else setRefDate((d) => addMonths(d, delta))
+  }
+
+  // Pendente abre o popup de aprovação (aceitar/recusar); os demais, os detalhes.
+  function openAppointment(appointment: Appointment) {
+    if (appointment.status === 'pending') setPendingAppt(toPendingView(appointment))
+    else setSelectedAppointment(appointment)
   }
 
   const periodLabel =
@@ -153,7 +251,7 @@ export function AgendaPage() {
         : `${MONTH_LABELS[Number(refDate.slice(5, 7)) - 1]} de ${refDate.slice(0, 4)}`
 
   return (
-    <div className={cn('flex flex-col', view !== 'month' && 'lg:h-[calc(100vh-4rem)]')}>
+    <div className={cn('flex flex-col', view !== 'month' && 'lg:h-[calc(100vh-6rem)]')}>
       <PageHeader
         title="Agenda"
         description="Veja por dia, semana ou mês. Clique em um horário para agendar."
@@ -163,17 +261,37 @@ export function AgendaPage() {
               onSelect={(appointment) => {
                 setRefDate(appointment.date)
                 setView('week')
-                setSelectedAppointment(appointment)
+                openAppointment(appointment)
               }}
             />
-            <Button leftIcon={<CalendarPlus className="h-4 w-4" />} onClick={() => setNewDialog({})}>
+            <Button
+              size="sm"
+              variant="outline"
+              leftIcon={<Clock className="h-4 w-4" />}
+              onClick={() => setWaitlistOpen(true)}
+            >
+              Fila de espera{waitlistCount > 0 ? ` (${waitlistCount})` : ''}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              leftIcon={<Zap className="h-4 w-4" />}
+              onClick={() => setWalkInOpen(true)}
+            >
+              Atender agora
+            </Button>
+            <Button
+              size="sm"
+              leftIcon={<CalendarPlus className="h-4 w-4" />}
+              onClick={() => setNewDialog({ employeeId: employeeFilter || undefined })}
+            >
               Novo agendamento
             </Button>
           </>
         }
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="mb-3 flex flex-wrap items-center gap-3">
         <div className="inline-flex items-center">
           <Button
             variant="outline"
@@ -225,23 +343,13 @@ export function AgendaPage() {
         </div>
 
         <div className="ml-auto flex flex-wrap items-center gap-4">
-          {view !== 'month' && (
-            <div className="hidden items-center gap-4 sm:flex">
-              {LEGEND.map((item) => (
-                <span
-                  key={item.label}
-                  className="flex items-center gap-1.5 text-xs text-ink-tertiary"
-                >
-                  <span className={cn('h-2 w-2 rounded-full', item.dotClass)} />
-                  {item.label}
-                </span>
-              ))}
-            </div>
-          )}
-
           {activeEmployees.length > 1 && (
             <div className="w-48">
-              <Select value={employeeFilter} onChange={(e) => setEmployeeFilter(e.target.value)}>
+              <Select
+                className="!h-8 text-[13px]"
+                value={employeeFilter}
+                onChange={(e) => setEmployeeFilter(e.target.value)}
+              >
                 <option value="">Todos os profissionais</option>
                 {activeEmployees.map((employee) => (
                   <option key={employee.id} value={employee.id}>
@@ -279,18 +387,30 @@ export function AgendaPage() {
           />
         ) : (
           <WeekGrid
-            weekDays={range.days}
-            appointments={appointmentsQuery.data ?? []}
-            closedWeekdays={closedWeekdays}
+            columns={columns}
             startMinutes={startMinutes}
             endMinutes={endMinutes}
-            showEmployee={activeEmployees.length > 1 && !employeeFilter}
+            showEmployee={showEmployeeInBlock}
             nowMinutes={nowMin}
-            onSlotClick={(date, time) => setNewDialog({ date, time })}
-            onAppointmentClick={setSelectedAppointment}
+            onAppointmentClick={openAppointment}
           />
         )}
       </div>
+
+      {/* Legenda de cores (abaixo da agenda, compacta) */}
+      {view !== 'month' && (
+        <div className="mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+          {LEGEND.map((item) => (
+            <span
+              key={item.label}
+              className="flex items-center gap-1.5 text-[11px] text-ink-tertiary"
+            >
+              <span className={cn('h-2 w-2 rounded-full', item.dotClass)} />
+              {item.label}
+            </span>
+          ))}
+        </div>
+      )}
 
       <NewAppointmentDialog
         open={newDialog !== null}
@@ -301,7 +421,37 @@ export function AgendaPage() {
         endMinutes={endMinutes}
         defaultDate={newDialog?.date}
         defaultTime={newDialog?.time}
+        defaultEmployeeId={newDialog?.employeeId}
       />
+
+      <WalkInDialog
+        open={walkInOpen}
+        onClose={() => setWalkInOpen(false)}
+        services={servicesQuery.data ?? []}
+        employees={employees}
+        defaultEmployeeId={employeeFilter || undefined}
+      />
+
+      <WaitlistDialog
+        open={waitlistOpen}
+        onClose={() => setWaitlistOpen(false)}
+        services={servicesQuery.data ?? []}
+        employees={employees}
+        onPromote={(entry) => {
+          setWaitlistOpen(false)
+          setPromoteEntry(entry)
+        }}
+      />
+
+      {promoteEntry && (
+        <WaitlistPromoteDialog
+          entry={promoteEntry}
+          onClose={() => setPromoteEntry(null)}
+          employees={employees}
+          startMinutes={startMinutes}
+          endMinutes={endMinutes}
+        />
+      )}
 
       <AppointmentDetailsDialog
         appointment={selectedAppointment}
@@ -309,6 +459,14 @@ export function AgendaPage() {
         startMinutes={startMinutes}
         endMinutes={endMinutes}
       />
+
+      {pendingAppt && (
+        <PendingAppointmentDialog
+          appointment={pendingAppt}
+          onClose={() => setPendingAppt(null)}
+          onResolved={() => setPendingAppt(null)}
+        />
+      )}
     </div>
   )
 }
