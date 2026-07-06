@@ -19,6 +19,13 @@ export interface EmployeePayload {
   commissionType?: 'percent' | 'fixed'
   commissions?: { serviceId: string; value: number }[]
   applyCommissionToAll?: boolean
+  // Folha de pagamento (opcional)
+  salaryCents?: number | null
+  bonuses?: { label: string; amountCents: number }[]
+  vrCents?: number | null
+  vtCents?: number | null
+  vaCents?: number | null
+  paymentDays?: { day: number; amountCents: number }[]
 }
 
 export function listEmployees() {

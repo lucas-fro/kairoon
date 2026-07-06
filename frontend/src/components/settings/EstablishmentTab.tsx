@@ -5,6 +5,7 @@ import { CheckCircle2, Copy, ExternalLink, Plus, Save, Trash2, XCircle } from 'l
 import { ApiError } from '../../api/client'
 import { checkSlugAvailability, updateEstablishment, updateSlug } from '../../api/establishment'
 import { useAuth } from '../../contexts/AuthContext'
+import { FixedCostsSection } from './FixedCostsSection'
 import {
   formatCep,
   formatCnpj,
@@ -575,6 +576,9 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Custos fixos (despesas recorrentes) */}
+      <FixedCostsSection />
     </div>
   )
 }

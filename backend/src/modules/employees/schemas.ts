@@ -48,6 +48,30 @@ export const createEmployeeSchema = z.object({
     .optional(),
   // Não é coluna: se true, replica a comissão para todos os profissionais
   applyCommissionToAll: z.boolean().optional(),
+  // Folha de pagamento (para previsão de custos fixos / futura folha salarial)
+  salaryCents: z.number().int().min(0, 'Salário inválido').nullable().optional(),
+  bonuses: z
+    .array(
+      z.object({
+        label: z.string().trim().max(60, 'Nome do bônus muito longo'),
+        amountCents: z.number().int().min(0),
+      }),
+    )
+    .max(20, 'Muitos bônus')
+    .optional(),
+  vrCents: z.number().int().min(0, 'VR inválido').nullable().optional(),
+  vtCents: z.number().int().min(0, 'VT inválido').nullable().optional(),
+  vaCents: z.number().int().min(0, 'VA inválido').nullable().optional(),
+  // 1 ou 2 dias de pagamento, cada um com o valor pago naquele dia
+  paymentDays: z
+    .array(
+      z.object({
+        day: z.number().int().min(1, 'Dia inválido').max(31, 'Dia inválido'),
+        amountCents: z.number().int().min(0),
+      }),
+    )
+    .max(2, 'No máximo 2 dias de pagamento')
+    .optional(),
 })
 
 export const updateEmployeeSchema = createEmployeeSchema.partial()

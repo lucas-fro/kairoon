@@ -1,8 +1,22 @@
 import { useMemo, useState } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDownCircle, ArrowUpCircle, Percent, Plus, Trash2, Wallet } from 'lucide-react'
+import {
+  ArrowDownCircle,
+  ArrowUpCircle,
+  CalendarClock,
+  Check,
+  Percent,
+  Plus,
+  Trash2,
+  Wallet,
+} from 'lucide-react'
 import { ApiError } from '../../api/client'
 import { getCommissionsReport } from '../../api/commissions'
+import {
+  getRecurringExpensesForecast,
+  settlePayroll,
+  settleRecurringExpense,
+} from '../../api/recurringExpenses'
 import { createTransaction, deleteTransaction, listTransactions } from '../../api/transactions'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
@@ -18,9 +32,9 @@ import { Skeleton, SkeletonList } from '../../components/ui/Skeleton'
 import { Table, TBody, Td, Th, THead, Tr } from '../../components/ui/Table'
 import { useToast } from '../../components/ui/Toast'
 import { addDays, todayStr } from '../../lib/dates'
-import { cn, formatBRL, formatDate, parseBRLToCents } from '../../lib/format'
+import { cn, formatBRL, formatDate, formatMonthLabel, parseBRLToCents } from '../../lib/format'
 import type { LucideIcon } from 'lucide-react'
-import type { Transaction, TransactionType } from '../../types/api'
+import type { RecurringExpenseForecastItem, Transaction, TransactionType } from '../../types/api'
 
 function errorMessage(err: unknown): string {
   return err instanceof ApiError ? err.message : 'Erro inesperado'
@@ -86,7 +100,7 @@ function CommissionsSection({ from, to }: { from: string; to: string }) {
       ) : query.isError ? (
         <Card className="p-8 text-center">
           <p className="text-sm text-ink-secondary">{errorMessage(query.error)}</p>
-          <Button variant="outline" className="mt-4" onClick={() => query.refetch()}>
+          <Button variant="outline" size="sm" className="mt-4" onClick={() => query.refetch()}>
             Tentar novamente
           </Button>
         </Card>
@@ -144,6 +158,180 @@ function CommissionsSection({ from, to }: { from: string; to: string }) {
   )
 }
 
+/**
+ * Previsão dos custos fixos do mês selecionado: total previsto, já pago e a
+ * pagar, com botão de "dar baixa" que lança a saída no fluxo de caixa. O mês é
+ * derivado do início do período filtrado na página.
+ */
+function FixedCostsForecast({ month }: { month: string }) {
+  const toast = useToast()
+  const queryClient = useQueryClient()
+
+  const query = useQuery({
+    queryKey: ['recurring-expenses-forecast', month],
+    queryFn: () => getRecurringExpensesForecast(month),
+    placeholderData: keepPreviousData,
+  })
+
+  function invalidate() {
+    queryClient.invalidateQueries({ queryKey: ['recurring-expenses-forecast'] })
+    queryClient.invalidateQueries({ queryKey: ['transactions'] })
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+  }
+
+  const settleMutation = useMutation({
+    mutationFn: (item: RecurringExpenseForecastItem) =>
+      item.kind === 'payroll' && item.employeeId
+        ? settlePayroll(item.employeeId, month, item.dayOfMonth)
+        : settleRecurringExpense(item.id, month),
+    onSuccess: () => {
+      invalidate()
+      toast.success('Baixa lançada no caixa!')
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  })
+
+  // Desfaz a baixa: remove o lançamento vinculado (volta a "a pagar")
+  const unsettleMutation = useMutation({
+    mutationFn: (transactionId: string) => deleteTransaction(transactionId),
+    onSuccess: () => {
+      invalidate()
+      toast.success('Baixa desfeita.')
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  })
+
+  const forecast = query.data
+
+  return (
+    <section className="mt-8">
+      <div className="mb-4 flex items-center gap-2">
+        <CalendarClock className="h-[18px] w-[18px] text-ink-tertiary" strokeWidth={1.9} />
+        <h2 className="font-display text-lg font-bold text-ink">Custos fixos</h2>
+        <span className="text-sm capitalize text-ink-tertiary">· {formatMonthLabel(month)}</span>
+      </div>
+
+      {query.isPending ? (
+        <SkeletonList rows={3} />
+      ) : query.isError ? (
+        <Card className="p-8 text-center">
+          <p className="text-sm text-ink-secondary">{errorMessage(query.error)}</p>
+          <Button variant="outline" size="sm" className="mt-4" onClick={() => query.refetch()}>
+            Tentar novamente
+          </Button>
+        </Card>
+      ) : !forecast || forecast.items.length === 0 ? (
+        <EmptyState
+          icon={CalendarClock}
+          title="Nenhum custo fixo previsto"
+          description="Cadastre custos fixos em Configurações → Estabelecimento e a folha dos profissionais em Configurações → Funcionários para prever as saídas e dar baixa por aqui."
+        />
+      ) : (
+        <Card>
+          {/* Resumo da previsão do mês */}
+          <div className="grid grid-cols-1 border-b border-line sm:grid-cols-3 sm:divide-x sm:divide-line">
+            <div className="px-5 py-4">
+              <p className="text-[13px] text-ink-secondary">Total do mês</p>
+              <p className="mt-1 font-display text-xl font-bold tabular-nums text-ink">
+                {formatBRL(forecast.summary.totalCents)}
+              </p>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-[13px] text-ink-secondary">Já pago</p>
+              <p className="mt-1 font-display text-xl font-bold tabular-nums text-success-dark">
+                {formatBRL(forecast.summary.postedCents)}
+              </p>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-[13px] text-ink-secondary">
+                A pagar{' '}
+                {forecast.summary.pendingCount > 0 && `(${forecast.summary.pendingCount})`}
+              </p>
+              <p className="mt-1 font-display text-xl font-bold tabular-nums text-error-dark">
+                {formatBRL(forecast.summary.pendingCents)}
+              </p>
+            </div>
+          </div>
+
+          <Table>
+            <THead>
+              <tr>
+                <Th>Descrição</Th>
+                <Th className="w-32">Vencimento</Th>
+                <Th className="text-right">Valor</Th>
+                <Th className="w-48 text-right">Status</Th>
+              </tr>
+            </THead>
+            <TBody>
+              {forecast.items.map((item) => {
+                const commissionCents = item.commissionCents ?? 0
+                return (
+                  <Tr key={item.id}>
+                    <Td>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium text-ink">{item.description}</span>
+                        {item.kind === 'payroll' && <Badge tone="info">Folha</Badge>}
+                      </div>
+                    </Td>
+                    <Td className="whitespace-nowrap text-ink-secondary">
+                      {formatDate(item.dueDate)}
+                    </Td>
+                    <Td className="whitespace-nowrap text-right">
+                      <div className="font-medium tabular-nums text-ink">
+                        {formatBRL(item.amountCents)}
+                      </div>
+                      {item.kind === 'payroll' && commissionCents > 0 && (
+                        <div className="text-xs text-ink-tertiary">
+                          + {formatBRL(commissionCents)} em comissão
+                        </div>
+                      )}
+                    </Td>
+                    <Td className="text-right">
+                      {item.posted ? (
+                        <div className="inline-flex items-center justify-end gap-2">
+                          <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success-dark">
+                            <Check className="h-4 w-4" />
+                            Baixado
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-ink-tertiary"
+                            onClick={() =>
+                              item.transactionId && unsettleMutation.mutate(item.transactionId)
+                            }
+                            isLoading={
+                              unsettleMutation.isPending &&
+                              unsettleMutation.variables === item.transactionId
+                            }
+                          >
+                            Desfazer
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => settleMutation.mutate(item)}
+                          isLoading={
+                            settleMutation.isPending && settleMutation.variables?.id === item.id
+                          }
+                        >
+                          Dar baixa
+                        </Button>
+                      )}
+                    </Td>
+                  </Tr>
+                )
+              })}
+            </TBody>
+          </Table>
+        </Card>
+      )}
+    </section>
+  )
+}
+
 export function FinancePage() {
   const toast = useToast()
   const queryClient = useQueryClient()
@@ -190,6 +378,9 @@ export function FinancePage() {
     mutationFn: deleteTransaction,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      // Excluir a saída de um custo fixo baixado o devolve para "a pagar".
+      queryClient.invalidateQueries({ queryKey: ['recurring-expenses-forecast'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       toast.success('Lançamento excluído.')
       setToDelete(null)
     },
@@ -229,7 +420,7 @@ export function FinancePage() {
         title="Financeiro"
         description="Fluxo de caixa do seu negócio"
         actions={
-          <Button leftIcon={<Plus className="h-4 w-4" />} onClick={openNewDialog}>
+          <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={openNewDialog}>
             Novo lançamento
           </Button>
         }
@@ -304,7 +495,7 @@ export function FinancePage() {
       ) : query.isError ? (
         <Card className="p-8 text-center">
           <p className="text-sm text-ink-secondary">{errorMessage(query.error)}</p>
-          <Button variant="outline" className="mt-4" onClick={() => query.refetch()}>
+          <Button variant="outline" size="sm" className="mt-4" onClick={() => query.refetch()}>
             Tentar novamente
           </Button>
         </Card>
@@ -339,7 +530,7 @@ export function FinancePage() {
               title="Nenhum lançamento no período"
               description="Os atendimentos concluídos entram aqui automaticamente."
               action={
-                <Button leftIcon={<Plus className="h-4 w-4" />} onClick={openNewDialog}>
+                <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={openNewDialog}>
                   Novo lançamento
                 </Button>
               }
@@ -400,6 +591,9 @@ export function FinancePage() {
           )}
         </>
       )}
+
+      {/* Previsão de custos fixos do mês */}
+      <FixedCostsForecast month={from.slice(0, 7)} />
 
       {/* Comissões apuradas no período */}
       <CommissionsSection from={from} to={to} />

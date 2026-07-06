@@ -47,10 +47,22 @@ const UPGRADE_BENEFITS = [
   'Relatórios completos de desempenho',
 ]
 
-const STEPS = ['Dados', 'Jornada', 'Comissão']
+const STEPS = ['Dados', 'Jornada', 'Comissão', 'Remuneração']
+
+const PAY_DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => i + 1)
 
 function getErrorMessage(err: unknown): string {
   return err instanceof ApiError ? err.message : 'Erro inesperado'
+}
+
+/** centavos → '1.234,56' */
+function centsToBRL(cents: number): string {
+  return (cents / 100).toFixed(2).replace('.', ',')
+}
+
+/** parseBRLToCents seguro para campos vazios */
+function toCents(value: string): number {
+  return value.trim() ? parseBRLToCents(value) : 0
 }
 
 function getInitials(name: string): string {
@@ -87,6 +99,17 @@ interface FormState {
   commissionEnabled: boolean
   commissionType: CommissionType
   applyCommissionToAll: boolean
+  // Remuneração (folha) — valores em texto BRL
+  salary: string
+  bonuses: { label: string; value: string }[]
+  vr: string
+  vt: string
+  va: string
+  paymentMode: 'none' | 'single' | 'split'
+  paymentDay1: string
+  paymentAmount1: string
+  paymentDay2: string
+  paymentAmount2: string
 }
 
 const EMPTY_FORM: FormState = {
@@ -105,6 +128,16 @@ const EMPTY_FORM: FormState = {
   commissionEnabled: false,
   commissionType: 'percent',
   applyCommissionToAll: false,
+  salary: '',
+  bonuses: [],
+  vr: '',
+  vt: '',
+  va: '',
+  paymentMode: 'none',
+  paymentDay1: '5',
+  paymentAmount1: '',
+  paymentDay2: '20',
+  paymentAmount2: '',
 }
 
 export function EmployeesTab() {
@@ -201,6 +234,28 @@ export function EmployeesTab() {
       commissionEnabled: employee.commissionEnabled,
       commissionType: employee.commissionType,
       applyCommissionToAll: false,
+      salary: employee.salaryCents != null ? centsToBRL(employee.salaryCents) : '',
+      bonuses: (employee.bonuses ?? []).map((b) => ({
+        label: b.label,
+        value: centsToBRL(b.amountCents),
+      })),
+      vr: employee.vrCents != null ? centsToBRL(employee.vrCents) : '',
+      vt: employee.vtCents != null ? centsToBRL(employee.vtCents) : '',
+      va: employee.vaCents != null ? centsToBRL(employee.vaCents) : '',
+      paymentMode:
+        (employee.paymentDays ?? []).length === 2
+          ? 'split'
+          : (employee.paymentDays ?? []).length === 1
+            ? 'single'
+            : 'none',
+      paymentDay1: String(employee.paymentDays?.[0]?.day ?? 5),
+      paymentAmount1: employee.paymentDays?.[0]
+        ? centsToBRL(employee.paymentDays[0].amountCents)
+        : '',
+      paymentDay2: String(employee.paymentDays?.[1]?.day ?? 20),
+      paymentAmount2: employee.paymentDays?.[1]
+        ? centsToBRL(employee.paymentDays[1].amountCents)
+        : '',
     })
     const values: Record<string, string> = {}
     for (const c of employee.commissions) {
@@ -304,6 +359,58 @@ export function EmployeesTab() {
     setStep(3)
   }
 
+  function goToPayroll() {
+    setError(undefined)
+    setStep(4)
+  }
+
+  /** Total mensal da folha (salário + bônus + VR + VT + VA), em centavos.
+   * Só conta bônus com rótulo — igual ao que o handleSave persiste. */
+  function payrollTotalCents(f: FormState): number {
+    const bonuses = f.bonuses.reduce(
+      (sum, b) => sum + (b.label.trim() ? toCents(b.value) : 0),
+      0,
+    )
+    return toCents(f.salary) + bonuses + toCents(f.vr) + toCents(f.vt) + toCents(f.va)
+  }
+
+  function addBonus() {
+    setForm((f) => ({ ...f, bonuses: [...f.bonuses, { label: '', value: '' }] }))
+  }
+
+  function removeBonus(index: number) {
+    setForm((f) => ({ ...f, bonuses: f.bonuses.filter((_, i) => i !== index) }))
+  }
+
+  function setBonus(index: number, field: 'label' | 'value', value: string) {
+    setForm((f) => ({
+      ...f,
+      bonuses: f.bonuses.map((b, i) => (i === index ? { ...b, [field]: value } : b)),
+    }))
+  }
+
+  /** Divide o total igualmente entre os dois dias */
+  function presetSplitHalf() {
+    setForm((f) => {
+      const total = payrollTotalCents(f)
+      const half = Math.floor(total / 2)
+      return { ...f, paymentAmount1: centsToBRL(half), paymentAmount2: centsToBRL(total - half) }
+    })
+  }
+
+  /** Bônus + benefícios no 1º dia; salário no 2º */
+  function presetSplitBonusFirst() {
+    setForm((f) => {
+      const total = payrollTotalCents(f)
+      const salary = toCents(f.salary)
+      return {
+        ...f,
+        paymentAmount1: centsToBRL(total - salary),
+        paymentAmount2: centsToBRL(salary),
+      }
+    })
+  }
+
   /** Preço → comissão/percentual e quanto sobra, exibido abaixo de cada serviço */
   function commissionHint(priceCents: number, raw: string): string {
     const price = formatBRL(priceCents)
@@ -338,6 +445,26 @@ export function EmployeesTab() {
       }))
       .filter((c) => c.value > 0)
 
+    // Remuneração (folha)
+    const bonuses = form.bonuses
+      .map((b) => ({ label: b.label.trim(), amountCents: toCents(b.value) }))
+      .filter((b) => b.label.length > 0 && b.amountCents > 0)
+
+    let paymentDays: { day: number; amountCents: number }[] = []
+    if (form.paymentMode === 'single') {
+      paymentDays = [{ day: Number(form.paymentDay1), amountCents: payrollTotalCents(form) }]
+    } else if (form.paymentMode === 'split') {
+      if (form.paymentDay1 === form.paymentDay2) {
+        setStep(4)
+        setError('Os dois dias de pagamento devem ser diferentes')
+        return
+      }
+      paymentDays = [
+        { day: Number(form.paymentDay1), amountCents: toCents(form.paymentAmount1) },
+        { day: Number(form.paymentDay2), amountCents: toCents(form.paymentAmount2) },
+      ]
+    }
+
     setError(undefined)
     saveMutation.mutate({
       id: editing?.id,
@@ -358,6 +485,12 @@ export function EmployeesTab() {
         commissionType: form.commissionType,
         commissions,
         applyCommissionToAll: form.commissionEnabled && form.applyCommissionToAll,
+        salaryCents: form.salary.trim() ? parseBRLToCents(form.salary) : null,
+        bonuses,
+        vrCents: form.vr.trim() ? parseBRLToCents(form.vr) : null,
+        vtCents: form.vt.trim() ? parseBRLToCents(form.vt) : null,
+        vaCents: form.va.trim() ? parseBRLToCents(form.va) : null,
+        paymentDays,
       },
     })
   }
@@ -704,7 +837,7 @@ export function EmployeesTab() {
               </Button>
             </DialogActions>
           </div>
-        ) : (
+        ) : step === 3 ? (
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3 rounded-lg bg-background p-3">
               <div>
@@ -828,6 +961,248 @@ export function EmployeesTab() {
                 onClick={() => {
                   setError(undefined)
                   setStep(2)
+                }}
+              >
+                Voltar
+              </Button>
+              <Button type="button" onClick={goToPayroll}>
+                Próximo
+              </Button>
+            </DialogActions>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-xs text-ink-tertiary">
+              Opcional. Usado na previsão de custos fixos e na futura folha salarial.
+            </p>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Input
+                label="Salário base"
+                inputMode="decimal"
+                placeholder="2.000,00"
+                leftIcon={<span className="text-sm">R$</span>}
+                value={form.salary}
+                onChange={(e) => setForm((f) => ({ ...f, salary: e.target.value }))}
+              />
+              <div className="grid grid-cols-3 gap-2">
+                <Input
+                  label="VR"
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  value={form.vr}
+                  onChange={(e) => setForm((f) => ({ ...f, vr: e.target.value }))}
+                />
+                <Input
+                  label="VT"
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  value={form.vt}
+                  onChange={(e) => setForm((f) => ({ ...f, vt: e.target.value }))}
+                />
+                <Input
+                  label="VA"
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  value={form.va}
+                  onChange={(e) => setForm((f) => ({ ...f, va: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            {/* Seção de bônus (repetível) */}
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[13px] font-medium text-ink-secondary">Bônus</span>
+                <button
+                  type="button"
+                  onClick={addBonus}
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/5"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Adicionar bônus
+                </button>
+              </div>
+              {form.bonuses.length === 0 ? (
+                <p className="rounded-lg bg-background px-3 py-2.5 text-center text-xs text-ink-tertiary">
+                  Nenhum bônus. Ex.: bônus de meta, ajuda de custo, insalubridade.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {form.bonuses.map((bonus, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Input
+                        placeholder="Ex.: Bônus de meta"
+                        value={bonus.label}
+                        onChange={(e) => setBonus(index, 'label', e.target.value)}
+                      />
+                      <div className="w-32 shrink-0">
+                        <Input
+                          inputMode="decimal"
+                          placeholder="0,00"
+                          leftIcon={<span className="text-sm">R$</span>}
+                          value={bonus.value}
+                          onChange={(e) => setBonus(index, 'value', e.target.value)}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeBonus(index)}
+                        className="shrink-0 rounded-lg p-2 text-ink-tertiary hover:bg-error-light hover:text-error-dark"
+                        aria-label="Remover bônus"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Total mensal */}
+            <div className="flex items-center justify-between rounded-lg bg-background px-3 py-2.5 text-sm">
+              <span className="text-ink-secondary">Total mensal</span>
+              <span className="font-semibold tabular-nums text-ink">
+                {formatBRL(payrollTotalCents(form))}
+              </span>
+            </div>
+
+            {/* Dias de pagamento */}
+            <div>
+              <span className="mb-2 block text-[13px] font-medium text-ink-secondary">
+                Dias de pagamento
+              </span>
+              <div className="inline-flex rounded-lg border border-line p-0.5">
+                {(
+                  [
+                    { key: 'none', label: 'Não lançar' },
+                    { key: 'single', label: '1 dia' },
+                    { key: 'split', label: '2 dias' },
+                  ] as const
+                ).map((option) => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, paymentMode: option.key }))}
+                    className={cn(
+                      'h-8 rounded-md px-3 text-[13px] font-medium transition-colors',
+                      form.paymentMode === option.key
+                        ? 'bg-primary text-white'
+                        : 'text-ink-secondary hover:text-ink',
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+
+              {form.paymentMode === 'none' && (
+                <p className="mt-2 text-xs text-ink-tertiary">
+                  A folha fica registrada, mas não aparece na previsão de custos fixos.
+                </p>
+              )}
+
+              {form.paymentMode === 'single' && (
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                  <span className="text-ink-secondary">Paga</span>
+                  <span className="font-semibold text-ink">{formatBRL(payrollTotalCents(form))}</span>
+                  <span className="text-ink-secondary">no dia</span>
+                  <div className="w-24">
+                    <Select
+                      className="!h-9"
+                      value={form.paymentDay1}
+                      onChange={(e) => setForm((f) => ({ ...f, paymentDay1: e.target.value }))}
+                    >
+                      {PAY_DAY_OPTIONS.map((day) => (
+                        <option key={day} value={day}>
+                          {day}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                </div>
+              )}
+
+              {form.paymentMode === 'split' && (
+                <div className="mt-3 space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={presetSplitHalf}
+                      className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-ink-secondary hover:bg-surface-hover"
+                    >
+                      Metade em cada
+                    </button>
+                    <button
+                      type="button"
+                      onClick={presetSplitBonusFirst}
+                      className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-ink-secondary hover:bg-surface-hover"
+                    >
+                      Bônus/benefícios no 1º, salário no 2º
+                    </button>
+                  </div>
+
+                  {(
+                    [
+                      { dayKey: 'paymentDay1', amountKey: 'paymentAmount1', label: '1º pagamento' },
+                      { dayKey: 'paymentDay2', amountKey: 'paymentAmount2', label: '2º pagamento' },
+                    ] as const
+                  ).map((row) => (
+                    <div key={row.dayKey} className="flex items-end gap-2">
+                      <div className="w-24 shrink-0">
+                        <Select
+                          label={row.label}
+                          className="!h-9"
+                          value={form[row.dayKey]}
+                          onChange={(e) =>
+                            setForm((f) => ({ ...f, [row.dayKey]: e.target.value }))
+                          }
+                        >
+                          {PAY_DAY_OPTIONS.map((day) => (
+                            <option key={day} value={day}>
+                              Dia {day}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
+                      <Input
+                        inputMode="decimal"
+                        placeholder="0,00"
+                        leftIcon={<span className="text-sm">R$</span>}
+                        value={form[row.amountKey]}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, [row.amountKey]: e.target.value }))
+                        }
+                      />
+                    </div>
+                  ))}
+
+                  {(() => {
+                    const sum = toCents(form.paymentAmount1) + toCents(form.paymentAmount2)
+                    const total = payrollTotalCents(form)
+                    if (total > 0 && sum !== total) {
+                      return (
+                        <p className="text-xs text-warning-dark">
+                          A soma dos pagamentos ({formatBRL(sum)}) difere do total (
+                          {formatBRL(total)}).
+                        </p>
+                      )
+                    }
+                    return null
+                  })()}
+                </div>
+              )}
+            </div>
+
+            {error && <p className="text-xs text-error-dark">{error}</p>}
+
+            <DialogActions className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                leftIcon={<ArrowLeft className="h-4 w-4" />}
+                onClick={() => {
+                  setError(undefined)
+                  setStep(3)
                 }}
                 disabled={saveMutation.isPending}
               >

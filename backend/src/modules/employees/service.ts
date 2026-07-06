@@ -21,6 +21,15 @@ function validateSchedule(data: { workStart?: string; workEnd?: string; lunchSta
   }
 }
 
+function validatePayroll(data: { paymentDays?: { day: number; amountCents: number }[] }) {
+  if (data.paymentDays && data.paymentDays.length > 1) {
+    const days = data.paymentDays.map((p) => p.day)
+    if (new Set(days).size !== days.length) {
+      throw new AppError('Os dois dias de pagamento devem ser diferentes', 400)
+    }
+  }
+}
+
 type EmployeeRow = typeof employees.$inferSelect
 type CommissionRow = typeof employeeCommissions.$inferSelect
 type Commission = { serviceId: string; value: number }
@@ -131,6 +140,7 @@ export async function listEmployees(establishmentId: string) {
 export async function createEmployee(establishmentId: string, input: CreateEmployeeInput) {
   const { applyScheduleToAll, applyCommissionToAll, commissions, ...data } = input
   validateSchedule(data)
+  validatePayroll(data)
 
   const establishment = await db.query.establishments.findFirst({
     where: eq(establishments.id, establishmentId),
@@ -173,6 +183,7 @@ export async function updateEmployee(
     throw new AppError('Nenhum dado para atualizar', 400)
   }
   validateSchedule(data)
+  validatePayroll(data)
 
   return db.transaction(async (tx) => {
     let updated: EmployeeRow | undefined

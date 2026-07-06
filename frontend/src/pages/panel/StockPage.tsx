@@ -28,6 +28,7 @@ interface FormState {
   price: string
   stock: string
   brand: string
+  supplier: string
   cost: string
   sku: string
   barcode: string
@@ -39,6 +40,7 @@ const EMPTY_FORM: FormState = {
   price: '',
   stock: '',
   brand: '',
+  supplier: '',
   cost: '',
   sku: '',
   barcode: '',
@@ -77,6 +79,7 @@ export function StockPage() {
       price: (product.priceCents / 100).toFixed(2).replace('.', ','),
       stock: String(product.stockQuantity),
       brand: product.brand ?? '',
+      supplier: product.supplier ?? '',
       cost: product.costCents != null ? (product.costCents / 100).toFixed(2).replace('.', ',') : '',
       sku: product.sku ?? '',
       barcode: product.barcode ?? '',
@@ -133,6 +136,7 @@ export function StockPage() {
       priceCents,
       stockQuantity: Math.max(0, Number(form.stock.replace(/\D/g, '')) || 0),
       brand: form.brand.trim() || null,
+      supplier: form.supplier.trim() || null,
       costCents: form.cost.trim() ? parseBRLToCents(form.cost) : null,
       sku: form.sku.trim() || null,
       barcode: form.barcode.trim() || null,
@@ -160,7 +164,7 @@ export function StockPage() {
         title="Estoque"
         description="Produtos disponíveis para venda no fechamento dos atendimentos."
         actions={
-          <Button onClick={openCreate} leftIcon={<Plus className="h-4 w-4" />}>
+          <Button size="sm" onClick={openCreate} leftIcon={<Plus className="h-4 w-4" />}>
             Novo produto
           </Button>
         }
@@ -186,7 +190,7 @@ export function StockPage() {
           title="Nenhum produto cadastrado"
           description="Cadastre produtos para vendê-los junto com os atendimentos e controlar o estoque."
           action={
-            <Button onClick={openCreate} leftIcon={<Plus className="h-4 w-4" />}>
+            <Button size="sm" onClick={openCreate} leftIcon={<Plus className="h-4 w-4" />}>
               Novo produto
             </Button>
           }
@@ -321,6 +325,15 @@ export function StockPage() {
                 placeholder="Ex.: Viking"
               />
               <Input
+                label="Fornecedor"
+                value={form.supplier}
+                onChange={(e) => setField('supplier', e.target.value)}
+                placeholder="Ex.: Distribuidora Silva"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Input
                 label="Preço de custo"
                 inputMode="decimal"
                 value={form.cost}
@@ -329,23 +342,21 @@ export function StockPage() {
                 leftIcon={<span className="text-sm">R$</span>}
                 hint={showMargin ? `Margem: ${formatBRL(marginCents)} (${marginPct}%)` : undefined}
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
               <Input
                 label="Código (SKU)"
                 value={form.sku}
                 onChange={(e) => setField('sku', e.target.value)}
                 placeholder="Ex.: POM-001"
               />
-              <Input
-                label="Código de barras"
-                inputMode="numeric"
-                value={form.barcode}
-                onChange={(e) => setField('barcode', e.target.value)}
-                placeholder="789..."
-              />
             </div>
+
+            <Input
+              label="Código de barras"
+              inputMode="numeric"
+              value={form.barcode}
+              onChange={(e) => setField('barcode', e.target.value)}
+              placeholder="789..."
+            />
 
             <Textarea
               label="Descrição"

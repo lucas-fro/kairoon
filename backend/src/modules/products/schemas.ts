@@ -18,6 +18,7 @@ export const createProductSchema = z.object({
   active: z.boolean().default(true),
   // Opcionais
   brand: emptyToNull(60, 'Marca muito longa'),
+  supplier: emptyToNull(80, 'Fornecedor muito longo'),
   description: emptyToNull(500, 'Descrição muito longa'),
   sku: emptyToNull(60, 'Código muito longo'),
   barcode: emptyToNull(60, 'Código de barras muito longo'),
@@ -31,6 +32,7 @@ export const updateProductSchema = z.object({
   stockQuantity: z.number().int().min(0, 'Estoque inválido').optional(),
   active: z.boolean().optional(),
   brand: emptyToNull(60, 'Marca muito longa'),
+  supplier: emptyToNull(80, 'Fornecedor muito longo'),
   description: emptyToNull(500, 'Descrição muito longa'),
   sku: emptyToNull(60, 'Código muito longo'),
   barcode: emptyToNull(60, 'Código de barras muito longo'),

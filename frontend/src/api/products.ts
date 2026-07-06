@@ -7,6 +7,7 @@ export interface ProductPayload {
   stockQuantity: number
   active?: boolean
   brand?: string | null
+  supplier?: string | null
   description?: string | null
   sku?: string | null
   barcode?: string | null
