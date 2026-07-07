@@ -82,18 +82,19 @@ export function SuccessStep({ result, establishment, branding }: SuccessStepProp
   const isPending = appointment.status === 'pending'
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col pt-2">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="shrink-0">
         <BrandBanner
           brandColor={branding.brandColor}
           bannerImageUrl={branding.bannerImageUrl}
           logoUrl={establishment.logoUrl}
           name={establishment.name}
+          rounded={false}
         />
       </div>
 
       {/* Miolo rolável (se não couber), para a página em si não ter scroll */}
-      <div className="thin-scrollbar -mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-2">
+      <div className="thin-scrollbar -mx-1 min-h-0 flex-1 overflow-y-auto px-5 pb-2">
         <div className="flex flex-col items-center text-center">
           <div
             className={cn(

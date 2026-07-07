@@ -54,14 +54,7 @@ export const updateEstablishmentSchema = z.object({
       debit: z.boolean(),
       credit: z.object({
         enabled: z.boolean(),
-        brands: z
-          .array(
-            z.object({
-              name: z.string().trim().min(1, 'Informe a bandeira').max(40, 'Nome muito longo'),
-              maxInstallments: z.number().int().min(1).max(24),
-            }),
-          )
-          .max(20, 'Muitas bandeiras'),
+        maxInstallments: z.number().int().min(1).max(24),
       }),
     })
     .optional(),

@@ -20,9 +20,10 @@ export interface UpdateAppointmentPayload {
   discountCents?: number
   /** cupom aplicado no fechamento (o servidor revalida e recalcula) */
   couponCode?: string
+  /** soma a dívida anterior do cliente ao valor devido e a abate no pagamento */
+  settlePreviousDebt?: boolean
   payments?: {
     method: PaymentMethod
-    brand?: string | null
     installments?: number | null
     amountCents: number
   }[]

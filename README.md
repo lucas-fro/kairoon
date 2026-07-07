@@ -122,7 +122,7 @@ Navegação do painel (sidebar): **Principal** (Dashboard, Agenda) · **Gestão*
 - Estados do atendimento: `pending` → `confirmed` → `completed`, além de `cancelled`. Remarcar, cancelar, reabrir e restaurar.
 - Cálculo de disponibilidade respeitando jornada do profissional, almoço, horário de funcionamento e bloqueios de agenda.
 - Trava por advisory lock (profissional + dia) evita reservas sobrepostas em concorrência.
-- **Fechamento do serviço (checkout):** formas de pagamento (dinheiro, PIX, débito, crédito com bandeira/parcelas), venda de **produtos** e **serviços extras** avulsos, aplicação de **cupom** (código, campanha automática ou desconto manual). Ao concluir, gera receita no financeiro, apura comissão, baixa estoque e acumula fidelidade/pontos — tudo em uma transação, revertida ao reabrir.
+- **Fechamento do serviço (checkout):** formas de pagamento (dinheiro, PIX, débito, crédito parcelado), venda de **produtos** e **serviços extras** avulsos, aplicação de **cupom** (código, campanha automática ou desconto manual). Aceita **gorjeta** (recebeu a mais) e **dívida** (recebeu a menos) por switch; a dívida vira saldo devedor do cliente, exibido no detalhe dele e opcionalmente cobrado num fechamento futuro. Ao concluir, gera receita no financeiro (pelo valor efetivamente recebido), apura comissão, baixa estoque e acumula fidelidade/pontos — tudo em uma transação, revertida ao reabrir.
 
 ### Clientes
 - Cadastro por telefone (chave única por estabelecimento), com histórico de atendimentos, total gasto e última visita computados na hora.

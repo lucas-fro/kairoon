@@ -24,6 +24,7 @@ import type { LucideIcon } from 'lucide-react'
 import { updateAppointment } from '../../api/appointments'
 import type { UpdateAppointmentPayload } from '../../api/appointments'
 import { ApiError } from '../../api/client'
+import { getClient } from '../../api/clients'
 import { listClientCoupons, validateCoupon } from '../../api/coupons'
 import { getClientLoyalty } from '../../api/loyalty'
 import { getClientPoints } from '../../api/points'
@@ -37,6 +38,7 @@ import { Dialog } from '../ui/Dialog'
 import { DialogActions } from '../ui/DialogActions'
 import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
+import { Switch } from '../ui/Switch'
 import { useToast } from '../ui/Toast'
 import { describeCouponDiscount } from '../../lib/coupons'
 import { cn, formatBRL, formatDate, formatPhone, parseBRLToCents } from '../../lib/format'
@@ -71,20 +73,26 @@ const FALLBACK_PAYMENT_SETTINGS: PaymentSettings = {
   cash: true,
   pix: true,
   debit: true,
-  credit: { enabled: false, brands: [] },
+  credit: { enabled: false, maxInstallments: 1 },
 }
 
 function centsToInput(cents: number): string {
   return (cents / 100).toFixed(2).replace('.', ',')
 }
 
+/** Mesmo dia do mês, N meses à frente (dia 31 num mês sem dia 31 vira o último dia daquele mês). */
+function addMonthsClamped(base: Date, months: number): Date {
+  const day = base.getDate()
+  const target = new Date(base.getFullYear(), base.getMonth() + months, 1)
+  const lastDayOfTargetMonth = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate()
+  target.setDate(Math.min(day, lastDayOfTargetMonth))
+  return target
+}
+
 function paymentLabel(payment: Payment): string {
   const base = METHOD_META[payment.method].label
-  if (payment.method !== 'credit') return base
-  const parts = [base]
-  if (payment.installments) parts.push(`${payment.installments}x`)
-  if (payment.brand) parts.push(payment.brand)
-  return parts.join(' · ')
+  if (payment.method !== 'credit' || !payment.installments) return base
+  return `${base} · ${payment.installments}x`
 }
 
 interface AppointmentDetailsDialogProps {
@@ -136,6 +144,7 @@ export function AppointmentDetailsDialog({
       queryClient.invalidateQueries({ queryKey: ['transactions'] })
       queryClient.invalidateQueries({ queryKey: ['commissions'] })
       queryClient.invalidateQueries({ queryKey: ['clients'] })
+      queryClient.invalidateQueries({ queryKey: ['client'] })
       queryClient.invalidateQueries({ queryKey: ['products'] })
       queryClient.invalidateQueries({ queryKey: ['coupons'] })
       queryClient.invalidateQueries({ queryKey: ['loyalty'] })
@@ -186,7 +195,14 @@ export function AppointmentDetailsDialog({
             isLoading={mutation.isPending}
             onSubviewChange={setCheckoutSubview}
             onBack={() => setFinalizing(false)}
-            onConfirm={(payments, discountCents, saleProducts, saleServices, couponCode) =>
+            onConfirm={(
+              payments,
+              discountCents,
+              saleProducts,
+              saleServices,
+              couponCode,
+              settlePreviousDebt,
+            ) =>
               mutation.mutate({
                 status: 'completed',
                 discountCents,
@@ -194,6 +210,7 @@ export function AppointmentDetailsDialog({
                 saleProducts,
                 saleServices,
                 couponCode,
+                settlePreviousDebt,
               })
             }
           />
@@ -290,6 +307,30 @@ export function AppointmentDetailsDialog({
                       <span className="font-medium text-ink">{formatBRL(payment.amountCents)}</span>
                     </div>
                   ))}
+                  {appointment.tipCents > 0 && (
+                    <div className="flex items-center justify-between border-t border-line-divider pt-2">
+                      <span className="text-ink-secondary">Gorjeta</span>
+                      <span className="font-medium text-success-dark">
+                        + {formatBRL(appointment.tipCents)}
+                      </span>
+                    </div>
+                  )}
+                  {appointment.debtCents > 0 && (
+                    <div className="flex items-center justify-between border-t border-line-divider pt-2">
+                      <span className="text-ink-secondary">Ficou devendo</span>
+                      <span className="font-medium text-warning-dark">
+                        {formatBRL(appointment.debtCents)}
+                      </span>
+                    </div>
+                  )}
+                  {appointment.debtCents < 0 && (
+                    <div className="flex items-center justify-between border-t border-line-divider pt-2">
+                      <span className="text-ink-secondary">Abateu da dívida</span>
+                      <span className="font-medium text-success-dark">
+                        {formatBRL(-appointment.debtCents)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -415,14 +456,14 @@ interface PaymentCheckoutProps {
   onConfirm: (
     payments: {
       method: PaymentMethod
-      brand: string | null
       installments: number | null
       amountCents: number
     }[],
     discountCents: number,
     saleProducts: { productId: string; quantity: number }[],
     saleServices: { serviceId: string; quantity: number }[],
-    couponCode?: string,
+    couponCode: string | undefined,
+    settlePreviousDebt: boolean,
   ) => void
 }
 
@@ -579,6 +620,19 @@ function PaymentCheckout({
     queryKey: ['points', 'client', clientId],
     queryFn: () => getClientPoints(clientId),
   })
+  // Dívida acumulada do cliente em fechamentos anteriores (exclui este
+  // atendimento, para não contar uma dívida que ele mesmo gerou ao refinalizar).
+  const clientDetailQuery = useQuery({
+    queryKey: ['client', clientId],
+    queryFn: () => getClient(clientId),
+  })
+  const previousDebtCents = useMemo(() => {
+    const history = clientDetailQuery.data?.history ?? []
+    const sum = history
+      .filter((h) => h.status === 'completed' && h.id !== appointment.id)
+      .reduce((total, h) => total + h.debtCents, 0)
+    return Math.max(0, sum)
+  }, [clientDetailQuery.data, appointment.id])
   const fidelitySummary = [
     loyaltyQuery.data?.program?.active
       ? `${loyaltyQuery.data.availableStamps}/${loyaltyQuery.data.program.stampsRequired} carimbos`
@@ -616,23 +670,30 @@ function PaymentCheckout({
     return list
   }, [paymentSettings])
 
-  const brands = paymentSettings.credit.brands
   const [selected, setSelected] = useState<PaymentMethod[]>([])
   const [amounts, setAmounts] = useState<Record<string, string>>({})
-  const [creditBrand, setCreditBrand] = useState(brands[0]?.name ?? '')
   const [creditInstallments, setCreditInstallments] = useState(1)
+  // Liberam finalizar quando o valor recebido não bate com o total: gorjeta
+  // (recebeu a mais) ou dívida (recebeu a menos).
+  const [allowTip, setAllowTip] = useState(false)
+  const [allowDebt, setAllowDebt] = useState(false)
+  // Somar a dívida anterior do cliente ao valor a cobrar neste fechamento.
+  const [settleDebt, setSettleDebt] = useState(false)
+
+  // Total efetivamente cobrado agora: serviço + (opcional) dívida anterior.
+  const dueCents = finalCents + (settleDebt ? previousDebtCents : 0)
 
   // Com uma única forma de pagamento, mantém o valor sincronizado ao total
-  // (que muda quando produtos entram/saem).
+  // (que muda quando produtos entram/saem ou ao incluir a dívida anterior).
   useEffect(() => {
     if (selected.length === 1) {
-      setAmounts({ [selected[0]]: centsToInput(finalCents) })
+      setAmounts({ [selected[0]]: centsToInput(dueCents) })
     }
-  }, [finalCents, selected])
+  }, [dueCents, selected])
 
-  const maxInstallments = brands.find((b) => b.name === creditBrand)?.maxInstallments ?? 1
+  const maxInstallments = paymentSettings.credit.maxInstallments
   const sumCents = selected.reduce((sum, method) => sum + parseBRLToCents(amounts[method] ?? ''), 0)
-  const remainingCents = finalCents - sumCents
+  const remainingCents = dueCents - sumCents
 
   function toggle(method: PaymentMethod) {
     if (selected.includes(method)) {
@@ -645,7 +706,7 @@ function PaymentCheckout({
       return
     }
     const allocated = selected.reduce((sum, m) => sum + parseBRLToCents(amounts[m] ?? ''), 0)
-    const left = Math.max(0, finalCents - allocated)
+    const left = Math.max(0, dueCents - allocated)
     setSelected([...selected, method])
     setAmounts((prev) => ({ ...prev, [method]: left > 0 ? centsToInput(left) : '' }))
   }
@@ -654,14 +715,16 @@ function PaymentCheckout({
     setAmounts((prev) => ({ ...prev, [method]: raw.replace(/[^\d,]/g, '') }))
   }
 
-  const creditMissingBrand = selected.includes('credit') && !creditBrand
-  const canFinalize =
-    selected.length > 0 && remainingCents === 0 && !creditMissingBrand && !isLoading
+  // remainingCents > 0 → recebeu a menos (dívida); < 0 → recebeu a mais (gorjeta)
+  const tipCents = remainingCents < 0 ? -remainingCents : 0
+  const debtCents = remainingCents > 0 ? remainingCents : 0
+  const mismatchAllowed =
+    remainingCents === 0 || (tipCents > 0 && allowTip) || (debtCents > 0 && allowDebt)
+  const canFinalize = selected.length > 0 && mismatchAllowed && !isLoading
 
   function handleConfirm() {
     const payments = selected.map((method) => ({
       method,
-      brand: method === 'credit' ? creditBrand || null : null,
       installments: method === 'credit' ? creditInstallments : null,
       amountCents: parseBRLToCents(amounts[method] ?? ''),
     }))
@@ -674,6 +737,7 @@ function PaymentCheckout({
       saleItems,
       saleServiceItems,
       appliedCoupon?.code ?? undefined,
+      settleDebt && previousDebtCents > 0,
     )
   }
 
@@ -835,16 +899,16 @@ function PaymentCheckout({
           </div>
 
           {/* Produtos, serviços extras e cupom */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-1.5">
             <button
               type="button"
               onClick={() => openView('products')}
-              className="relative flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-medium text-ink-secondary transition-colors hover:border-primary/40 hover:bg-primary/5"
+              className="flex items-center gap-1.5 rounded-lg border border-line px-2 py-1.5 text-xs font-medium text-ink-secondary transition-colors hover:border-primary/40 hover:bg-primary/5"
             >
-              <ShoppingBag className="h-4 w-4 shrink-0 text-ink-tertiary" />
-              <span>Produtos</span>
+              <ShoppingBag className="h-3.5 w-3.5 shrink-0 text-ink-tertiary" />
+              <span className="truncate">Produtos</span>
               {saleItems.length > 0 && (
-                <span className="ml-auto flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-white">
+                <span className="ml-auto flex h-4 min-w-[16px] shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-white">
                   {saleItems.length}
                 </span>
               )}
@@ -852,12 +916,12 @@ function PaymentCheckout({
             <button
               type="button"
               onClick={() => openView('services')}
-              className="relative flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-medium text-ink-secondary transition-colors hover:border-primary/40 hover:bg-primary/5"
+              className="flex items-center gap-1.5 rounded-lg border border-line px-2 py-1.5 text-xs font-medium text-ink-secondary transition-colors hover:border-primary/40 hover:bg-primary/5"
             >
-              <Scissors className="h-4 w-4 shrink-0 text-ink-tertiary" />
-              <span>Serviços</span>
+              <Scissors className="h-3.5 w-3.5 shrink-0 text-ink-tertiary" />
+              <span className="truncate">Serviços</span>
               {saleServiceItems.length > 0 && (
-                <span className="ml-auto flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-white">
+                <span className="ml-auto flex h-4 min-w-[16px] shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-white">
                   {saleServiceItems.length}
                 </span>
               )}
@@ -865,10 +929,10 @@ function PaymentCheckout({
             <button
               type="button"
               onClick={() => openView('coupon')}
-              className="relative flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-medium text-ink-secondary transition-colors hover:border-primary/40 hover:bg-primary/5"
+              className="flex items-center gap-1.5 rounded-lg border border-line px-2 py-1.5 text-xs font-medium text-ink-secondary transition-colors hover:border-primary/40 hover:bg-primary/5"
             >
-              <Ticket className="h-4 w-4 shrink-0 text-ink-tertiary" />
-              <span>Cupom</span>
+              <Ticket className="h-3.5 w-3.5 shrink-0 text-ink-tertiary" />
+              <span className="truncate">Cupom</span>
               {(appliedCoupon || campaignCoupon || manualDiscountCents > 0) && (
                 <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-primary" />
               )}
@@ -913,10 +977,45 @@ function PaymentCheckout({
             </div>
             <div className="flex items-center justify-between border-t border-line-divider pt-2">
               <span className="font-medium text-ink">Total final</span>
-              <span className="font-display text-lg font-bold text-primary">
+              <span
+                className={cn(
+                  'font-display font-bold text-primary',
+                  settleDebt && previousDebtCents > 0 ? 'text-base' : 'text-lg',
+                )}
+              >
                 {formatBRL(finalCents)}
               </span>
             </div>
+
+            {/* Dívida anterior do cliente — pode ser somada ao valor a cobrar */}
+            {previousDebtCents > 0 && (
+              <>
+                <label className="flex cursor-pointer items-start justify-between gap-3 rounded-lg border border-warning/40 bg-warning-light/40 px-3 py-2.5">
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-medium text-ink">
+                      Cliente tem {formatBRL(previousDebtCents)} pendente
+                    </span>
+                    <span className="mt-0.5 block text-xs text-ink-tertiary">
+                      Cobrar junto neste fechamento
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={settleDebt}
+                    onChange={(e) => setSettleDebt(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-line accent-primary"
+                  />
+                </label>
+                {settleDebt && (
+                  <div className="flex items-center justify-between border-t border-line-divider pt-2">
+                    <span className="font-medium text-ink">Total a cobrar</span>
+                    <span className="font-display text-lg font-bold text-primary">
+                      {formatBRL(dueCents)}
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
 
@@ -951,6 +1050,24 @@ function PaymentCheckout({
                       <Icon className="h-4 w-4 text-ink-tertiary" />
                       <span className="text-sm font-medium text-ink">{meta.label}</span>
                     </label>
+                    {isOn && method === 'credit' && (
+                      <div className="w-20 shrink-0">
+                        <Select
+                          aria-label="Parcelas"
+                          value={String(creditInstallments)}
+                          onChange={(e) => setCreditInstallments(Number(e.target.value))}
+                        >
+                          {Array.from(
+                            { length: Math.max(1, maxInstallments) },
+                            (_, i) => i + 1,
+                          ).map((n) => (
+                            <option key={n} value={n}>
+                              {n}x
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
+                    )}
                     {isOn && (
                       <div className="relative w-24 shrink-0">
                         <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[13px] text-ink-tertiary">
@@ -967,38 +1084,29 @@ function PaymentCheckout({
                     )}
                   </div>
                   {isOn && method === 'credit' && (
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      <Select
-                        aria-label="Bandeira"
-                        value={creditBrand}
-                        onChange={(e) => {
-                          setCreditBrand(e.target.value)
-                          setCreditInstallments(1)
-                        }}
-                      >
-                        {brands.length === 0 ? (
-                          <option value="">Sem bandeiras</option>
-                        ) : (
-                          brands.map((b) => (
-                            <option key={b.name} value={b.name}>
-                              {b.name}
-                            </option>
-                          ))
-                        )}
-                      </Select>
-                      <Select
-                        aria-label="Parcelas"
-                        value={String(creditInstallments)}
-                        onChange={(e) => setCreditInstallments(Number(e.target.value))}
-                      >
-                        {Array.from({ length: Math.max(1, maxInstallments) }, (_, i) => i + 1).map(
-                          (n) => (
-                            <option key={n} value={n}>
-                              {n}x
-                            </option>
-                          ),
-                        )}
-                      </Select>
+                    <div className="mt-2 space-y-1 border-t border-line-divider pt-2">
+                      {(() => {
+                        const totalCents = parseBRLToCents(amounts.credit ?? '')
+                        const baseCents = Math.floor(totalCents / creditInstallments)
+                        const remainderCents = totalCents - baseCents * creditInstallments
+                        const today = new Date()
+                        return Array.from({ length: creditInstallments }, (_, i) => {
+                          const cents = i === 0 ? baseCents + remainderCents : baseCents
+                          const date = addMonthsClamped(today, i)
+                          return (
+                            <div
+                              key={i}
+                              className="flex items-center justify-between text-xs text-ink-tertiary"
+                            >
+                              <span>
+                                {i + 1}/{creditInstallments} ·{' '}
+                                {date.toLocaleDateString('pt-BR')}
+                              </span>
+                              <span>{formatBRL(cents)}</span>
+                            </div>
+                          )
+                        })
+                      })()}
                     </div>
                   )}
                 </div>
@@ -1006,17 +1114,46 @@ function PaymentCheckout({
             })
           )}
 
-          {selected.length > 0 && remainingCents !== 0 && (
-            <p
+          {selected.length > 0 && debtCents > 0 && (
+            <div
               className={cn(
-                'text-xs font-medium',
-                remainingCents > 0 ? 'text-warning-dark' : 'text-error-dark',
+                'flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5',
+                allowDebt ? 'border-warning/40 bg-warning-light/40' : 'border-line',
               )}
             >
-              {remainingCents > 0
-                ? `Falta alocar ${formatBRL(remainingCents)}`
-                : `Excedeu em ${formatBRL(-remainingCents)}`}
-            </p>
+              <div className="min-w-0">
+                <p className="text-[13px] font-medium text-ink">
+                  Cliente fica devendo {formatBRL(debtCents)}
+                </p>
+                <p className="text-xs text-ink-tertiary">
+                  {allowDebt
+                    ? 'A receita lançada será só o valor recebido.'
+                    : 'Ative para finalizar mesmo recebendo a menos.'}
+                </p>
+              </div>
+              <Switch checked={allowDebt} onChange={setAllowDebt} aria-label="Aceitar dívida" />
+            </div>
+          )}
+
+          {selected.length > 0 && tipCents > 0 && (
+            <div
+              className={cn(
+                'flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5',
+                allowTip ? 'border-success/40 bg-success-light/40' : 'border-line',
+              )}
+            >
+              <div className="min-w-0">
+                <p className="text-[13px] font-medium text-ink">
+                  Gorjeta de {formatBRL(tipCents)}
+                </p>
+                <p className="text-xs text-ink-tertiary">
+                  {allowTip
+                    ? 'O valor a mais entra como receita.'
+                    : 'Ative para finalizar recebendo a mais.'}
+                </p>
+              </div>
+              <Switch checked={allowTip} onChange={setAllowTip} aria-label="Aceitar gorjeta" />
+            </div>
           )}
         </div>
       </div>

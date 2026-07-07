@@ -51,11 +51,13 @@ export const updateAppointmentSchema = z.object({
   discountCents: z.number().int().min(0, 'Desconto inválido').optional(),
   // Cupom aplicado no fechamento (o servidor revalida e recalcula o desconto)
   couponCode: z.string().trim().min(1).optional(),
+  // Quando true, soma a dívida anterior do cliente ao valor devido e a abate
+  // com o pagamento deste fechamento.
+  settlePreviousDebt: z.boolean().optional(),
   payments: z
     .array(
       z.object({
         method: paymentMethodSchema,
-        brand: z.string().trim().max(40).nullable().optional(),
         installments: z.number().int().min(1).max(24).nullable().optional(),
         amountCents: z.number().int().min(0),
       }),

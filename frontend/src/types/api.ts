@@ -14,21 +14,15 @@ export interface Socials {
 
 export type PaymentMethod = 'cash' | 'pix' | 'debit' | 'credit'
 
-export interface CreditBrand {
-  name: string
-  maxInstallments: number
-}
-
 export interface PaymentSettings {
   cash: boolean
   pix: boolean
   debit: boolean
-  credit: { enabled: boolean; brands: CreditBrand[] }
+  credit: { enabled: boolean; maxInstallments: number }
 }
 
 export interface Payment {
   method: PaymentMethod
-  brand: string | null
   installments: number | null
   amountCents: number
 }
@@ -209,6 +203,7 @@ export interface ClientHistoryItem {
   serviceName: string
   priceCents: number
   employeeName: string
+  debtCents: number
 }
 
 export interface ClientDetail {
@@ -216,6 +211,7 @@ export interface ClientDetail {
   stats: {
     appointmentsCount: number
     totalSpentCents: number
+    outstandingDebtCents: number
     lastVisit: string | null
   }
   history: ClientHistoryItem[]
@@ -236,6 +232,10 @@ export interface Appointment {
   payments: Payment[] | null
   saleProducts: SaleProduct[] | null
   saleServices: SaleService[] | null
+  /** efeito líquido deste fechamento no saldo devedor do cliente (com sinal) */
+  debtCents: number
+  /** gorjeta recebida no fechamento (valor pago acima do total devido) */
+  tipCents: number
   createdAt: string
   client: { id: string; name: string; phone: string }
   service: { id: string; name: string; durationMinutes: number; priceCents: number }

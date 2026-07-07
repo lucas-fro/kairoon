@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { CheckCircle2, Copy, ExternalLink, Plus, Save, Search, Trash2, XCircle } from 'lucide-react'
+import { CheckCircle2, Copy, ExternalLink, Save, Search, XCircle } from 'lucide-react'
 import { ApiError } from '../../api/client'
 import { checkSlugAvailability, updateEstablishment, updateSlug } from '../../api/establishment'
 import { useAuth } from '../../contexts/AuthContext'
@@ -41,7 +41,7 @@ const DEFAULT_PAYMENTS: PaymentSettings = {
   cash: true,
   pix: true,
   debit: true,
-  credit: { enabled: true, brands: [] },
+  credit: { enabled: true, maxInstallments: 12 },
 }
 
 const INSTALLMENT_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1)
@@ -203,43 +203,8 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
     onError: (err) => toast.error(err instanceof ApiError ? err.message : 'Erro inesperado'),
   })
 
-  function addBrand() {
-    setPayments((p) => ({
-      ...p,
-      credit: { ...p.credit, brands: [...p.credit.brands, { name: '', maxInstallments: 12 }] },
-    }))
-  }
-
-  function updateBrand(index: number, patch: Partial<{ name: string; maxInstallments: number }>) {
-    setPayments((p) => ({
-      ...p,
-      credit: {
-        ...p.credit,
-        brands: p.credit.brands.map((b, i) => (i === index ? { ...b, ...patch } : b)),
-      },
-    }))
-  }
-
-  function removeBrand(index: number) {
-    setPayments((p) => ({
-      ...p,
-      credit: { ...p.credit, brands: p.credit.brands.filter((_, i) => i !== index) },
-    }))
-  }
-
   function handleSavePayments() {
-    if (payments.credit.enabled && payments.credit.brands.some((b) => !b.name.trim())) {
-      toast.error('Informe o nome de todas as bandeiras (ou remova as vazias)')
-      return
-    }
-    const cleaned: PaymentSettings = {
-      ...payments,
-      credit: {
-        ...payments.credit,
-        brands: payments.credit.brands.map((b) => ({ ...b, name: b.name.trim() })),
-      },
-    }
-    paymentsMutation.mutate(cleaned)
+    paymentsMutation.mutate(payments)
   }
 
   // Validação de disponibilidade do slug com debounce de 2 segundos
@@ -609,13 +574,13 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
             ))}
           </div>
 
-          {/* Crédito com bandeiras e parcelas */}
+          {/* Crédito com parcelamento */}
           <div className="space-y-3 rounded-lg border border-line p-4">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-ink">Crédito</p>
                 <p className="mt-0.5 text-xs text-ink-tertiary">
-                  Defina as bandeiras aceitas e em quantas vezes você parcela cada uma.
+                  Aceitar cartão de crédito no fechamento dos atendimentos.
                 </p>
               </div>
               <Switch
@@ -628,57 +593,26 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
             </div>
 
             {payments.credit.enabled && (
-              <div className="space-y-2">
-                {payments.credit.brands.length === 0 && (
-                  <p className="rounded-lg bg-background px-3 py-3 text-center text-xs text-ink-tertiary">
-                    Nenhuma bandeira adicionada ainda.
-                  </p>
-                )}
-                {payments.credit.brands.map((brand, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <div className="flex-1">
-                      <Input
-                        placeholder="Bandeira (ex.: Visa)"
-                        value={brand.name}
-                        onChange={(e) => updateBrand(index, { name: e.target.value })}
-                      />
-                    </div>
-                    <div className="w-24 shrink-0">
-                      <Select
-                        aria-label="Máximo de parcelas"
-                        value={String(brand.maxInstallments)}
-                        onChange={(e) =>
-                          updateBrand(index, { maxInstallments: Number(e.target.value) })
-                        }
-                      >
-                        {INSTALLMENT_OPTIONS.map((n) => (
-                          <option key={n} value={n}>
-                            {n}x
-                          </option>
-                        ))}
-                      </Select>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="shrink-0 px-2 text-error-dark hover:bg-error-light hover:text-error-dark"
-                      onClick={() => removeBrand(index)}
-                      aria-label="Remover bandeira"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  leftIcon={<Plus className="h-4 w-4" />}
-                  onClick={addBrand}
-                >
-                  Adicionar bandeira
-                </Button>
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-sm font-medium text-ink">Máximo de parcelas</p>
+                <div className="w-24 shrink-0">
+                  <Select
+                    aria-label="Máximo de parcelas"
+                    value={String(payments.credit.maxInstallments)}
+                    onChange={(e) =>
+                      setPayments((p) => ({
+                        ...p,
+                        credit: { ...p.credit, maxInstallments: Number(e.target.value) },
+                      }))
+                    }
+                  >
+                    {INSTALLMENT_OPTIONS.map((n) => (
+                      <option key={n} value={n}>
+                        {n}x
+                      </option>
+                    ))}
+                  </Select>
+                </div>
               </div>
             )}
           </div>

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, ilike, inArray, like, lte, ne, or } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, ilike, inArray, like, lte, ne, or, sql } from 'drizzle-orm'
 import { db } from '../../db'
 import {
   appointments,
@@ -36,7 +36,6 @@ const joinedWith = {
 
 type Payment = {
   method: 'cash' | 'pix' | 'debit' | 'credit'
-  brand: string | null
   installments: number | null
   amountCents: number
 }
@@ -56,6 +55,8 @@ interface JoinedRow {
   payments: Payment[] | null
   saleProducts: SaleProduct[] | null
   saleServices: SaleService[] | null
+  debtCents: number
+  tipCents: number
   createdAt: Date
   client: { id: string; name: string; phone: string }
   service: { id: string; name: string; durationMinutes: number; priceCents: number }
@@ -75,6 +76,8 @@ function toJoinedAppointment(row: JoinedRow) {
     payments: row.payments,
     saleProducts: row.saleProducts,
     saleServices: row.saleServices,
+    debtCents: row.debtCents,
+    tipCents: row.tipCents,
     createdAt: row.createdAt,
     client: row.client,
     service: row.service,
@@ -414,7 +417,6 @@ export async function updateAppointment(
     if (input.payments !== undefined)
       paymentsToStore = input.payments.map((p) => ({
         method: p.method,
-        brand: p.brand ?? null,
         installments: p.installments ?? null,
         amountCents: p.amountCents,
       }))
@@ -500,10 +502,42 @@ export async function updateAppointment(
       throw new AppError('O desconto não pode ser maior que o total', 400)
     }
     const finalCents = Math.max(0, subtotalCents - discountToStore)
-    if (newStatus === 'completed' && paymentsToStore && paymentsToStore.length > 0) {
-      const sum = paymentsToStore.reduce((acc, p) => acc + p.amountCents, 0)
-      if (sum !== finalCents) {
-        throw new AppError('A soma das formas de pagamento deve ser igual ao total final', 400)
+    // Valor efetivamente recebido no fechamento. Pode diferir do total quando o
+    // cliente deixa gorjeta (paga a mais) ou fica devendo (paga a menos) — nesse
+    // caso a receita reflete o dinheiro que de fato entrou, não o valor nominal.
+    const collectedCents =
+      newStatus === 'completed' && paymentsToStore && paymentsToStore.length > 0
+        ? paymentsToStore.reduce((acc, p) => acc + p.amountCents, 0)
+        : finalCents
+
+    // Dívida/gorjeta do cliente. debtCents é o efeito líquido (com sinal) no
+    // saldo devedor: > 0 passou a dever mais, < 0 quitou parte. Quando o
+    // fechamento inclui a dívida anterior (settlePreviousDebt), ela entra no
+    // valor devido e é abatida pelo que foi pago. tipCents é o valor pago acima
+    // do total devido. Reabrir/cancelar zera ambos (o pagamento também é zerado).
+    let debtCentsToStore = 0
+    let tipCentsToStore = 0
+    if (newStatus === 'completed') {
+      const [prevRow] = await tx
+        .select({ balance: sql<string>`coalesce(sum(${appointments.debtCents}), 0)` })
+        .from(appointments)
+        .where(
+          and(
+            eq(appointments.establishmentId, establishmentId),
+            eq(appointments.clientId, appointment.clientId),
+            eq(appointments.status, 'completed'),
+            ne(appointments.id, id),
+          ),
+        )
+      const prevBalance = Number(prevRow?.balance ?? 0)
+      const settling = Boolean(input.settlePreviousDebt) && prevBalance > 0
+      const dueCents = finalCents + (settling ? prevBalance : 0)
+      tipCentsToStore = Math.max(0, collectedCents - dueCents)
+      if (settling) {
+        const newBalance = Math.max(0, dueCents - collectedCents)
+        debtCentsToStore = newBalance - prevBalance
+      } else {
+        debtCentsToStore = Math.max(0, finalCents - collectedCents)
       }
     }
 
@@ -519,6 +553,8 @@ export async function updateAppointment(
         payments: paymentsToStore,
         saleProducts: saleProductsToStore,
         saleServices: saleServicesToStore,
+        debtCents: debtCentsToStore,
+        tipCents: tipCentsToStore,
       })
       .where(and(eq(appointments.id, id), eq(appointments.establishmentId, establishmentId)))
       .returning()
@@ -566,11 +602,11 @@ export async function updateAppointment(
         where: and(eq(transactions.appointmentId, id), eq(transactions.type, 'income')),
       })
       if (existingIncome) {
-        // Remarcação move a receita; mudança de desconto ajusta o valor
-        if (existingIncome.date !== updated.date || existingIncome.amountCents !== finalCents) {
+        // Remarcação move a receita; mudança de desconto/valor recebido ajusta o total
+        if (existingIncome.date !== updated.date || existingIncome.amountCents !== collectedCents) {
           await tx
             .update(transactions)
-            .set({ date: updated.date, amountCents: finalCents })
+            .set({ date: updated.date, amountCents: collectedCents })
             .where(eq(transactions.id, existingIncome.id))
         }
       } else {
@@ -578,7 +614,7 @@ export async function updateAppointment(
           establishmentId,
           appointmentId: id,
           description: `Serviço: ${appointment.service.name} — ${appointment.client.name}`,
-          amountCents: finalCents,
+          amountCents: collectedCents,
           type: 'income',
           date: updated.date,
         })

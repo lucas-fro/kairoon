@@ -371,7 +371,12 @@ export function PublicBookingPage() {
 
       <main
         key={state.step}
-        className="step-enter mx-auto flex w-full min-h-0 max-w-md flex-1 flex-col px-4"
+        className={cn(
+          'step-enter mx-auto flex w-full min-h-0 max-w-md flex-1 flex-col',
+          // Nos passos "bare" o banner de marca precisa encostar nas laterais e no
+          // topo — o padding horizontal fica por conta de cada etapa internamente.
+          !isBareStep && 'px-4',
+        )}
       >
         {isBareStep || !title ? (
           renderStep()

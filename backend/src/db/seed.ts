@@ -51,14 +51,7 @@ async function main() {
         cash: true,
         pix: true,
         debit: true,
-        credit: {
-          enabled: true,
-          brands: [
-            { name: 'Visa', maxInstallments: 12 },
-            { name: 'Mastercard', maxInstallments: 12 },
-            { name: 'Elo', maxInstallments: 6 },
-          ],
-        },
+        credit: { enabled: true, maxInstallments: 12 },
       },
       welcomeMessage:
         'Bem-vindo à Navalha de Ouro! Agende seu horário em poucos cliques e venha renovar o visual.',

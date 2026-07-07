@@ -70,6 +70,7 @@ export async function getClientDetails(establishmentId: string, id: string) {
       serviceName: services.name,
       priceCents: services.priceCents,
       employeeName: employees.name,
+      debtCents: appointments.debtCents,
     })
     .from(appointments)
     .innerJoin(services, eq(services.id, appointments.serviceId))
@@ -79,11 +80,13 @@ export async function getClientDetails(establishmentId: string, id: string) {
 
   const today = todayStr()
   const nonCancelled = history.filter((a) => a.status !== 'cancelled')
+  const completed = history.filter((a) => a.status === 'completed')
   const stats = {
     appointmentsCount: nonCancelled.length,
-    totalSpentCents: history
-      .filter((a) => a.status === 'completed')
-      .reduce((total, a) => total + a.priceCents, 0),
+    totalSpentCents: completed.reduce((total, a) => total + a.priceCents, 0),
+    // Saldo devedor atual do cliente: soma (com sinal) do efeito de cada
+    // fechamento. Nunca negativo (uma gorjeta não vira crédito a favor).
+    outstandingDebtCents: Math.max(0, completed.reduce((total, a) => total + a.debtCents, 0)),
     // history está ordenado por date desc: a primeira visita não-cancelada até hoje é a mais recente
     lastVisit: nonCancelled.find((a) => a.date <= today)?.date ?? null,
   }

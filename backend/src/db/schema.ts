@@ -101,26 +101,20 @@ export const establishments = pgTable('establishments', {
   // pendentes até o estabelecimento aceitar.
   autoConfirm: boolean('auto_confirm').notNull().default(true),
   // Formas de pagamento aceitas no fechamento do serviço. Para crédito,
-  // guarda as bandeiras aceitas e o máximo de parcelas de cada uma.
+  // guarda apenas o máximo de parcelas (sem distinguir bandeira do cartão).
   paymentSettings: jsonb('payment_settings')
     .$type<{
       cash: boolean
       pix: boolean
       debit: boolean
-      credit: { enabled: boolean; brands: { name: string; maxInstallments: number }[] }
+      credit: { enabled: boolean; maxInstallments: number }
     }>()
     .notNull()
     .default({
       cash: true,
       pix: true,
       debit: true,
-      credit: {
-        enabled: true,
-        brands: [
-          { name: 'Visa', maxInstallments: 12 },
-          { name: 'Mastercard', maxInstallments: 12 },
-        ],
-      },
+      credit: { enabled: true, maxInstallments: 12 },
     }),
   quiz: jsonb('quiz').$type<Record<string, string>>(),
   plan: text('plan').notNull().default('free'),
@@ -308,7 +302,6 @@ export const appointments = pgTable(
     payments: jsonb('payments').$type<
       {
         method: 'cash' | 'pix' | 'debit' | 'credit'
-        brand: string | null
         installments: number | null
         amountCents: number
       }[]
@@ -322,6 +315,12 @@ export const appointments = pgTable(
     saleServices: jsonb('sale_services').$type<
       { serviceId: string; name: string; quantity: number; unitPriceCents: number }[]
     >(),
+    // Efeito líquido deste fechamento no saldo devedor do cliente (com sinal):
+    // > 0 = cliente passou a dever mais; < 0 = quitou parte da dívida anterior.
+    // O saldo devedor do cliente é a soma de debt_cents dos seus atendimentos.
+    debtCents: integer('debt_cents').notNull().default(0),
+    // Gorjeta recebida no fechamento (valor pago acima do total devido).
+    tipCents: integer('tip_cents').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('appointments_establishment_date_idx').on(t.establishmentId, t.date)],

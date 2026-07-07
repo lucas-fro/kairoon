@@ -30,7 +30,7 @@ export function SectionNav({ tabs, active, onChange, children }: SectionNavProps
       {/* Desktop: sidebar vertical */}
       <aside className="hidden shrink-0 lg:block lg:w-[224px]">
         <nav
-          className="sticky top-4 space-y-0.5"
+          className="sticky top-20 space-y-0.5"
           role="tablist"
           aria-orientation="vertical"
         >

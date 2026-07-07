@@ -325,6 +325,21 @@ export function ClientDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Valor pendente (dívida acumulada em fechamentos anteriores) */}
+      {stats.outstandingDebtCents > 0 && (
+        <div className="mb-4 flex items-center gap-3 rounded-xl border border-warning/40 bg-warning-light/50 px-4 py-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-warning/15">
+            <Wallet className="h-5 w-5 text-warning-dark" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[13px] text-ink-secondary">Valor pendente a pagar</p>
+            <p className="font-display text-xl font-bold text-warning-dark">
+              {formatBRL(stats.outstandingDebtCents)}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Estatísticas */}
       <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard icon={Wallet} label="Total gasto" value={formatBRL(stats.totalSpentCents)} />

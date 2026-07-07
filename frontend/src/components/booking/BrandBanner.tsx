@@ -8,6 +8,8 @@ interface BrandBannerProps {
   logoUrl: string | null
   name: string
   className?: string
+  /** `false` deixa o banner com cantos retos, para uso encostado nas bordas da tela. */
+  rounded?: boolean
 }
 
 /**
@@ -21,13 +23,14 @@ export function BrandBanner({
   logoUrl,
   name,
   className,
+  rounded = true,
 }: BrandBannerProps) {
   const fg = readableTextColor(brandColor)
 
   return (
     <div className={cn('relative w-full pb-14', className)}>
       <div
-        className="h-32 w-full overflow-hidden rounded-2xl"
+        className={cn('h-32 w-full overflow-hidden', rounded && 'rounded-2xl')}
         style={{ backgroundColor: brandColor }}
       >
         {bannerImageUrl && (
