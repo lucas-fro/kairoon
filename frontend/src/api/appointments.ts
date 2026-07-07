@@ -27,6 +27,7 @@ export interface UpdateAppointmentPayload {
     amountCents: number
   }[]
   saleProducts?: { productId: string; quantity: number }[]
+  saleServices?: { serviceId: string; quantity: number }[]
 }
 
 export function listAppointments(params: {
@@ -43,6 +44,11 @@ export function listAppointments(params: {
 
 export function getAppointment(id: string) {
   return api<Appointment>(`/appointments/${id}`)
+}
+
+/** Agendamentos criados nas últimas `sinceHours` horas (por data de criação). */
+export function listRecentAppointments(sinceHours = 24) {
+  return api<Appointment[]>(`/appointments/recent?sinceHours=${sinceHours}`)
 }
 
 export function searchAppointments(q: string) {

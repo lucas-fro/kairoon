@@ -317,6 +317,11 @@ export const appointments = pgTable(
     saleProducts: jsonb('sale_products').$type<
       { productId: string; name: string; quantity: number; unitPriceCents: number }[]
     >(),
+    // Serviços extras realizados junto no fechamento, além do serviço principal
+    // do agendamento (snapshot de nome/preço na venda)
+    saleServices: jsonb('sale_services').$type<
+      { serviceId: string; name: string; quantity: number; unitPriceCents: number }[]
+    >(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('appointments_establishment_date_idx').on(t.establishmentId, t.date)],

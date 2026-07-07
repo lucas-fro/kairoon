@@ -288,15 +288,15 @@ function FixedCostsForecast({ month }: { month: string }) {
                     </Td>
                     <Td className="text-right">
                       {item.posted ? (
-                        <div className="inline-flex items-center justify-end gap-2">
-                          <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success-dark">
+                        <div className="group/settle relative inline-flex h-8 min-w-[110px] items-center justify-end">
+                          <span className="pointer-events-none absolute inset-y-0 right-0 inline-flex items-center gap-1.5 text-sm font-medium text-success-dark transition-opacity duration-150 group-hover/settle:opacity-0">
                             <Check className="h-4 w-4" />
                             Baixado
                           </span>
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-ink-tertiary"
+                            className="absolute inset-y-0 right-0 text-ink-tertiary opacity-0 transition-opacity duration-150 group-hover/settle:opacity-100"
                             onClick={() =>
                               item.transactionId && unsettleMutation.mutate(item.transactionId)
                             }

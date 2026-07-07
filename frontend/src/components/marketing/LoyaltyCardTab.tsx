@@ -144,6 +144,11 @@ export function LoyaltyCardTab() {
 
   return (
     <div className="space-y-6">
+      <p className="text-sm text-ink-secondary">
+        A cada atendimento elegível o cliente ganha 1 carimbo; ao completar o cartão, os carimbos
+        viram um cupom pessoal com a recompensa configurada.
+      </p>
+
       {query.isPending && <SkeletonList rows={4} />}
 
       {query.isError && (
@@ -161,35 +166,20 @@ export function LoyaltyCardTab() {
       )}
 
       {!query.isPending && !query.isError && (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Stamp className="h-4 w-4 text-primary" />
-                Como funciona
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-3">
-              <p className="text-sm text-ink-secondary">{howItWorks}</p>
-              <p className="mt-2 text-xs text-ink-tertiary">
-                O resgate é feito na página do cliente (Clientes → detalhe): ao completar o cartão,
-                os carimbos são trocados por um cupom pessoal com a recompensa.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
+        <div className="flex flex-col-reverse gap-6 xl:flex-row">
+          <Card className="w-full flex-1">
             <CardHeader>
               <CardTitle>Configuração</CardTitle>
             </CardHeader>
             <CardContent className="pt-4">
-              <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+              <form onSubmit={handleSubmit} className="max-w-2xl space-y-4" noValidate>
                 <div className="flex items-center justify-between gap-4 rounded-lg bg-background px-4 py-3">
                   <div>
-                    <p className="text-sm font-medium text-ink">Cartão fidelidade ativo</p>
-                    <p className="text-xs text-ink-tertiary">
-                      Com o programa ativo, cada atendimento concluído elegível gera 1 carimbo
-                      automaticamente.
+                    <p className="text-sm font-medium text-ink">
+                      Cartão fidelidade{' '}
+                      <span className={active ? 'text-success-dark' : 'text-ink-tertiary'}>
+                        {active ? 'ativado' : 'desativado'}
+                      </span>
                     </p>
                   </div>
                   <Switch checked={active} onChange={setActive} aria-label="Cartão fidelidade ativo" />
@@ -219,88 +209,90 @@ export function LoyaltyCardTab() {
                   <span className="mb-2 block text-[13px] font-medium text-ink-secondary">
                     Recompensa ao completar o cartão
                   </span>
-                  <div className="inline-flex w-full rounded-lg border border-line p-0.5">
-                    {REWARD_OPTIONS.map(({ key, label }) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => {
-                          setRewardType(key)
-                          setRewardValue('')
-                          setFormErrors((prev) => ({ ...prev, reward: undefined }))
-                        }}
-                        className={cn(
-                          'inline-flex h-9 flex-1 items-center justify-center rounded-md text-[13px] font-medium transition-colors',
-                          rewardType === key
-                            ? 'bg-primary text-white'
-                            : 'text-ink-secondary hover:text-ink',
-                        )}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className="inline-flex shrink-0 rounded-lg border border-line p-0.5">
+                      {REWARD_OPTIONS.map(({ key, label }) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => {
+                            setRewardType(key)
+                            setRewardValue('')
+                            setFormErrors((prev) => ({ ...prev, reward: undefined }))
+                          }}
+                          className={cn(
+                            'inline-flex h-9 items-center justify-center rounded-md px-4 text-[13px] font-medium transition-colors',
+                            rewardType === key
+                              ? 'bg-primary text-white'
+                              : 'text-ink-secondary hover:text-ink',
+                          )}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
 
-                {rewardType === 'free_service' ? (
-                  <Select
-                    label="Serviço da recompensa"
-                    value={rewardServiceId}
-                    onChange={(e) => setRewardServiceId(e.target.value)}
-                  >
-                    <option value="">Qualquer serviço</option>
-                    {serviceOptions.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} — {formatBRL(s.priceCents)}
-                      </option>
-                    ))}
-                  </Select>
-                ) : (
-                  <div>
-                    <span className="mb-2 block text-[13px] font-medium text-ink-secondary">
-                      {rewardType === 'percent' ? 'Desconto (%)' : 'Valor do desconto'}
-                    </span>
-                    <div className="relative">
-                      {rewardType === 'fixed' && (
-                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-tertiary">
-                          R$
-                        </span>
-                      )}
-                      <input
-                        inputMode={rewardType === 'percent' ? 'numeric' : 'decimal'}
-                        value={rewardValue}
-                        onChange={(e) => {
-                          const v = e.target.value
-                          if (rewardType === 'percent') {
-                            const digits = onlyDigits(v).slice(0, 3)
-                            setRewardValue(
-                              digits === '' ? '' : String(Math.min(Number(digits), 100)),
-                            )
-                          } else {
-                            setRewardValue(v.replace(/[^\d,]/g, ''))
-                          }
-                        }}
-                        placeholder={rewardType === 'percent' ? '10' : '0,00'}
-                        className={cn(
-                          'h-10 w-full rounded-lg border bg-surface text-sm text-ink placeholder:text-ink-tertiary',
-                          'transition-shadow duration-150 focus:outline-none focus:ring-[3px]',
-                          rewardType === 'fixed' ? 'pl-9 pr-3' : 'pl-3 pr-8',
-                          formErrors.reward
-                            ? 'border-error focus:border-error focus:ring-error-light'
-                            : 'border-line focus:border-secondary focus:ring-secondary-light',
-                        )}
-                      />
-                      {rewardType === 'percent' && (
-                        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-ink-tertiary">
-                          %
-                        </span>
+                    <div className="min-w-0 flex-1">
+                      {rewardType === 'free_service' ? (
+                        <Select
+                          aria-label="Serviço da recompensa"
+                          value={rewardServiceId}
+                          onChange={(e) => setRewardServiceId(e.target.value)}
+                        >
+                          <option value="">Qualquer serviço</option>
+                          {serviceOptions.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name} — {formatBRL(s.priceCents)}
+                            </option>
+                          ))}
+                        </Select>
+                      ) : (
+                        <div className="relative">
+                          {rewardType === 'fixed' && (
+                            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-tertiary">
+                              R$
+                            </span>
+                          )}
+                          <input
+                            inputMode={rewardType === 'percent' ? 'numeric' : 'decimal'}
+                            value={rewardValue}
+                            aria-label={
+                              rewardType === 'percent' ? 'Desconto em %' : 'Valor do desconto'
+                            }
+                            onChange={(e) => {
+                              const v = e.target.value
+                              if (rewardType === 'percent') {
+                                const digits = onlyDigits(v).slice(0, 3)
+                                setRewardValue(
+                                  digits === '' ? '' : String(Math.min(Number(digits), 100)),
+                                )
+                              } else {
+                                setRewardValue(v.replace(/[^\d,]/g, ''))
+                              }
+                            }}
+                            placeholder={rewardType === 'percent' ? '10' : '0,00'}
+                            className={cn(
+                              'h-10 w-full rounded-lg border bg-surface text-sm text-ink placeholder:text-ink-tertiary',
+                              'transition-shadow duration-150 focus:outline-none focus:ring-[3px]',
+                              rewardType === 'fixed' ? 'pl-9 pr-3' : 'pl-3 pr-8',
+                              formErrors.reward
+                                ? 'border-error focus:border-error focus:ring-error-light'
+                                : 'border-line focus:border-secondary focus:ring-secondary-light',
+                            )}
+                          />
+                          {rewardType === 'percent' && (
+                            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-ink-tertiary">
+                              %
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
-                    {formErrors.reward && (
-                      <p className="mt-1.5 text-xs text-error-dark">{formErrors.reward}</p>
-                    )}
                   </div>
-                )}
+                  {formErrors.reward && (
+                    <p className="mt-1.5 text-xs text-error-dark">{formErrors.reward}</p>
+                  )}
+                </div>
 
                 <p className="flex items-center gap-1.5 text-xs text-ink-tertiary">
                   <AlertCircle className="h-3.5 w-3.5 shrink-0" />
@@ -319,7 +311,23 @@ export function LoyaltyCardTab() {
               </form>
             </CardContent>
           </Card>
-        </>
+
+          <Card className="w-full flex-1">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Stamp className="h-4 w-4 text-primary" />
+                Como funciona
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-3">
+              <p className="text-sm text-ink-secondary">{howItWorks}</p>
+              <p className="mt-2 text-xs text-ink-tertiary">
+                O resgate é feito na página do cliente (Clientes → detalhe): ao completar o cartão,
+                os carimbos são trocados por um cupom pessoal com a recompensa.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   )

@@ -5,7 +5,7 @@ import { CouponsTab } from '../../components/marketing/CouponsTab'
 import { LoyaltyCardTab } from '../../components/marketing/LoyaltyCardTab'
 import { PointsTab } from '../../components/marketing/PointsTab'
 import { PageHeader } from '../../components/ui/PageHeader'
-import { Tabs } from '../../components/ui/Tabs'
+import { SectionNav } from '../../components/ui/SectionNav'
 import type { TabItem } from '../../components/ui/Tabs'
 
 const TABS: TabItem[] = [
@@ -30,14 +30,16 @@ export function MarketingPage() {
         description="Cupons, campanhas automáticas, cartão fidelidade e programa de pontos para atrair e reter clientes."
       />
 
-      <Tabs tabs={TABS} active={activeTab} onChange={(key) => setSearchParams({ tab: key })} />
-
-      <div className="mt-8">
+      <SectionNav
+        tabs={TABS}
+        active={activeTab}
+        onChange={(key) => setSearchParams({ tab: key })}
+      >
         {activeTab === 'cupons' && <CouponsTab />}
         {activeTab === 'campanhas' && <CampaignsTab />}
         {activeTab === 'cartao' && <LoyaltyCardTab />}
         {activeTab === 'pontos' && <PointsTab />}
-      </div>
+      </SectionNav>
     </div>
   )
 }

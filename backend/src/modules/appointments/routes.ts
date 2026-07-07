@@ -3,6 +3,7 @@ import {
   createAppointmentSchema,
   idParamSchema,
   listAppointmentsQuerySchema,
+  recentAppointmentsQuerySchema,
   searchAppointmentsQuerySchema,
   updateAppointmentSchema,
 } from './schemas'
@@ -19,6 +20,11 @@ export async function appointmentsRoutes(app: FastifyInstance) {
   app.get('/search', async (request) => {
     const query = searchAppointmentsQuerySchema.parse(request.query)
     return appointmentsService.searchAppointments(request.user.establishmentId, query)
+  })
+
+  app.get('/recent', async (request) => {
+    const query = recentAppointmentsQuerySchema.parse(request.query)
+    return appointmentsService.listRecentAppointments(request.user.establishmentId, query)
   })
 
   app.get('/:id', async (request) => {

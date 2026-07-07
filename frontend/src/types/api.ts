@@ -111,6 +111,13 @@ export interface SaleProduct {
   unitPriceCents: number
 }
 
+export interface SaleService {
+  serviceId: string
+  name: string
+  quantity: number
+  unitPriceCents: number
+}
+
 export type Gender = 'masculino' | 'feminino' | 'outro'
 
 export type CommissionType = 'percent' | 'fixed'
@@ -228,6 +235,8 @@ export interface Appointment {
   discountCents: number
   payments: Payment[] | null
   saleProducts: SaleProduct[] | null
+  saleServices: SaleService[] | null
+  createdAt: string
   client: { id: string; name: string; phone: string }
   service: { id: string; name: string; durationMinutes: number; priceCents: number }
   employee: { id: string; name: string }

@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Banknote,
   CalendarClock,
-  ChevronRight,
   Clock,
   CreditCard,
   Gift,
@@ -29,6 +28,7 @@ import { listClientCoupons, validateCoupon } from '../../api/coupons'
 import { getClientLoyalty } from '../../api/loyalty'
 import { getClientPoints } from '../../api/points'
 import { listProducts } from '../../api/products'
+import { listServices } from '../../api/services'
 import { useAuth } from '../../contexts/AuthContext'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
@@ -40,7 +40,14 @@ import { Select } from '../ui/Select'
 import { useToast } from '../ui/Toast'
 import { describeCouponDiscount } from '../../lib/coupons'
 import { cn, formatBRL, formatDate, formatPhone, parseBRLToCents } from '../../lib/format'
-import type { Appointment, Payment, PaymentMethod, PaymentSettings, Product } from '../../types/api'
+import type {
+  Appointment,
+  Payment,
+  PaymentMethod,
+  PaymentSettings,
+  Product,
+  Service,
+} from '../../types/api'
 import { buildTimeOptions } from './timeOptions'
 
 const statusBadge: Record<
@@ -100,7 +107,9 @@ export function AppointmentDetailsDialog({
   const [rescheduling, setRescheduling] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [finalizing, setFinalizing] = useState(false)
-  const [pickingProducts, setPickingProducts] = useState(false)
+  const [checkoutSubview, setCheckoutSubview] = useState<
+    'products' | 'services' | 'coupon' | null
+  >(null)
   const [newDate, setNewDate] = useState('')
   const [newTime, setNewTime] = useState('')
 
@@ -114,7 +123,7 @@ export function AppointmentDetailsDialog({
     setRescheduling(false)
     setConfirmCancel(false)
     setFinalizing(false)
-    setPickingProducts(false)
+    setCheckoutSubview(null)
     setNewDate(appointment.date)
     setNewTime(appointment.startTime)
   }, [appointment])
@@ -158,11 +167,15 @@ export function AppointmentDetailsDialog({
         open={!confirmCancel}
         onClose={onClose}
         title={
-          pickingProducts
+          checkoutSubview === 'products'
             ? 'Selecionar produtos'
-            : finalizing
-              ? 'Fechamento do serviço'
-              : 'Detalhes do agendamento'
+            : checkoutSubview === 'services'
+              ? 'Adicionar serviço extra'
+              : checkoutSubview === 'coupon'
+                ? 'Cupom de desconto'
+                : finalizing
+                  ? 'Fechamento do serviço'
+                  : 'Detalhes do agendamento'
         }
         maxWidth={finalizing ? 'max-w-3xl' : 'max-w-md'}
       >
@@ -171,14 +184,15 @@ export function AppointmentDetailsDialog({
             appointment={appointment}
             paymentSettings={paymentSettings}
             isLoading={mutation.isPending}
-            onPickingChange={setPickingProducts}
+            onSubviewChange={setCheckoutSubview}
             onBack={() => setFinalizing(false)}
-            onConfirm={(payments, discountCents, saleProducts, couponCode) =>
+            onConfirm={(payments, discountCents, saleProducts, saleServices, couponCode) =>
               mutation.mutate({
                 status: 'completed',
                 discountCents,
                 payments,
                 saleProducts,
+                saleServices,
                 couponCode,
               })
             }
@@ -228,6 +242,24 @@ export function AppointmentDetailsDialog({
                 <p className="text-ink-secondary">Profissional: {appointment.employee.name}</p>
               </div>
             </div>
+
+            {appointment.status === 'completed' &&
+              appointment.saleServices &&
+              appointment.saleServices.length > 0 && (
+                <div className="space-y-2 rounded-xl bg-background p-4 text-sm">
+                  <p className="text-[13px] font-medium text-ink-secondary">Serviços extras</p>
+                  {appointment.saleServices.map((service, index) => (
+                    <div key={index} className="flex items-center justify-between">
+                      <span className="text-ink-secondary">
+                        {service.quantity}× {service.name}
+                      </span>
+                      <span className="font-medium text-ink">
+                        {formatBRL(service.quantity * service.unitPriceCents)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
             {appointment.status === 'completed' &&
               appointment.saleProducts &&
@@ -378,7 +410,7 @@ interface PaymentCheckoutProps {
   appointment: Appointment
   paymentSettings: PaymentSettings
   isLoading: boolean
-  onPickingChange: (picking: boolean) => void
+  onSubviewChange: (view: 'products' | 'services' | 'coupon' | null) => void
   onBack: () => void
   onConfirm: (
     payments: {
@@ -389,6 +421,7 @@ interface PaymentCheckoutProps {
     }[],
     discountCents: number,
     saleProducts: { productId: string; quantity: number }[],
+    saleServices: { serviceId: string; quantity: number }[],
     couponCode?: string,
   ) => void
 }
@@ -397,7 +430,7 @@ function PaymentCheckout({
   appointment,
   paymentSettings,
   isLoading,
-  onPickingChange,
+  onSubviewChange,
   onBack,
   onConfirm,
 }: PaymentCheckoutProps) {
@@ -408,22 +441,40 @@ function PaymentCheckout({
   )
   const catalogById = useMemo(() => new Map(catalog.map((p) => [p.id, p])), [catalog])
 
+  const extraServicesQuery = useQuery({ queryKey: ['services'], queryFn: listServices })
+  const serviceCatalog = useMemo(
+    () => (extraServicesQuery.data ?? []).filter((s) => s.active),
+    [extraServicesQuery.data],
+  )
+  const serviceCatalogById = useMemo(
+    () => new Map(serviceCatalog.map((s) => [s.id, s])),
+    [serviceCatalog],
+  )
+
   const [saleItems, setSaleItems] = useState<{ productId: string; quantity: number }[]>([])
-  const [picking, setPicking] = useState(false)
+  const [saleServiceItems, setSaleServiceItems] = useState<{ serviceId: string; quantity: number }[]>(
+    [],
+  )
+  const [view, setView] = useState<'checkout' | 'products' | 'services' | 'coupon'>('checkout')
 
-  function openPicker() {
-    setPicking(true)
-    onPickingChange(true)
+  function openView(next: 'products' | 'services' | 'coupon') {
+    setView(next)
+    onSubviewChange(next)
   }
 
-  function closePicker() {
-    setPicking(false)
-    onPickingChange(false)
+  function closeView() {
+    setView('checkout')
+    onSubviewChange(null)
   }
 
-  function applyPicked(items: { productId: string; quantity: number }[]) {
+  function applyPickedProducts(items: { productId: string; quantity: number }[]) {
     setSaleItems(items)
-    closePicker()
+    closeView()
+  }
+
+  function applyPickedServices(items: { serviceId: string; quantity: number }[]) {
+    setSaleServiceItems(items)
+    closeView()
   }
 
   const servicesCents = appointment.service.priceCents
@@ -431,7 +482,39 @@ function PaymentCheckout({
     (sum, item) => sum + (catalogById.get(item.productId)?.priceCents ?? 0) * item.quantity,
     0,
   )
-  const subtotalCents = servicesCents + productsCents
+  const extraServicesCents = saleServiceItems.reduce(
+    (sum, item) => sum + (serviceCatalogById.get(item.serviceId)?.priceCents ?? 0) * item.quantity,
+    0,
+  )
+  const subtotalCents = servicesCents + productsCents + extraServicesCents
+
+  // Linhas de serviço do resumo: o serviço agendado é a base (1×) e cada serviço
+  // extra igual a ele soma na mesma linha (evita duplicar). Assim todas as linhas
+  // exibem "N×", inclusive a do serviço agendado.
+  const serviceLines = useMemo(() => {
+    const lines = [
+      {
+        id: appointment.service.id,
+        name: appointment.service.name,
+        quantity: 1,
+        unitPriceCents: appointment.service.priceCents,
+      },
+    ]
+    for (const item of saleServiceItems) {
+      const service = serviceCatalogById.get(item.serviceId)
+      if (!service) continue
+      const existing = lines.find((line) => line.id === item.serviceId)
+      if (existing) existing.quantity += item.quantity
+      else
+        lines.push({
+          id: item.serviceId,
+          name: service.name,
+          quantity: item.quantity,
+          unitPriceCents: service.priceCents,
+        })
+    }
+    return lines
+  }, [appointment.service, saleServiceItems, serviceCatalogById])
 
   const clientId = appointment.client.id
 
@@ -585,18 +668,141 @@ function PaymentCheckout({
     // Com cupom ou campanha, o servidor recalcula o desconto (fonte da
     // verdade); o desconto manual só vale sem cupom.
     const manualToSend = appliedCoupon || campaignCoupon ? 0 : manualDiscountCents
-    onConfirm(payments, manualToSend, saleItems, appliedCoupon?.code ?? undefined)
+    onConfirm(
+      payments,
+      manualToSend,
+      saleItems,
+      saleServiceItems,
+      appliedCoupon?.code ?? undefined,
+    )
   }
 
-  if (picking) {
+  if (view === 'products') {
     return (
       <ProductPicker
         catalog={catalog}
         loading={productsQuery.isLoading}
         initial={saleItems}
-        onCancel={closePicker}
-        onSave={applyPicked}
+        onCancel={closeView}
+        onSave={applyPickedProducts}
       />
+    )
+  }
+
+  if (view === 'services') {
+    return (
+      <ServicePicker
+        catalog={serviceCatalog}
+        loading={extraServicesQuery.isLoading}
+        initial={saleServiceItems}
+        onCancel={closeView}
+        onSave={applyPickedServices}
+      />
+    )
+  }
+
+  if (view === 'coupon') {
+    return (
+      <div className="space-y-4">
+        <div className="space-y-2">
+          {appliedCoupon ? (
+            <div className="flex items-center justify-between rounded-lg border border-primary/40 bg-primary/5 px-3 py-2">
+              <div className="flex min-w-0 items-center gap-2 text-sm">
+                <Ticket className="h-4 w-4 shrink-0 text-primary" />
+                <span className="truncate font-mono font-medium text-ink">
+                  {appliedCoupon.code}
+                </span>
+                <span className="shrink-0 text-xs text-ink-tertiary">
+                  {describeCouponDiscount(appliedCoupon.discountType, appliedCoupon.discountValue)}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={clearCoupon}
+                className="shrink-0 text-xs font-medium text-error-dark hover:underline"
+              >
+                Remover
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Input
+                  leftIcon={<Ticket className="h-4 w-4" />}
+                  placeholder="Cupom (opcional)"
+                  value={couponInput}
+                  onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0"
+                disabled={!couponInput.trim() || (Boolean(appliedCode) && couponQuery.isLoading)}
+                onClick={() => applyCouponCode(couponInput)}
+              >
+                Aplicar
+              </Button>
+            </div>
+          )}
+          {couponError && <p className="text-xs font-medium text-error-dark">{couponError}</p>}
+
+          {/* Recompensas cunhadas disponíveis do cliente — aplicar em um toque */}
+          {!appliedCoupon &&
+            (clientCouponsQuery.data ?? [])
+              .filter((coupon) => coupon.code)
+              .map((coupon) => (
+                <button
+                  key={coupon.id}
+                  type="button"
+                  onClick={() => applyCouponCode(coupon.code!)}
+                  className="flex w-full items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-left text-xs transition-colors hover:border-primary/40 hover:bg-primary/5"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Gift className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span className="shrink-0 font-mono font-medium text-ink">{coupon.code}</span>
+                    {coupon.name && (
+                      <span className="truncate text-ink-tertiary">{coupon.name}</span>
+                    )}
+                  </span>
+                  <span className="shrink-0 font-medium text-primary">
+                    {describeCouponDiscount(coupon.discountType, coupon.discountValue)}
+                  </span>
+                </button>
+              ))}
+
+          {campaignCoupon && (
+            <div className="flex items-center justify-between gap-2 rounded-lg bg-secondary-light/60 px-3 py-2 text-xs">
+              <span className="flex min-w-0 items-center gap-1.5 text-ink-secondary">
+                <Megaphone className="h-3.5 w-3.5 shrink-0 text-primary" />
+                <span className="truncate">
+                  Campanha{campaignCoupon.name ? ` "${campaignCoupon.name}"` : ''} aplicada
+                  automaticamente
+                </span>
+              </span>
+              <span className="shrink-0 font-medium text-primary">
+                − {formatBRL(campaignCoupon.discountCents)}
+              </span>
+            </div>
+          )}
+
+          <Input
+            aria-label="Desconto manual"
+            inputMode="decimal"
+            placeholder="Desconto manual (opcional)"
+            leftIcon={<span className="text-sm">R$</span>}
+            value={manualDiscount}
+            onChange={(e) => setManualDiscount(e.target.value.replace(/[^\d,]/g, ''))}
+            disabled={Boolean(appliedCoupon)}
+          />
+        </div>
+
+        <DialogActions>
+          <Button variant="outline" size="sm" onClick={closeView}>
+            Voltar
+          </Button>
+        </DialogActions>
+      </div>
     )
   }
 
@@ -628,125 +834,58 @@ function PaymentCheckout({
             )}
           </div>
 
-          {/* Botão que abre o seletor de produtos */}
-          {catalog.length > 0 && (
+          {/* Produtos, serviços extras e cupom */}
+          <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
-              onClick={openPicker}
-              className="flex w-full items-center gap-2 rounded-xl border border-line px-4 py-3 text-sm font-medium text-ink-secondary transition-colors hover:border-primary/40 hover:bg-primary/5"
+              onClick={() => openView('products')}
+              className="relative flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-medium text-ink-secondary transition-colors hover:border-primary/40 hover:bg-primary/5"
             >
-              <ShoppingBag className="h-4 w-4 text-ink-tertiary" />
+              <ShoppingBag className="h-4 w-4 shrink-0 text-ink-tertiary" />
               <span>Produtos</span>
               {saleItems.length > 0 && (
-                <span className="text-xs text-ink-tertiary">
-                  · {saleItems.length} {saleItems.length === 1 ? 'item' : 'itens'}
+                <span className="ml-auto flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-white">
+                  {saleItems.length}
                 </span>
               )}
-              <ChevronRight className="ml-auto h-4 w-4 text-ink-tertiary" />
             </button>
-          )}
-
-          {/* Cupom e desconto manual */}
-          <div className="space-y-2">
-            {appliedCoupon ? (
-              <div className="flex items-center justify-between rounded-lg border border-primary/40 bg-primary/5 px-3 py-2">
-                <div className="flex min-w-0 items-center gap-2 text-sm">
-                  <Ticket className="h-4 w-4 shrink-0 text-primary" />
-                  <span className="truncate font-mono font-medium text-ink">
-                    {appliedCoupon.code}
-                  </span>
-                  <span className="shrink-0 text-xs text-ink-tertiary">
-                    {describeCouponDiscount(appliedCoupon.discountType, appliedCoupon.discountValue)}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={clearCoupon}
-                  className="shrink-0 text-xs font-medium text-error-dark hover:underline"
-                >
-                  Remover
-                </button>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <Input
-                    leftIcon={<Ticket className="h-4 w-4" />}
-                    placeholder="Cupom (opcional)"
-                    value={couponInput}
-                    onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="shrink-0"
-                  disabled={!couponInput.trim() || (Boolean(appliedCode) && couponQuery.isLoading)}
-                  onClick={() => applyCouponCode(couponInput)}
-                >
-                  Aplicar
-                </Button>
-              </div>
-            )}
-            {couponError && (
-              <p className="text-xs font-medium text-error-dark">{couponError}</p>
-            )}
-
-            {/* Recompensas cunhadas disponíveis do cliente — aplicar em um toque */}
-            {!appliedCoupon &&
-              (clientCouponsQuery.data ?? [])
-                .filter((coupon) => coupon.code)
-                .map((coupon) => (
-                  <button
-                    key={coupon.id}
-                    type="button"
-                    onClick={() => applyCouponCode(coupon.code!)}
-                    className="flex w-full items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-left text-xs transition-colors hover:border-primary/40 hover:bg-primary/5"
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      <Gift className="h-3.5 w-3.5 shrink-0 text-primary" />
-                      <span className="shrink-0 font-mono font-medium text-ink">{coupon.code}</span>
-                      {coupon.name && (
-                        <span className="truncate text-ink-tertiary">{coupon.name}</span>
-                      )}
-                    </span>
-                    <span className="shrink-0 font-medium text-primary">
-                      {describeCouponDiscount(coupon.discountType, coupon.discountValue)}
-                    </span>
-                  </button>
-                ))}
-
-            {campaignCoupon && (
-              <div className="flex items-center justify-between gap-2 rounded-lg bg-secondary-light/60 px-3 py-2 text-xs">
-                <span className="flex min-w-0 items-center gap-1.5 text-ink-secondary">
-                  <Megaphone className="h-3.5 w-3.5 shrink-0 text-primary" />
-                  <span className="truncate">
-                    Campanha{campaignCoupon.name ? ` "${campaignCoupon.name}"` : ''} aplicada
-                    automaticamente
-                  </span>
+            <button
+              type="button"
+              onClick={() => openView('services')}
+              className="relative flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-medium text-ink-secondary transition-colors hover:border-primary/40 hover:bg-primary/5"
+            >
+              <Scissors className="h-4 w-4 shrink-0 text-ink-tertiary" />
+              <span>Serviços</span>
+              {saleServiceItems.length > 0 && (
+                <span className="ml-auto flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-white">
+                  {saleServiceItems.length}
                 </span>
-                <span className="shrink-0 font-medium text-primary">
-                  − {formatBRL(campaignCoupon.discountCents)}
-                </span>
-              </div>
-            )}
-
-            <Input
-              aria-label="Desconto manual"
-              inputMode="decimal"
-              placeholder="Desconto manual (opcional)"
-              leftIcon={<span className="text-sm">R$</span>}
-              value={manualDiscount}
-              onChange={(e) => setManualDiscount(e.target.value.replace(/[^\d,]/g, ''))}
-              disabled={Boolean(appliedCoupon)}
-            />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => openView('coupon')}
+              className="relative flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-medium text-ink-secondary transition-colors hover:border-primary/40 hover:bg-primary/5"
+            >
+              <Ticket className="h-4 w-4 shrink-0 text-ink-tertiary" />
+              <span>Cupom</span>
+              {(appliedCoupon || campaignCoupon || manualDiscountCents > 0) && (
+                <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-primary" />
+              )}
+            </button>
           </div>
 
           <div className="space-y-2 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-ink-secondary">Serviço</span>
-              <span className="text-ink">{formatBRL(servicesCents)}</span>
-            </div>
+            {serviceLines.map((line) => (
+              <div key={line.id} className="flex items-center justify-between">
+                <span className="text-ink-secondary">
+                  {line.quantity}× {line.name}
+                </span>
+                <span className="text-ink">
+                  {formatBRL(line.unitPriceCents * line.quantity)}
+                </span>
+              </div>
+            ))}
             {saleItems.map((item) => {
               const product = catalogById.get(item.productId)
               if (!product) return null
@@ -1009,6 +1148,141 @@ function ProductPicker({ catalog, loading, initial, onCancel, onSave }: ProductP
                       onClick={() => setProductQty(product, current + 1)}
                       disabled={current >= product.stockQuantity}
                       className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-ink-secondary transition-colors hover:bg-background disabled:opacity-40"
+                      aria-label="Aumentar"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      <div className="flex items-center justify-between border-t border-line-divider pt-3 text-sm">
+        <span className="text-ink-secondary">
+          {selectedCount > 0
+            ? `${selectedCount} ${selectedCount === 1 ? 'item' : 'itens'}`
+            : 'Nenhum item'}
+        </span>
+        <span className="font-display font-semibold text-primary">{formatBRL(totalCents)}</span>
+      </div>
+
+      <DialogActions>
+        <Button variant="outline" size="sm" onClick={onCancel}>
+          Voltar
+        </Button>
+        <Button size="sm" onClick={handleSave}>
+          Salvar
+        </Button>
+      </DialogActions>
+    </div>
+  )
+}
+
+interface ServicePickerProps {
+  catalog: Service[]
+  loading: boolean
+  initial: { serviceId: string; quantity: number }[]
+  onCancel: () => void
+  onSave: (items: { serviceId: string; quantity: number }[]) => void
+}
+
+/** Tela para adicionar serviços extras (além do serviço principal) no fechamento. */
+function ServicePicker({ catalog, loading, initial, onCancel, onSave }: ServicePickerProps) {
+  const [qty, setQty] = useState<Record<string, number>>(() =>
+    Object.fromEntries(initial.map((it) => [it.serviceId, it.quantity])),
+  )
+  const [search, setSearch] = useState('')
+
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    if (!term) return catalog
+    return catalog.filter((s) => s.name.toLowerCase().includes(term))
+  }, [catalog, search])
+
+  const selectedCount = useMemo(() => Object.values(qty).reduce((sum, q) => sum + q, 0), [qty])
+  const totalCents = useMemo(
+    () => catalog.reduce((sum, s) => sum + (qty[s.id] ?? 0) * s.priceCents, 0),
+    [catalog, qty],
+  )
+
+  function setServiceQty(service: Service, next: number) {
+    const clamped = Math.max(0, Math.min(next, 20))
+    setQty((prev) => {
+      const copy = { ...prev }
+      if (clamped <= 0) delete copy[service.id]
+      else copy[service.id] = clamped
+      return copy
+    })
+  }
+
+  function handleSave() {
+    const items = Object.entries(qty)
+      .filter(([, q]) => q > 0)
+      .map(([serviceId, quantity]) => ({ serviceId, quantity }))
+    onSave(items)
+  }
+
+  return (
+    <div className="space-y-4">
+      <Input
+        leftIcon={<Search className="h-4 w-4" />}
+        placeholder="Buscar serviço…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+
+      <div className="max-h-[46vh] space-y-2 overflow-y-auto pr-1">
+        {loading ? (
+          <p className="py-8 text-center text-sm text-ink-tertiary">Carregando serviços…</p>
+        ) : filtered.length === 0 ? (
+          <p className="py-8 text-center text-sm text-ink-tertiary">
+            {catalog.length === 0
+              ? 'Nenhum serviço cadastrado.'
+              : 'Nenhum serviço encontrado.'}
+          </p>
+        ) : (
+          filtered.map((service) => {
+            const current = qty[service.id] ?? 0
+            return (
+              <div
+                key={service.id}
+                className={cn(
+                  'flex items-center gap-3 rounded-xl border p-3 transition-colors',
+                  current > 0 ? 'border-primary/40 bg-primary/5' : 'border-line',
+                )}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-ink">{service.name}</p>
+                  <p className="truncate text-xs text-ink-tertiary">
+                    {formatBRL(service.priceCents)}
+                  </p>
+                </div>
+                {current === 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setServiceQty(service, 1)}
+                    className="flex shrink-0 items-center gap-1 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/5"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Adicionar
+                  </button>
+                ) : (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setServiceQty(service, current - 1)}
+                      className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-ink-secondary transition-colors hover:bg-background"
+                      aria-label="Diminuir"
+                    >
+                      <Minus className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="w-7 text-center text-sm font-medium text-ink">{current}</span>
+                    <button
+                      type="button"
+                      onClick={() => setServiceQty(service, current + 1)}
+                      className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-ink-secondary transition-colors hover:bg-background"
                       aria-label="Aumentar"
                     >
                       <Plus className="h-3.5 w-3.5" />

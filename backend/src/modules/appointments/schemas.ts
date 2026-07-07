@@ -15,6 +15,11 @@ export const listAppointmentsQuerySchema = z.object({
 
 export const idParamSchema = z.object({ id: z.string().uuid('Agendamento inválido') })
 
+export const recentAppointmentsQuerySchema = z.object({
+  // Janela de "recentes" pela data de criação (não pela data do atendimento).
+  sinceHours: z.coerce.number().int().min(1).max(168).default(24),
+})
+
 export const searchAppointmentsQuerySchema = z.object({
   q: z.string().trim().min(1, 'Informe o termo de busca'),
 })
@@ -65,9 +70,19 @@ export const updateAppointmentSchema = z.object({
       }),
     )
     .optional(),
+  // Serviços extras realizados junto (além do serviço principal do agendamento)
+  saleServices: z
+    .array(
+      z.object({
+        serviceId: z.string().uuid('Serviço inválido'),
+        quantity: z.number().int().min(1, 'Quantidade inválida'),
+      }),
+    )
+    .optional(),
 })
 
 export type ListAppointmentsQuery = z.infer<typeof listAppointmentsQuerySchema>
+export type RecentAppointmentsQuery = z.infer<typeof recentAppointmentsQuerySchema>
 export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>
 export type UpdateAppointmentInput = z.infer<typeof updateAppointmentSchema>
 export type SearchAppointmentsQuery = z.infer<typeof searchAppointmentsQuerySchema>

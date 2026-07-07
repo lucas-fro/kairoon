@@ -3,6 +3,9 @@ import { AppLayout } from './components/layout/AppLayout'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { LoginPage } from './pages/auth/LoginPage'
 import { RegisterPage } from './pages/auth/RegisterPage'
+import { AccountDeletionPage } from './pages/legal/AccountDeletionPage'
+import { PrivacyPolicyPage } from './pages/legal/PrivacyPolicyPage'
+import { TermsOfServicePage } from './pages/legal/TermsOfServicePage'
 import { AgendaPage } from './pages/panel/AgendaPage'
 import { ClientDetailPage } from './pages/panel/ClientDetailPage'
 import { ClientsPage } from './pages/panel/ClientsPage'
@@ -21,6 +24,9 @@ export function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/politica-de-privacidade" element={<PrivacyPolicyPage />} />
+        <Route path="/termos-de-uso" element={<TermsOfServicePage />} />
+        <Route path="/exclusao-de-conta" element={<AccountDeletionPage />} />
 
         <Route
           path="/app"

@@ -7,19 +7,20 @@ import {
   Bell,
   Cake,
   CalendarClock,
+  CalendarPlus,
   CheckCheck,
   Clock,
   PackageMinus,
   Receipt,
   Wallet,
 } from 'lucide-react'
-import { listAppointments } from '../../api/appointments'
+import { listAppointments, listRecentAppointments } from '../../api/appointments'
 import { listClients } from '../../api/clients'
 import { listProducts } from '../../api/products'
 import { getRecurringExpensesForecast } from '../../api/recurringExpenses'
 import { listWaitlist } from '../../api/waitlist'
 import { addDays, timeToMinutes, todayStr } from '../../lib/dates'
-import { cn, formatBRL, formatDate } from '../../lib/format'
+import { cn, formatBRL, formatDate, timeAgo } from '../../lib/format'
 import { useDropdown } from '../../hooks/useDropdown'
 import { PendingAppointmentDialog, toPendingView } from '../realtime/PendingAppointmentDialog'
 import type { PendingAppointmentView } from '../realtime/PendingAppointmentDialog'
@@ -45,6 +46,8 @@ interface NotificationItem {
   tone: Tone
   title: string
   description: string
+  /** ISO de quando o evento aconteceu — exibido como "há X" no rodapé */
+  timestamp?: string
   onClick: () => void
 }
 
@@ -68,6 +71,12 @@ export function NotificationsBell() {
   const pendingQuery = useQuery({
     queryKey: ['appointments', 'pending', today],
     queryFn: () => listAppointments({ start: today, end: addDays(today, 365), status: 'pending' }),
+    refetchInterval: 45000,
+  })
+  // Agendamentos criados nas últimas 24h (por data de criação) — "novo agendamento"
+  const recentQuery = useQuery({
+    queryKey: ['appointments', 'recent'],
+    queryFn: () => listRecentAppointments(24),
     refetchInterval: 45000,
   })
   // Atendimentos de hoje já confirmados (para achar os que passaram e não fecharam)
@@ -113,6 +122,7 @@ export function NotificationsBell() {
         tone: 'warning',
         title: 'Agendamento a aprovar',
         description: `${a.client.name} · ${a.service.name} · ${formatDate(a.date)} ${a.startTime}`,
+        timestamp: a.createdAt,
         onClick: () => {
           setSelected(toPendingView(a))
           setOpen(false)
@@ -120,7 +130,23 @@ export function NotificationsBell() {
       })
     }
 
-    // 2. Atendimentos de hoje que já passaram e não foram fechados
+    // 2. Novos agendamentos (criados nas últimas 24h e já confirmados). Os
+    // pendentes aparecem acima como "a aprovar", então aqui só entram os
+    // confirmados — reservas auto-confirmadas do link público e do painel.
+    for (const a of recentQuery.data ?? []) {
+      if (a.status !== 'confirmed') continue
+      list.push({
+        id: `new:${a.id}`,
+        icon: CalendarPlus,
+        tone: 'success',
+        title: 'Novo agendamento',
+        description: `${a.client.name} · ${a.service.name} · ${formatDate(a.date)} ${a.startTime}`,
+        timestamp: a.createdAt,
+        onClick: () => go('/app/agenda'),
+      })
+    }
+
+    // 3. Atendimentos de hoje que já passaram e não foram fechados
     for (const a of todayConfirmedQuery.data ?? []) {
       if (timeToMinutes(a.endTime) <= nowMin) {
         list.push({
@@ -134,7 +160,7 @@ export function NotificationsBell() {
       }
     }
 
-    // 3. Fila de espera: para hoje, vencida, ou esperando há muito tempo
+    // 4. Fila de espera: para hoje, vencida, ou esperando há muito tempo
     for (const w of waitlistQuery.data ?? []) {
       const ageDays = Math.floor((now.getTime() - new Date(w.createdAt).getTime()) / 86_400_000)
       const forToday = w.targetDate === today
@@ -151,12 +177,13 @@ export function NotificationsBell() {
           tone: 'info',
           title: 'Fila de espera',
           description: `${w.client.name} · ${w.service.name} · ${reason}`,
+          timestamp: w.createdAt,
           onClick: () => go('/app/agenda'),
         })
       }
     }
 
-    // 4. Aniversariantes do dia
+    // 5. Aniversariantes do dia
     for (const c of clientsQuery.data ?? []) {
       if (isBirthdayToday(c.birthDate, today)) {
         list.push({
@@ -170,7 +197,7 @@ export function NotificationsBell() {
       }
     }
 
-    // 5. Custos fixos / folha vencendo ou vencidos e ainda não baixados
+    // 6. Custos fixos / folha vencendo ou vencidos e ainda não baixados
     for (const it of forecastQuery.data?.items ?? []) {
       if (it.posted || it.dueDate > tomorrow) continue
       const isPayroll = it.kind === 'payroll'
@@ -184,7 +211,7 @@ export function NotificationsBell() {
       })
     }
 
-    // 6. Estoque baixo ou esgotado
+    // 7. Estoque baixo ou esgotado
     for (const p of productsQuery.data ?? []) {
       if (!p.active || p.stockQuantity > LOW_STOCK) continue
       const out = p.stockQuantity === 0
@@ -202,6 +229,7 @@ export function NotificationsBell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     pendingQuery.data,
+    recentQuery.data,
     todayConfirmedQuery.data,
     waitlistQuery.data,
     clientsQuery.data,
@@ -215,6 +243,7 @@ export function NotificationsBell() {
   const count = notifications.length
   const someLoading = [
     pendingQuery,
+    recentQuery,
     todayConfirmedQuery,
     waitlistQuery,
     clientsQuery,
@@ -229,9 +258,9 @@ export function NotificationsBell() {
         onClick={() => setOpen((v) => !v)}
         aria-label="Notificações"
         aria-expanded={open}
-        className="relative flex h-9 w-9 items-center justify-center rounded-lg text-ink-secondary transition-colors hover:bg-background"
+        className="relative flex h-10 w-10 items-center justify-center rounded-lg text-ink-secondary transition-colors hover:bg-background"
       >
-        <Bell className="h-[22px] w-[22px]" strokeWidth={1.9} />
+        <Bell className="h-[26px] w-[26px]" strokeWidth={1.9} />
         {count > 0 && (
           <span className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-error px-1 text-[10px] font-semibold leading-none text-white">
             {count > 9 ? '9+' : count}
@@ -279,6 +308,9 @@ export function NotificationsBell() {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-ink">{n.title}</p>
                     <p className="text-xs text-ink-secondary">{n.description}</p>
+                    {n.timestamp && (
+                      <p className="mt-1 text-[11px] text-ink-tertiary">{timeAgo(n.timestamp)}</p>
+                    )}
                   </div>
                 </button>
               ))

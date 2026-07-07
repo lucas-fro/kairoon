@@ -9,8 +9,8 @@ import { ServicesTab } from '../../components/settings/ServicesTab'
 import { TimeBlocksCard } from '../../components/settings/TimeBlocksCard'
 import { WorkingHoursTab } from '../../components/settings/WorkingHoursTab'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { SectionNav } from '../../components/ui/SectionNav'
 import { PageLoader } from '../../components/ui/Spinner'
-import { Tabs } from '../../components/ui/Tabs'
 import type { TabItem } from '../../components/ui/Tabs'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -18,7 +18,7 @@ const TABS: TabItem[] = [
   { key: 'estabelecimento', label: 'Estabelecimento', icon: Store },
   { key: 'servicos', label: 'Serviços', icon: Scissors },
   { key: 'funcionarios', label: 'Funcionários', icon: Users },
-  { key: 'funcionamento', label: 'Funcionamento', icon: Clock },
+  { key: 'funcionamento', label: 'Expediente', icon: Clock },
   { key: 'aparencia', label: 'Aparência', icon: Palette },
   { key: 'plano', label: 'Plano', icon: Crown },
   { key: 'conta', label: 'Conta', icon: UserCog },
@@ -42,9 +42,11 @@ export function SettingsPage() {
         description="Gerencie o estabelecimento, serviços, equipe, funcionamento e seu plano."
       />
 
-      <Tabs tabs={TABS} active={activeTab} onChange={(key) => setSearchParams({ tab: key })} />
-
-      <div className="mt-8">
+      <SectionNav
+        tabs={TABS}
+        active={activeTab}
+        onChange={(key) => setSearchParams({ tab: key })}
+      >
         {activeTab === 'estabelecimento' && <EstablishmentTab establishment={establishment} />}
         {activeTab === 'servicos' && <ServicesTab />}
         {activeTab === 'funcionarios' && <EmployeesTab />}
@@ -57,7 +59,7 @@ export function SettingsPage() {
         {activeTab === 'aparencia' && <AppearanceTab establishment={establishment} />}
         {activeTab === 'plano' && <PlanTab />}
         {activeTab === 'conta' && <AccountTab />}
-      </div>
+      </SectionNav>
     </div>
   )
 }

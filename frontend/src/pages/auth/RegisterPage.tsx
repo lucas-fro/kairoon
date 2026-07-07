@@ -35,7 +35,7 @@ const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const TOTAL_STEPS = 3
 
 const STEP_TITLES: Record<number, { title: string; subtitle: string }> = {
-  1: { title: 'Sua conta', subtitle: 'Dados de acesso — é com o e-mail e a senha que você entra.' },
+  1: { title: 'Sua conta', subtitle: 'É com o e-mail e a senha que você entra.' },
   2: { title: 'Seu negócio', subtitle: 'O básico para colocar sua agenda no ar.' },
   3: { title: 'Quase lá', subtitle: 'Opcional: nos ajuda a personalizar sua experiência.' },
 }
@@ -219,8 +219,10 @@ export function RegisterPage() {
   const [bizWhatsapp, setBizWhatsapp] = useState('')
   const [bizEmail, setBizEmail] = useState('')
 
-  // Etapa 3 — quiz (opcional)
+  // Etapa 3 — quiz (opcional) + aceite legal (obrigatório)
   const [quiz, setQuiz] = useState<Record<string, string>>({})
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false)
 
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -280,8 +282,9 @@ export function RegisterPage() {
   const step2Valid =
     businessName.trim().length >= 2 && businessType !== null && slugUsable && contactValid
 
-  // Quiz é opcional — não bloqueia a conclusão do cadastro.
-  const currentStepValid = step === 1 ? step1Valid : step === 2 ? step2Valid : true
+  // Quiz é opcional, mas o aceite dos termos e da política é obrigatório para concluir.
+  const step3Valid = acceptedTerms && acceptedPrivacy
+  const currentStepValid = step === 1 ? step1Valid : step === 2 ? step2Valid : step3Valid
 
   function handleBusinessNameChange(value: string) {
     setBusinessName(value)
@@ -460,7 +463,7 @@ export function RegisterPage() {
                       value={personalPhone}
                       onChange={(e) => setPersonalPhone(formatPhone(e.target.value))}
                       error={personalPhoneError}
-                      hint="Opcional — para você acessar sua conta e receber avisos."
+                      hint="Para você acessar sua conta e receber avisos."
                     />
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <PasswordField
@@ -646,6 +649,49 @@ export function RegisterPage() {
                         </div>
                       </div>
                     ))}
+
+                    <div className="space-y-2.5 rounded-lg border border-line bg-background/60 p-3">
+                      <label className="flex cursor-pointer items-start gap-2.5">
+                        <input
+                          type="checkbox"
+                          checked={acceptedTerms}
+                          onChange={(e) => setAcceptedTerms(e.target.checked)}
+                          className="mt-0.5 h-4 w-4 shrink-0 rounded border-line text-primary focus:ring-2 focus:ring-secondary-light"
+                        />
+                        <span className="text-[13px] leading-snug text-ink-secondary">
+                          Li e aceito os{' '}
+                          <a
+                            href="/termos-de-uso"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-primary hover:underline"
+                          >
+                            Termos de Uso
+                          </a>
+                          .
+                        </span>
+                      </label>
+                      <label className="flex cursor-pointer items-start gap-2.5">
+                        <input
+                          type="checkbox"
+                          checked={acceptedPrivacy}
+                          onChange={(e) => setAcceptedPrivacy(e.target.checked)}
+                          className="mt-0.5 h-4 w-4 shrink-0 rounded border-line text-primary focus:ring-2 focus:ring-secondary-light"
+                        />
+                        <span className="text-[13px] leading-snug text-ink-secondary">
+                          Li e aceito a{' '}
+                          <a
+                            href="/politica-de-privacidade"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-primary hover:underline"
+                          >
+                            Política de Privacidade
+                          </a>
+                          .
+                        </span>
+                      </label>
+                    </div>
                   </div>
                 )}
               </div>

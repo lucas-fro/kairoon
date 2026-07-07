@@ -267,9 +267,11 @@ export function PointsTab() {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between gap-4 rounded-lg bg-background px-4 py-3">
               <div>
-                <p className="text-sm font-medium text-ink">Programa de pontos ativo</p>
-                <p className="text-xs text-ink-tertiary">
-                  Com o programa ativo, cada atendimento concluído gera pontos para o cliente.
+                <p className="text-sm font-medium text-ink">
+                  Programa de pontos{' '}
+                  <span className={programActive ? 'text-success-dark' : 'text-ink-tertiary'}>
+                    {programActive ? 'ativado' : 'desativado'}
+                  </span>
                 </p>
               </div>
               <Switch

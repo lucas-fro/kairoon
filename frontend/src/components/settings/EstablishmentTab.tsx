@@ -61,7 +61,7 @@ function stripHandle(value: string): string {
 }
 
 export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
-  const { user, setEstablishment } = useAuth()
+  const { setEstablishment } = useAuth()
   const toast = useToast()
 
   // Dados
@@ -346,22 +346,6 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
                 error={errors.email}
               />
             </div>
-
-            {(user?.phone || user?.email) && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (user?.phone) {
-                    setPhone(formatPhone(user.phone))
-                    setWhatsapp(formatPhone(user.phone))
-                  }
-                  if (user?.email) setEmail(user.email)
-                }}
-                className="-mt-1 text-xs font-medium text-secondary-hover hover:underline"
-              >
-                Usar meu telefone e e-mail pessoal como contato
-              </button>
-            )}
 
             {/* Linha 2 (PC): tipo de negócio, CNPJ, CEP */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

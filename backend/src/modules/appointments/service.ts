@@ -21,6 +21,7 @@ import { syncPointsEntry } from '../points/service'
 import type {
   CreateAppointmentInput,
   ListAppointmentsQuery,
+  RecentAppointmentsQuery,
   SearchAppointmentsQuery,
   UpdateAppointmentInput,
 } from './schemas'
@@ -41,6 +42,7 @@ type Payment = {
 }
 
 type SaleProduct = { productId: string; name: string; quantity: number; unitPriceCents: number }
+type SaleService = { serviceId: string; name: string; quantity: number; unitPriceCents: number }
 
 interface JoinedRow {
   id: string
@@ -53,6 +55,8 @@ interface JoinedRow {
   discountCents: number
   payments: Payment[] | null
   saleProducts: SaleProduct[] | null
+  saleServices: SaleService[] | null
+  createdAt: Date
   client: { id: string; name: string; phone: string }
   service: { id: string; name: string; durationMinutes: number; priceCents: number }
   employee: { id: string; name: string }
@@ -70,6 +74,8 @@ function toJoinedAppointment(row: JoinedRow) {
     discountCents: row.discountCents,
     payments: row.payments,
     saleProducts: row.saleProducts,
+    saleServices: row.saleServices,
+    createdAt: row.createdAt,
     client: row.client,
     service: row.service,
     employee: row.employee,
@@ -96,6 +102,30 @@ async function buildSaleSnapshot(
       name: product.name,
       quantity: item.quantity,
       unitPriceCents: product.priceCents,
+    }
+  })
+}
+
+/** Monta o snapshot (nome/preço atuais) dos serviços extras realizados junto */
+async function buildSaleServicesSnapshot(
+  establishmentId: string,
+  items: { serviceId: string; quantity: number }[],
+): Promise<SaleService[]> {
+  if (items.length === 0) return []
+  const ids = items.map((i) => i.serviceId)
+  const rows = await db
+    .select({ id: services.id, name: services.name, priceCents: services.priceCents })
+    .from(services)
+    .where(and(eq(services.establishmentId, establishmentId), inArray(services.id, ids)))
+  const byId = new Map(rows.map((s) => [s.id, s]))
+  return items.map((item) => {
+    const service = byId.get(item.serviceId)
+    if (!service) throw new AppError('Serviço não encontrado', 404)
+    return {
+      serviceId: service.id,
+      name: service.name,
+      quantity: item.quantity,
+      unitPriceCents: service.priceCents,
     }
   })
 }
@@ -195,6 +225,29 @@ export async function listAppointments(establishmentId: string, query: ListAppoi
     where: and(...conditions),
     with: joinedWith,
     orderBy: [asc(appointments.date), asc(appointments.startTime)],
+  })
+  return rows.map(toJoinedAppointment)
+}
+
+/**
+ * Agendamentos criados recentemente (por createdAt, não pela data do
+ * atendimento). Alimenta a notificação de "novo agendamento" no painel —
+ * inclui reservas do link público e do próprio painel. Ignora cancelados.
+ */
+export async function listRecentAppointments(
+  establishmentId: string,
+  query: RecentAppointmentsQuery,
+) {
+  const since = new Date(Date.now() - query.sinceHours * 3_600_000)
+  const rows = await db.query.appointments.findMany({
+    where: and(
+      eq(appointments.establishmentId, establishmentId),
+      gte(appointments.createdAt, since),
+      ne(appointments.status, 'cancelled'),
+    ),
+    with: joinedWith,
+    orderBy: [desc(appointments.createdAt)],
+    limit: 30,
   })
   return rows.map(toJoinedAppointment)
 }
@@ -355,6 +408,7 @@ export async function updateAppointment(
   let discountToStore = appointment.discountCents
   let paymentsToStore: Payment[] | null = appointment.payments
   let saleProductsToStore: SaleProduct[] | null = appointment.saleProducts
+  let saleServicesToStore: SaleService[] | null = appointment.saleServices
   if (newStatus === 'completed') {
     if (input.discountCents !== undefined) discountToStore = input.discountCents
     if (input.payments !== undefined)
@@ -366,16 +420,23 @@ export async function updateAppointment(
       }))
     if (input.saleProducts !== undefined)
       saleProductsToStore = await buildSaleSnapshot(establishmentId, input.saleProducts)
+    if (input.saleServices !== undefined)
+      saleServicesToStore = await buildSaleServicesSnapshot(establishmentId, input.saleServices)
   } else {
     discountToStore = 0
     paymentsToStore = null
     saleProductsToStore = null
+    saleServicesToStore = null
   }
   const productsCents = (saleProductsToStore ?? []).reduce(
     (acc, p) => acc + p.quantity * p.unitPriceCents,
     0,
   )
-  const subtotalCents = priceCents + productsCents
+  const extraServicesCents = (saleServicesToStore ?? []).reduce(
+    (acc, s) => acc + s.quantity * s.unitPriceCents,
+    0,
+  )
+  const subtotalCents = priceCents + productsCents + extraServicesCents
   // A validação de desconto/pagamentos acontece dentro da transação: o cupom
   // (código digitado ou campanha automática) é resolvido lá e redefine o
   // desconto antes do cálculo do total final.
@@ -412,7 +473,8 @@ export async function updateAppointment(
       input.couponCode !== undefined ||
       input.discountCents !== undefined ||
       input.payments !== undefined ||
-      input.saleProducts !== undefined
+      input.saleProducts !== undefined ||
+      input.saleServices !== undefined
     const shouldResolveCoupon =
       newStatus === 'completed' && (appointment.status !== 'completed' || reclosing)
     if (newStatus !== 'completed' || shouldResolveCoupon) {
@@ -456,6 +518,7 @@ export async function updateAppointment(
         discountCents: discountToStore,
         payments: paymentsToStore,
         saleProducts: saleProductsToStore,
+        saleServices: saleServicesToStore,
       })
       .where(and(eq(appointments.id, id), eq(appointments.establishmentId, establishmentId)))
       .returning()

@@ -134,6 +134,13 @@
       "when": 1783380070609,
       "tag": "0018_warm_cobalt_man",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1783432418769,
+      "tag": "0019_colossal_spiral",
+      "breakpoints": true
     }
   ]
 }
