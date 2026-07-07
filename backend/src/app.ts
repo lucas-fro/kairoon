@@ -9,9 +9,12 @@ import { appointmentsRoutes } from './modules/appointments/routes'
 import { authRoutes } from './modules/auth/routes'
 import { clientsRoutes } from './modules/clients/routes'
 import { commissionsRoutes } from './modules/commissions/routes'
+import { couponsRoutes } from './modules/coupons/routes'
 import { dashboardRoutes } from './modules/dashboard/routes'
 import { employeesRoutes } from './modules/employees/routes'
 import { establishmentRoutes } from './modules/establishment/routes'
+import { loyaltyRoutes } from './modules/loyalty/routes'
+import { pointsRoutes } from './modules/points/routes'
 import { productsRoutes } from './modules/products/routes'
 import { publicRoutes } from './modules/public/routes'
 import { realtimeRoutes } from './modules/realtime/routes'
@@ -71,6 +74,9 @@ export async function buildApp() {
   await app.register(dashboardRoutes, { prefix: '/dashboard' })
   await app.register(reportsRoutes, { prefix: '/reports' })
   await app.register(commissionsRoutes, { prefix: '/commissions' })
+  await app.register(couponsRoutes, { prefix: '/coupons' })
+  await app.register(loyaltyRoutes, { prefix: '/loyalty' })
+  await app.register(pointsRoutes, { prefix: '/points' })
   await app.register(publicRoutes, { prefix: '/public' })
   await app.register(realtimeRoutes, { prefix: '/realtime' })
 

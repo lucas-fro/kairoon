@@ -7,7 +7,10 @@ import {
   CalendarDays,
   CalendarX,
   Clock,
+  Coins,
+  Gift,
   Pencil,
+  Stamp,
   UserX,
   Wallet,
 } from 'lucide-react'
@@ -15,6 +18,9 @@ import { Link, useParams } from 'react-router-dom'
 import { ApiError } from '../../api/client'
 import { getClient, updateClient } from '../../api/clients'
 import type { ClientPayload } from '../../api/clients'
+import { listClientCoupons } from '../../api/coupons'
+import { getClientLoyalty, redeemLoyalty } from '../../api/loyalty'
+import { getClientPoints, redeemPoints } from '../../api/points'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
@@ -25,7 +31,8 @@ import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
 import { PageLoader } from '../../components/ui/Spinner'
 import { useToast } from '../../components/ui/Toast'
-import { formatBRL, formatDate, formatPhone, isValidPhone, onlyDigits } from '../../lib/format'
+import { describeCouponDiscount, describeCouponValidity } from '../../lib/coupons'
+import { cn, formatBRL, formatDate, formatPhone, isValidPhone, onlyDigits } from '../../lib/format'
 import type { AppointmentStatus, Client } from '../../types/api'
 
 function getInitials(name: string): string {
@@ -193,11 +200,57 @@ function BackLink() {
 export function ClientDetailPage() {
   const { id } = useParams<{ id: string }>()
   const [editOpen, setEditOpen] = useState(false)
+  const queryClient = useQueryClient()
+  const toast = useToast()
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['client', id],
     queryFn: () => getClient(id!),
     enabled: Boolean(id),
+  })
+
+  const loyaltyQuery = useQuery({
+    queryKey: ['loyalty', 'client', id],
+    queryFn: () => getClientLoyalty(id!),
+    enabled: Boolean(id),
+  })
+  const pointsQuery = useQuery({
+    queryKey: ['points', 'client', id],
+    queryFn: () => getClientPoints(id!),
+    enabled: Boolean(id),
+  })
+  const couponsQuery = useQuery({
+    queryKey: ['coupons', 'client', id],
+    queryFn: () => listClientCoupons(id!),
+    enabled: Boolean(id),
+  })
+
+  const invalidateFidelity = () => {
+    queryClient.invalidateQueries({ queryKey: ['loyalty'] })
+    queryClient.invalidateQueries({ queryKey: ['points'] })
+    queryClient.invalidateQueries({ queryKey: ['coupons'] })
+  }
+
+  const redeemLoyaltyMutation = useMutation({
+    mutationFn: () => redeemLoyalty(id!),
+    onSuccess: ({ coupon }) => {
+      invalidateFidelity()
+      toast.success(`Recompensa resgatada! Cupom ${coupon.code} criado para este cliente.`)
+    },
+    onError: (err) => {
+      toast.error(err instanceof ApiError ? err.message : 'Erro inesperado ao resgatar')
+    },
+  })
+
+  const redeemPointsMutation = useMutation({
+    mutationFn: (rewardId: string) => redeemPoints(id!, rewardId),
+    onSuccess: ({ coupon }) => {
+      invalidateFidelity()
+      toast.success(`Pontos resgatados! Cupom ${coupon.code} criado para este cliente.`)
+    },
+    onError: (err) => {
+      toast.error(err instanceof ApiError ? err.message : 'Erro inesperado ao resgatar')
+    },
   })
 
   if (isLoading) {
@@ -282,6 +335,151 @@ export function ClientDetailPage() {
           value={stats.lastVisit ? formatDate(stats.lastVisit) : '—'}
         />
       </div>
+
+      {/* Fidelidade: carimbos, pontos e cupons disponíveis */}
+      {(() => {
+        const loyalty = loyaltyQuery.data
+        const points = pointsQuery.data
+        const clientCoupons = couponsQuery.data ?? []
+        const showLoyalty = Boolean(loyalty?.program?.active)
+        const showPoints = Boolean(points?.program?.active)
+        if (!showLoyalty && !showPoints && clientCoupons.length === 0) return null
+        return (
+          <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+            {showLoyalty && loyalty?.program && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Stamp className="h-4 w-4 text-primary" /> Cartão fidelidade
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="font-display text-2xl font-bold text-ink">
+                      {loyalty.availableStamps}
+                    </span>
+                    <span className="text-sm text-ink-secondary">
+                      / {loyalty.program.stampsRequired} carimbos
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Array.from({ length: loyalty.program.stampsRequired }, (_, i) => (
+                      <span
+                        key={i}
+                        className={cn(
+                          'h-2.5 w-2.5 rounded-full',
+                          i < Math.min(loyalty.availableStamps, loyalty.program!.stampsRequired)
+                            ? 'bg-primary'
+                            : 'bg-ink-disabled/40',
+                        )}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-xs text-ink-tertiary">
+                    Recompensa:{' '}
+                    {describeCouponDiscount(loyalty.program.rewardType, loyalty.program.rewardValue)}
+                  </p>
+                  <Button
+                    size="sm"
+                    disabled={!loyalty.canRedeem}
+                    isLoading={redeemLoyaltyMutation.isPending}
+                    onClick={() => redeemLoyaltyMutation.mutate()}
+                  >
+                    Resgatar recompensa
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {showPoints && points && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Coins className="h-4 w-4 text-primary" /> Pontos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="font-display text-2xl font-bold text-ink">
+                      {points.balance}
+                    </span>
+                    <span className="text-sm text-ink-secondary">pontos</span>
+                  </div>
+                  {points.rewards.length === 0 ? (
+                    <p className="text-xs text-ink-tertiary">
+                      Nenhuma recompensa cadastrada em Fidelidade → Pontos.
+                    </p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {points.rewards.map((reward) => (
+                        <li
+                          key={reward.id}
+                          className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-ink">{reward.name}</p>
+                            <p className="text-xs text-ink-tertiary">
+                              {reward.costPoints} pts ·{' '}
+                              {describeCouponDiscount(reward.rewardType, reward.rewardValue)}
+                            </p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={points.balance < reward.costPoints}
+                            isLoading={
+                              redeemPointsMutation.isPending &&
+                              redeemPointsMutation.variables === reward.id
+                            }
+                            onClick={() => redeemPointsMutation.mutate(reward.id)}
+                          >
+                            Resgatar
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Gift className="h-4 w-4 text-primary" /> Cupons disponíveis
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {clientCoupons.length === 0 ? (
+                  <p className="text-sm text-ink-tertiary">
+                    Nenhum cupom disponível. Recompensas resgatadas aparecem aqui.
+                  </p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {clientCoupons.map((coupon) => (
+                      <li
+                        key={coupon.id}
+                        className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate font-mono font-medium text-ink">{coupon.code}</p>
+                          <p className="text-xs text-ink-tertiary">
+                            {coupon.name ? `${coupon.name} · ` : ''}
+                            {describeCouponValidity(coupon.validFrom, coupon.validUntil)}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-sm font-semibold text-primary">
+                          {describeCouponDiscount(coupon.discountType, coupon.discountValue)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )
+      })()}
 
       {/* Histórico */}
       <Card>

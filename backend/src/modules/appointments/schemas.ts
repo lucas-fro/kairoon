@@ -44,6 +44,8 @@ export const updateAppointmentSchema = z.object({
   employeeId: z.string().uuid('Profissional inválido').optional(),
   // Fechamento do serviço
   discountCents: z.number().int().min(0, 'Desconto inválido').optional(),
+  // Cupom aplicado no fechamento (o servidor revalida e recalcula o desconto)
+  couponCode: z.string().trim().min(1).optional(),
   payments: z
     .array(
       z.object({

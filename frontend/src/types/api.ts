@@ -233,6 +233,101 @@ export interface Appointment {
   employee: { id: string; name: string }
 }
 
+export type CouponDiscountType = 'percent' | 'fixed' | 'free_service'
+export type CouponSource = 'manual' | 'campaign' | 'loyalty' | 'points'
+export type CouponAppliesTo = 'total' | 'service'
+
+export interface Coupon {
+  id: string
+  establishmentId: string
+  name: string | null
+  /** null em campanhas (aplicação automática, sem código) */
+  code: string | null
+  source: CouponSource
+  discountType: CouponDiscountType
+  /** porcentagem (0–100) quando 'percent'; centavos quando 'fixed'; ignorado em 'free_service' */
+  discountValue: number
+  appliesTo: CouponAppliesTo
+  /** null/vazio = qualquer serviço */
+  appliesToServiceIds: string[] | null
+  minSpendCents: number
+  maxDiscountCents: number | null
+  validFrom: string | null
+  validUntil: string | null
+  /** null = ilimitado */
+  maxUses: number | null
+  usesPerClient: number
+  firstVisitOnly: boolean
+  autoApply: boolean
+  /** preenchido = cupom pessoal (recompensa cunhada) */
+  clientId: string | null
+  active: boolean
+  createdAt: string
+  redemptionsCount: number
+}
+
+export interface AppliedCouponPreview {
+  couponId: string
+  code: string | null
+  name: string | null
+  source: CouponSource
+  discountType: CouponDiscountType
+  discountValue: number
+  discountCents: number
+}
+
+export interface CouponValidationResult {
+  coupon: AppliedCouponPreview | null
+  discountCents: number
+}
+
+export type LoyaltyRewardType = 'free_service' | 'percent' | 'fixed'
+
+export interface LoyaltyProgram {
+  id: string
+  establishmentId: string
+  active: boolean
+  stampsRequired: number
+  minTicketCents: number
+  rewardType: LoyaltyRewardType
+  rewardValue: number
+  rewardServiceId: string | null
+  createdAt: string
+}
+
+export interface ClientLoyaltySummary {
+  program: LoyaltyProgram | null
+  availableStamps: number
+  canRedeem: boolean
+}
+
+export interface PointsProgram {
+  id: string
+  establishmentId: string
+  active: boolean
+  pointsPerService: number
+  pointsPerCurrencyUnit: number
+  createdAt: string
+}
+
+export interface PointsReward {
+  id: string
+  establishmentId: string
+  name: string
+  costPoints: number
+  rewardType: CouponDiscountType
+  rewardValue: number
+  rewardServiceId: string | null
+  active: boolean
+  createdAt: string
+}
+
+export interface ClientPointsSummary {
+  program: PointsProgram | null
+  balance: number
+  rewards: PointsReward[]
+}
+
 export type WaitlistStatus = 'waiting' | 'scheduled'
 
 export interface WaitlistEntry {

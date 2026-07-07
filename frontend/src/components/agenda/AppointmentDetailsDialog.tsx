@@ -6,7 +6,9 @@ import {
   ChevronRight,
   Clock,
   CreditCard,
+  Gift,
   Globe,
+  Megaphone,
   Minus,
   Phone,
   Plus,
@@ -14,13 +16,18 @@ import {
   Scissors,
   Search,
   ShoppingBag,
+  Stamp,
   Store,
+  Ticket,
   User,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { updateAppointment } from '../../api/appointments'
 import type { UpdateAppointmentPayload } from '../../api/appointments'
 import { ApiError } from '../../api/client'
+import { listClientCoupons, validateCoupon } from '../../api/coupons'
+import { getClientLoyalty } from '../../api/loyalty'
+import { getClientPoints } from '../../api/points'
 import { listProducts } from '../../api/products'
 import { useAuth } from '../../contexts/AuthContext'
 import { Badge } from '../ui/Badge'
@@ -31,6 +38,7 @@ import { DialogActions } from '../ui/DialogActions'
 import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
 import { useToast } from '../ui/Toast'
+import { describeCouponDiscount } from '../../lib/coupons'
 import { cn, formatBRL, formatDate, formatPhone, parseBRLToCents } from '../../lib/format'
 import type { Appointment, Payment, PaymentMethod, PaymentSettings, Product } from '../../types/api'
 import { buildTimeOptions } from './timeOptions'
@@ -120,6 +128,9 @@ export function AppointmentDetailsDialog({
       queryClient.invalidateQueries({ queryKey: ['commissions'] })
       queryClient.invalidateQueries({ queryKey: ['clients'] })
       queryClient.invalidateQueries({ queryKey: ['products'] })
+      queryClient.invalidateQueries({ queryKey: ['coupons'] })
+      queryClient.invalidateQueries({ queryKey: ['loyalty'] })
+      queryClient.invalidateQueries({ queryKey: ['points'] })
       const message =
         variables.status === 'completed'
           ? 'Atendimento finalizado — entrada lançada no financeiro'
@@ -162,8 +173,14 @@ export function AppointmentDetailsDialog({
             isLoading={mutation.isPending}
             onPickingChange={setPickingProducts}
             onBack={() => setFinalizing(false)}
-            onConfirm={(payments, discountCents, saleProducts) =>
-              mutation.mutate({ status: 'completed', discountCents, payments, saleProducts })
+            onConfirm={(payments, discountCents, saleProducts, couponCode) =>
+              mutation.mutate({
+                status: 'completed',
+                discountCents,
+                payments,
+                saleProducts,
+                couponCode,
+              })
             }
           />
         ) : (
@@ -372,6 +389,7 @@ interface PaymentCheckoutProps {
     }[],
     discountCents: number,
     saleProducts: { productId: string; quantity: number }[],
+    couponCode?: string,
   ) => void
 }
 
@@ -413,10 +431,98 @@ function PaymentCheckout({
     (sum, item) => sum + (catalogById.get(item.productId)?.priceCents ?? 0) * item.quantity,
     0,
   )
-  // Desconto será tratado depois; por ora o total final é serviço + produtos.
-  const discountCents = 0
   const subtotalCents = servicesCents + productsCents
+
+  const clientId = appointment.client.id
+
+  // Cupom digitado: validado no servidor (revalida sozinho quando o subtotal
+  // muda, ex.: produtos entram/saem).
+  const [couponInput, setCouponInput] = useState('')
+  const [appliedCode, setAppliedCode] = useState<string | null>(null)
+  const [manualDiscount, setManualDiscount] = useState('')
+
+  const couponQuery = useQuery({
+    queryKey: ['coupons', 'validate', appointment.id, appliedCode, subtotalCents],
+    queryFn: () =>
+      validateCoupon({
+        code: appliedCode!,
+        clientId,
+        serviceId: appointment.service.id,
+        subtotalCents,
+        date: appointment.date,
+        appointmentId: appointment.id,
+      }),
+    enabled: Boolean(appliedCode),
+    retry: false,
+  })
+  const appliedCoupon = appliedCode ? (couponQuery.data?.coupon ?? null) : null
+  const couponError =
+    appliedCode && couponQuery.isError
+      ? couponQuery.error instanceof ApiError
+        ? couponQuery.error.message
+        : 'Não foi possível validar o cupom'
+      : null
+
+  const manualDiscountCents = Math.min(parseBRLToCents(manualDiscount), subtotalCents)
+
+  // Campanha automática: só quando não há cupom digitado nem desconto manual
+  // (mesma regra do servidor).
+  const campaignQuery = useQuery({
+    queryKey: ['coupons', 'campaign-preview', appointment.id, subtotalCents],
+    queryFn: () =>
+      validateCoupon({
+        clientId,
+        serviceId: appointment.service.id,
+        subtotalCents,
+        date: appointment.date,
+        appointmentId: appointment.id,
+      }),
+    enabled: !appliedCode && manualDiscountCents === 0,
+    retry: false,
+  })
+  const campaignCoupon =
+    !appliedCode && manualDiscountCents === 0 ? (campaignQuery.data?.coupon ?? null) : null
+
+  // Cupons pessoais do cliente (recompensas de fidelidade/pontos) + resumo
+  const clientCouponsQuery = useQuery({
+    queryKey: ['coupons', 'client', clientId],
+    queryFn: () => listClientCoupons(clientId),
+  })
+  const loyaltyQuery = useQuery({
+    queryKey: ['loyalty', 'client', clientId],
+    queryFn: () => getClientLoyalty(clientId),
+  })
+  const pointsQuery = useQuery({
+    queryKey: ['points', 'client', clientId],
+    queryFn: () => getClientPoints(clientId),
+  })
+  const fidelitySummary = [
+    loyaltyQuery.data?.program?.active
+      ? `${loyaltyQuery.data.availableStamps}/${loyaltyQuery.data.program.stampsRequired} carimbos`
+      : null,
+    pointsQuery.data?.program?.active ? `${pointsQuery.data.balance} pontos` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
+  const discountCents = appliedCoupon
+    ? appliedCoupon.discountCents
+    : campaignCoupon
+      ? campaignCoupon.discountCents
+      : manualDiscountCents
   const finalCents = Math.max(0, subtotalCents - discountCents)
+
+  function applyCouponCode(code: string) {
+    const normalized = code.trim().toUpperCase()
+    if (!normalized) return
+    setCouponInput(normalized)
+    setAppliedCode(normalized)
+  }
+
+  function clearCoupon() {
+    setAppliedCode(null)
+    setCouponInput('')
+  }
 
   const available = useMemo(() => {
     const list: PaymentMethod[] = []
@@ -476,7 +582,10 @@ function PaymentCheckout({
       installments: method === 'credit' ? creditInstallments : null,
       amountCents: parseBRLToCents(amounts[method] ?? ''),
     }))
-    onConfirm(payments, discountCents, saleItems)
+    // Com cupom ou campanha, o servidor recalcula o desconto (fonte da
+    // verdade); o desconto manual só vale sem cupom.
+    const manualToSend = appliedCoupon || campaignCoupon ? 0 : manualDiscountCents
+    onConfirm(payments, manualToSend, saleItems, appliedCoupon?.code ?? undefined)
   }
 
   if (picking) {
@@ -511,6 +620,12 @@ function PaymentCheckout({
                 {formatDate(appointment.date)} · {appointment.startTime}
               </p>
             </div>
+            {fidelitySummary && (
+              <div className="flex items-center gap-3">
+                <Stamp className="h-4 w-4 shrink-0 text-ink-tertiary" />
+                <p className="text-ink-secondary">{fidelitySummary}</p>
+              </div>
+            )}
           </div>
 
           {/* Botão que abre o seletor de produtos */}
@@ -530,6 +645,102 @@ function PaymentCheckout({
               <ChevronRight className="ml-auto h-4 w-4 text-ink-tertiary" />
             </button>
           )}
+
+          {/* Cupom e desconto manual */}
+          <div className="space-y-2">
+            {appliedCoupon ? (
+              <div className="flex items-center justify-between rounded-lg border border-primary/40 bg-primary/5 px-3 py-2">
+                <div className="flex min-w-0 items-center gap-2 text-sm">
+                  <Ticket className="h-4 w-4 shrink-0 text-primary" />
+                  <span className="truncate font-mono font-medium text-ink">
+                    {appliedCoupon.code}
+                  </span>
+                  <span className="shrink-0 text-xs text-ink-tertiary">
+                    {describeCouponDiscount(appliedCoupon.discountType, appliedCoupon.discountValue)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearCoupon}
+                  className="shrink-0 text-xs font-medium text-error-dark hover:underline"
+                >
+                  Remover
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Input
+                    leftIcon={<Ticket className="h-4 w-4" />}
+                    placeholder="Cupom (opcional)"
+                    value={couponInput}
+                    onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="shrink-0"
+                  disabled={!couponInput.trim() || (Boolean(appliedCode) && couponQuery.isLoading)}
+                  onClick={() => applyCouponCode(couponInput)}
+                >
+                  Aplicar
+                </Button>
+              </div>
+            )}
+            {couponError && (
+              <p className="text-xs font-medium text-error-dark">{couponError}</p>
+            )}
+
+            {/* Recompensas cunhadas disponíveis do cliente — aplicar em um toque */}
+            {!appliedCoupon &&
+              (clientCouponsQuery.data ?? [])
+                .filter((coupon) => coupon.code)
+                .map((coupon) => (
+                  <button
+                    key={coupon.id}
+                    type="button"
+                    onClick={() => applyCouponCode(coupon.code!)}
+                    className="flex w-full items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-left text-xs transition-colors hover:border-primary/40 hover:bg-primary/5"
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Gift className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      <span className="shrink-0 font-mono font-medium text-ink">{coupon.code}</span>
+                      {coupon.name && (
+                        <span className="truncate text-ink-tertiary">{coupon.name}</span>
+                      )}
+                    </span>
+                    <span className="shrink-0 font-medium text-primary">
+                      {describeCouponDiscount(coupon.discountType, coupon.discountValue)}
+                    </span>
+                  </button>
+                ))}
+
+            {campaignCoupon && (
+              <div className="flex items-center justify-between gap-2 rounded-lg bg-secondary-light/60 px-3 py-2 text-xs">
+                <span className="flex min-w-0 items-center gap-1.5 text-ink-secondary">
+                  <Megaphone className="h-3.5 w-3.5 shrink-0 text-primary" />
+                  <span className="truncate">
+                    Campanha{campaignCoupon.name ? ` "${campaignCoupon.name}"` : ''} aplicada
+                    automaticamente
+                  </span>
+                </span>
+                <span className="shrink-0 font-medium text-primary">
+                  − {formatBRL(campaignCoupon.discountCents)}
+                </span>
+              </div>
+            )}
+
+            <Input
+              aria-label="Desconto manual"
+              inputMode="decimal"
+              placeholder="Desconto manual (opcional)"
+              leftIcon={<span className="text-sm">R$</span>}
+              value={manualDiscount}
+              onChange={(e) => setManualDiscount(e.target.value.replace(/[^\d,]/g, ''))}
+              disabled={Boolean(appliedCoupon)}
+            />
+          </div>
 
           <div className="space-y-2 text-sm">
             <div className="flex items-center justify-between">
@@ -551,9 +762,14 @@ function PaymentCheckout({
               )
             })}
             <div className="flex items-center justify-between">
-              <span className="text-ink-secondary">Desconto</span>
-              <span className="text-ink-tertiary">
-                {discountCents > 0 ? `- ${formatBRL(discountCents)}` : '—'}
+              <span className="text-ink-secondary">
+                Desconto
+                {appliedCoupon ? ` (${appliedCoupon.code})` : campaignCoupon ? ' (campanha)' : ''}
+              </span>
+              <span
+                className={discountCents > 0 ? 'font-medium text-success-dark' : 'text-ink-tertiary'}
+              >
+                {discountCents > 0 ? `− ${formatBRL(discountCents)}` : '—'}
               </span>
             </div>
             <div className="flex items-center justify-between border-t border-line-divider pt-2">

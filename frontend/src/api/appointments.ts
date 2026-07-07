@@ -18,6 +18,8 @@ export interface UpdateAppointmentPayload {
   startTime?: string
   employeeId?: string
   discountCents?: number
+  /** cupom aplicado no fechamento (o servidor revalida e recalcula) */
+  couponCode?: string
   payments?: {
     method: PaymentMethod
     brand?: string | null

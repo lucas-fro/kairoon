@@ -27,6 +27,34 @@ export const transactionTypeEnum = pgEnum('transaction_type', ['income', 'expens
 // Fila de espera: 'waiting' aguardando encaixe; 'scheduled' já virou agendamento.
 export const waitlistStatusEnum = pgEnum('waitlist_status', ['waiting', 'scheduled'])
 
+// Marketing/fidelidade: o cupom é o instrumento universal de desconto.
+// 'manual' = código criado pelo dono; 'campaign' = desconto automático por
+// condição (autoApply); 'loyalty'/'points' = cupom pessoal cunhado pelos
+// programas de fidelidade/pontos.
+export const couponSourceEnum = pgEnum('coupon_source', [
+  'manual',
+  'campaign',
+  'loyalty',
+  'points',
+])
+// 'free_service' = o serviço do atendimento sai de graça (desconto = preço do
+// serviço, nunca dos produtos).
+export const couponDiscountTypeEnum = pgEnum('coupon_discount_type', [
+  'percent',
+  'fixed',
+  'free_service',
+])
+// Base do desconto: ticket inteiro (serviço + produtos) ou só a linha do serviço.
+export const couponAppliesToEnum = pgEnum('coupon_applies_to', ['total', 'service'])
+
+export const loyaltyRewardTypeEnum = pgEnum('loyalty_reward_type', [
+  'free_service',
+  'percent',
+  'fixed',
+])
+
+export const pointsEntryTypeEnum = pgEnum('points_entry_type', ['earn', 'redeem'])
+
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
@@ -425,6 +453,218 @@ export const commissionEntries = pgTable(
   ],
 )
 
+// Cupom de desconto (definição/regra) — serve o cupom manual, a campanha
+// automática (autoApply, code null) e o cupom pessoal cunhado por
+// fidelidade/pontos (clientId preenchido, maxUses 1). discountValue: 0–100
+// quando 'percent', centavos quando 'fixed', ignorado em 'free_service'.
+export const coupons = pgTable(
+  'coupons',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    establishmentId: uuid('establishment_id')
+      .notNull()
+      .references(() => establishments.id, { onDelete: 'cascade' }),
+    // Rótulo exibido na lista (obrigatório na prática para campanhas, que não
+    // têm código); opcional como descrição de cupons manuais.
+    name: text('name'),
+    code: text('code'),
+    source: couponSourceEnum('source').notNull().default('manual'),
+    discountType: couponDiscountTypeEnum('discount_type').notNull(),
+    discountValue: integer('discount_value').notNull().default(0),
+    appliesTo: couponAppliesToEnum('applies_to').notNull().default('total'),
+    // null/vazio = qualquer serviço
+    appliesToServiceIds: jsonb('applies_to_service_ids').$type<string[]>(),
+    minSpendCents: integer('min_spend_cents').notNull().default(0),
+    // Teto opcional do desconto (protege percent/free_service em tickets altos)
+    maxDiscountCents: integer('max_discount_cents'),
+    validFrom: date('valid_from', { mode: 'string' }),
+    validUntil: date('valid_until', { mode: 'string' }),
+    // null = ilimitado
+    maxUses: integer('max_uses'),
+    usesPerClient: integer('uses_per_client').notNull().default(1),
+    firstVisitOnly: boolean('first_visit_only').notNull().default(false),
+    autoApply: boolean('auto_apply').notNull().default(false),
+    // Preenchido = cupom pessoal (só vale para este cliente)
+    clientId: uuid('client_id').references(() => clients.id, { onDelete: 'cascade' }),
+    active: boolean('active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // Postgres mantém múltiplos NULL distintos: campanhas (code null) não colidem
+    uniqueIndex('coupons_establishment_code_idx').on(t.establishmentId, t.code),
+    index('coupons_establishment_client_idx').on(t.establishmentId, t.clientId),
+    index('coupons_establishment_active_auto_idx').on(t.establishmentId, t.active, t.autoApply),
+  ],
+)
+
+// Ledger de uso de cupom: 1 linha por atendimento (estorno ao reabrir =
+// delete por appointmentId, igual a commission_entries).
+export const couponRedemptions = pgTable(
+  'coupon_redemptions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    establishmentId: uuid('establishment_id')
+      .notNull()
+      .references(() => establishments.id, { onDelete: 'cascade' }),
+    couponId: uuid('coupon_id')
+      .notNull()
+      .references(() => coupons.id, { onDelete: 'restrict' }),
+    clientId: uuid('client_id')
+      .notNull()
+      .references(() => clients.id, { onDelete: 'cascade' }),
+    appointmentId: uuid('appointment_id')
+      .notNull()
+      .references(() => appointments.id, { onDelete: 'cascade' }),
+    // Snapshot do desconto aplicado (centavos)
+    discountCents: integer('discount_cents').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('coupon_redemptions_appointment_idx').on(t.appointmentId),
+    index('coupon_redemptions_coupon_idx').on(t.couponId),
+    index('coupon_redemptions_coupon_client_idx').on(t.couponId, t.clientId),
+  ],
+)
+
+// Cartão de fidelidade: configuração (1 por estabelecimento). Cada atendimento
+// concluído com finalCents >= minTicketCents vale 1 carimbo; ao juntar
+// stampsRequired o cliente resgata a recompensa (vira cupom pessoal).
+export const loyaltyPrograms = pgTable(
+  'loyalty_programs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    establishmentId: uuid('establishment_id')
+      .notNull()
+      .references(() => establishments.id, { onDelete: 'cascade' }),
+    active: boolean('active').notNull().default(false),
+    stampsRequired: integer('stamps_required').notNull().default(10),
+    minTicketCents: integer('min_ticket_cents').notNull().default(0),
+    rewardType: loyaltyRewardTypeEnum('reward_type').notNull().default('free_service'),
+    rewardValue: integer('reward_value').notNull().default(0),
+    // null = qualquer serviço (free_service)
+    rewardServiceId: uuid('reward_service_id').references(() => services.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('loyalty_programs_establishment_idx').on(t.establishmentId)],
+)
+
+// Concessão da recompensa do cartão: snapshot da regra no momento do resgate
+// e o cupom pessoal cunhado.
+export const loyaltyRedemptions = pgTable('loyalty_redemptions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  establishmentId: uuid('establishment_id')
+    .notNull()
+    .references(() => establishments.id, { onDelete: 'cascade' }),
+  clientId: uuid('client_id')
+    .notNull()
+    .references(() => clients.id, { onDelete: 'cascade' }),
+  stampsSpent: integer('stamps_spent').notNull(),
+  couponId: uuid('coupon_id').references(() => coupons.id, { onDelete: 'set null' }),
+  rewardType: loyaltyRewardTypeEnum('reward_type').notNull(),
+  rewardValue: integer('reward_value').notNull(),
+  rewardServiceId: uuid('reward_service_id').references(() => services.id, {
+    onDelete: 'set null',
+  }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+// Ledger de carimbos: 1 linha por carimbo, chaveada pelo atendimento que o
+// gerou (estorno ao reabrir = delete por appointmentId). redemptionId null =
+// disponível; preenchido = consumido por um resgate.
+export const loyaltyStamps = pgTable(
+  'loyalty_stamps',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    establishmentId: uuid('establishment_id')
+      .notNull()
+      .references(() => establishments.id, { onDelete: 'cascade' }),
+    clientId: uuid('client_id')
+      .notNull()
+      .references(() => clients.id, { onDelete: 'cascade' }),
+    appointmentId: uuid('appointment_id')
+      .notNull()
+      .references(() => appointments.id, { onDelete: 'cascade' }),
+    redemptionId: uuid('redemption_id').references(() => loyaltyRedemptions.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('loyalty_stamps_appointment_idx').on(t.appointmentId),
+    index('loyalty_stamps_establishment_client_idx').on(t.establishmentId, t.clientId),
+  ],
+)
+
+// Programa de pontos: configuração (1 por estabelecimento). Pontos ganhos por
+// atendimento concluído = pointsPerService + floor(finalCents/100) * pointsPerCurrencyUnit.
+export const pointsPrograms = pgTable(
+  'points_programs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    establishmentId: uuid('establishment_id')
+      .notNull()
+      .references(() => establishments.id, { onDelete: 'cascade' }),
+    active: boolean('active').notNull().default(false),
+    pointsPerService: integer('points_per_service').notNull().default(0),
+    pointsPerCurrencyUnit: integer('points_per_currency_unit').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('points_programs_establishment_idx').on(t.establishmentId)],
+)
+
+// Catálogo de níveis de resgate: X pontos = recompensa (vira cupom pessoal).
+export const pointsRewards = pgTable(
+  'points_rewards',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    establishmentId: uuid('establishment_id')
+      .notNull()
+      .references(() => establishments.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    costPoints: integer('cost_points').notNull(),
+    rewardType: couponDiscountTypeEnum('reward_type').notNull(),
+    rewardValue: integer('reward_value').notNull().default(0),
+    rewardServiceId: uuid('reward_service_id').references(() => services.id, {
+      onDelete: 'set null',
+    }),
+    active: boolean('active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('points_rewards_establishment_active_idx').on(t.establishmentId, t.active)],
+)
+
+// Ledger de pontos: 'earn' (positivo, 1 por atendimento concluído) e 'redeem'
+// (negativo, appointmentId null). Saldo = sum(points) por cliente.
+export const pointsEntries = pgTable(
+  'points_entries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    establishmentId: uuid('establishment_id')
+      .notNull()
+      .references(() => establishments.id, { onDelete: 'cascade' }),
+    clientId: uuid('client_id')
+      .notNull()
+      .references(() => clients.id, { onDelete: 'cascade' }),
+    // Preenchido para 'earn'; null para 'redeem'
+    appointmentId: uuid('appointment_id').references(() => appointments.id, {
+      onDelete: 'cascade',
+    }),
+    rewardId: uuid('reward_id').references(() => pointsRewards.id, { onDelete: 'set null' }),
+    type: pointsEntryTypeEnum('type').notNull(),
+    // Positivo em 'earn', negativo em 'redeem'
+    points: integer('points').notNull(),
+    couponId: uuid('coupon_id').references(() => coupons.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // 1 'earn' por atendimento; 'redeem' tem appointmentId null (múltiplos ok)
+    uniqueIndex('points_entries_appointment_idx').on(t.appointmentId),
+    index('points_entries_establishment_client_idx').on(t.establishmentId, t.clientId),
+  ],
+)
+
 export const usersRelations = relations(users, ({ many }) => ({
   establishments: many(establishments),
 }))
@@ -440,6 +680,14 @@ export const establishmentsRelations = relations(establishments, ({ one, many })
   timeBlocks: many(timeBlocks),
   products: many(products),
   recurringExpenses: many(recurringExpenses),
+  coupons: many(coupons),
+  couponRedemptions: many(couponRedemptions),
+  loyaltyPrograms: many(loyaltyPrograms),
+  loyaltyStamps: many(loyaltyStamps),
+  loyaltyRedemptions: many(loyaltyRedemptions),
+  pointsPrograms: many(pointsPrograms),
+  pointsRewards: many(pointsRewards),
+  pointsEntries: many(pointsEntries),
 }))
 
 export const productsRelations = relations(products, ({ one }) => ({
@@ -549,6 +797,101 @@ export const commissionEntriesRelations = relations(commissionEntries, ({ one })
     fields: [commissionEntries.serviceId],
     references: [services.id],
   }),
+}))
+
+export const couponsRelations = relations(coupons, ({ one, many }) => ({
+  establishment: one(establishments, {
+    fields: [coupons.establishmentId],
+    references: [establishments.id],
+  }),
+  client: one(clients, { fields: [coupons.clientId], references: [clients.id] }),
+  redemptions: many(couponRedemptions),
+}))
+
+export const couponRedemptionsRelations = relations(couponRedemptions, ({ one }) => ({
+  establishment: one(establishments, {
+    fields: [couponRedemptions.establishmentId],
+    references: [establishments.id],
+  }),
+  coupon: one(coupons, { fields: [couponRedemptions.couponId], references: [coupons.id] }),
+  client: one(clients, { fields: [couponRedemptions.clientId], references: [clients.id] }),
+  appointment: one(appointments, {
+    fields: [couponRedemptions.appointmentId],
+    references: [appointments.id],
+  }),
+}))
+
+export const loyaltyProgramsRelations = relations(loyaltyPrograms, ({ one }) => ({
+  establishment: one(establishments, {
+    fields: [loyaltyPrograms.establishmentId],
+    references: [establishments.id],
+  }),
+  rewardService: one(services, {
+    fields: [loyaltyPrograms.rewardServiceId],
+    references: [services.id],
+  }),
+}))
+
+export const loyaltyStampsRelations = relations(loyaltyStamps, ({ one }) => ({
+  establishment: one(establishments, {
+    fields: [loyaltyStamps.establishmentId],
+    references: [establishments.id],
+  }),
+  client: one(clients, { fields: [loyaltyStamps.clientId], references: [clients.id] }),
+  appointment: one(appointments, {
+    fields: [loyaltyStamps.appointmentId],
+    references: [appointments.id],
+  }),
+  redemption: one(loyaltyRedemptions, {
+    fields: [loyaltyStamps.redemptionId],
+    references: [loyaltyRedemptions.id],
+  }),
+}))
+
+export const loyaltyRedemptionsRelations = relations(loyaltyRedemptions, ({ one, many }) => ({
+  establishment: one(establishments, {
+    fields: [loyaltyRedemptions.establishmentId],
+    references: [establishments.id],
+  }),
+  client: one(clients, { fields: [loyaltyRedemptions.clientId], references: [clients.id] }),
+  coupon: one(coupons, { fields: [loyaltyRedemptions.couponId], references: [coupons.id] }),
+  stamps: many(loyaltyStamps),
+}))
+
+export const pointsProgramsRelations = relations(pointsPrograms, ({ one }) => ({
+  establishment: one(establishments, {
+    fields: [pointsPrograms.establishmentId],
+    references: [establishments.id],
+  }),
+}))
+
+export const pointsRewardsRelations = relations(pointsRewards, ({ one, many }) => ({
+  establishment: one(establishments, {
+    fields: [pointsRewards.establishmentId],
+    references: [establishments.id],
+  }),
+  rewardService: one(services, {
+    fields: [pointsRewards.rewardServiceId],
+    references: [services.id],
+  }),
+  entries: many(pointsEntries),
+}))
+
+export const pointsEntriesRelations = relations(pointsEntries, ({ one }) => ({
+  establishment: one(establishments, {
+    fields: [pointsEntries.establishmentId],
+    references: [establishments.id],
+  }),
+  client: one(clients, { fields: [pointsEntries.clientId], references: [clients.id] }),
+  appointment: one(appointments, {
+    fields: [pointsEntries.appointmentId],
+    references: [appointments.id],
+  }),
+  reward: one(pointsRewards, {
+    fields: [pointsEntries.rewardId],
+    references: [pointsRewards.id],
+  }),
+  coupon: one(coupons, { fields: [pointsEntries.couponId], references: [coupons.id] }),
 }))
 
 export const waitlistEntriesRelations = relations(waitlistEntries, ({ one }) => ({

@@ -6,13 +6,10 @@ import {
   Check,
   Eye,
   EyeOff,
-  FileText,
-  Fingerprint,
   HeartPulse,
   Loader2,
   Lock,
   Mail,
-  MapPin,
   Phone,
   Scissors,
   Smartphone,
@@ -29,19 +26,7 @@ import { KairoonLogotype } from '../../components/brand/Logo'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { useAuth } from '../../contexts/AuthContext'
-import {
-  cn,
-  formatCep,
-  formatCnpj,
-  formatCpf,
-  formatPhone,
-  isValidCep,
-  isValidCnpj,
-  isValidCpf,
-  isValidPhone,
-  onlyDigits,
-} from '../../lib/format'
-import { fetchAddressByCep } from '../../lib/viacep'
+import { cn, formatPhone, isValidPhone, onlyDigits } from '../../lib/format'
 import type { BusinessType } from '../../types/api'
 
 const EMAIL_REGEX = /^\S+@\S+\.\S+$/
@@ -50,9 +35,9 @@ const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const TOTAL_STEPS = 3
 
 const STEP_TITLES: Record<number, { title: string; subtitle: string }> = {
-  1: { title: 'Sua conta', subtitle: 'Comece criando seu acesso.' },
-  2: { title: 'Seu negócio', subtitle: 'Conte um pouco sobre seu estabelecimento.' },
-  3: { title: 'Só mais 30 segundos', subtitle: 'Nos conte sobre seu negócio.' },
+  1: { title: 'Sua conta', subtitle: 'Dados de acesso — é com o e-mail e a senha que você entra.' },
+  2: { title: 'Seu negócio', subtitle: 'O básico para colocar sua agenda no ar.' },
+  3: { title: 'Quase lá', subtitle: 'Opcional: nos ajuda a personalizar sua experiência.' },
 }
 
 /** Destaques exibidos no painel de marca durante o cadastro. */
@@ -212,11 +197,10 @@ export function RegisterPage() {
 
   const [step, setStep] = useState(1)
 
-  // Etapa 1 — conta
+  // Etapa 1 — conta (identidade + login do dono)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [emailApiError, setEmailApiError] = useState<string | null>(null)
-  const [cpf, setCpf] = useState('')
   const [personalPhone, setPersonalPhone] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -224,54 +208,22 @@ export function RegisterPage() {
   // Etapa 2 — negócio
   const [businessName, setBusinessName] = useState('')
   const [businessType, setBusinessType] = useState<BusinessType | null>(null)
-  const [document, setDocument] = useState('')
-  const [address, setAddress] = useState('')
-  const [addressNumber, setAddressNumber] = useState('')
-  const [neighborhood, setNeighborhood] = useState('')
-  const [city, setCity] = useState('')
-  const [uf, setUf] = useState('')
-  const [cep, setCep] = useState('')
-  const [cepStatus, setCepStatus] = useState<'idle' | 'loading' | 'notfound'>('idle')
-  const [phone, setPhone] = useState('')
   const [slug, setSlug] = useState('')
   const [slugTouched, setSlugTouched] = useState(false)
   const [slugApiError, setSlugApiError] = useState<string | null>(null)
   const [slugStatus, setSlugStatus] = useState<SlugStatus>('idle')
 
-  // Etapa 3 — quiz
+  // Contato do estabelecimento (o que o cliente vê). Por padrão reaproveita o
+  // contato pessoal do dono — evita digitar o mesmo telefone/e-mail duas vezes.
+  const [sameContact, setSameContact] = useState(true)
+  const [bizWhatsapp, setBizWhatsapp] = useState('')
+  const [bizEmail, setBizEmail] = useState('')
+
+  // Etapa 3 — quiz (opcional)
   const [quiz, setQuiz] = useState<Record<string, string>>({})
 
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-
-  // Autopreenchimento de endereço pelo CEP (ViaCEP) ao completar os 8 dígitos.
-  useEffect(() => {
-    const digits = onlyDigits(cep)
-    if (digits.length !== 8) {
-      setCepStatus('idle')
-      return
-    }
-    let cancelled = false
-    setCepStatus('loading')
-    const timer = setTimeout(() => {
-      fetchAddressByCep(digits).then((addr) => {
-        if (cancelled) return
-        if (!addr) {
-          setCepStatus('notfound')
-          return
-        }
-        setCepStatus('idle')
-        setAddress(addr.street)
-        setNeighborhood(addr.neighborhood)
-        setCity(addr.city)
-        setUf(addr.state)
-      })
-    }, 400)
-    return () => {
-      cancelled = true
-      clearTimeout(timer)
-    }
-  }, [cep])
 
   // Verifica a disponibilidade do link em tempo real (debounce) enquanto o usuário digita.
   useEffect(() => {
@@ -305,10 +257,8 @@ export function RegisterPage() {
   const slugFormatError =
     slug && !SLUG_REGEX.test(slug) ? 'Use apenas letras minúsculas, números e hífens' : undefined
   const personalPhoneError = personalPhone && !isValidPhone(personalPhone) ? 'Telefone incompleto' : undefined
-  const phoneError = phone && !isValidPhone(phone) ? 'Telefone incompleto' : undefined
-  const cpfError = cpf && !isValidCpf(cpf) ? 'CPF inválido' : undefined
-  const documentError = document && !isValidCnpj(document) ? 'CNPJ inválido' : undefined
-  const cepError = cep && !isValidCep(cep) ? 'CEP inválido' : undefined
+  const bizWhatsappError = bizWhatsapp && !isValidPhone(bizWhatsapp) ? 'Telefone incompleto' : undefined
+  const bizEmailError = bizEmail && !EMAIL_REGEX.test(bizEmail.trim()) ? 'Informe um e-mail válido' : undefined
 
   const slugHasError = Boolean(slugApiError || slugFormatError) || slugStatus === 'taken'
   const slugIsAvailable = slugStatus === 'available'
@@ -320,23 +270,18 @@ export function RegisterPage() {
   const step1Valid =
     name.trim().length >= 2 &&
     EMAIL_REGEX.test(email.trim()) &&
-    isValidCpf(cpf) &&
-    isValidPhone(personalPhone) &&
+    (personalPhone === '' || isValidPhone(personalPhone)) &&
     password.length >= 6 &&
     confirmPassword === password
 
+  const contactValid =
+    sameContact || ((bizWhatsapp === '' || isValidPhone(bizWhatsapp)) && (bizEmail === '' || EMAIL_REGEX.test(bizEmail.trim())))
+
   const step2Valid =
-    businessName.trim().length >= 2 &&
-    businessType !== null &&
-    slugUsable &&
-    isValidCnpj(document) &&
-    address.trim().length >= 3 &&
-    (cep === '' || isValidCep(cep)) &&
-    (phone === '' || isValidPhone(phone))
+    businessName.trim().length >= 2 && businessType !== null && slugUsable && contactValid
 
-  const step3Valid = QUIZ_QUESTIONS.every((q) => Boolean(quiz[q.key]))
-
-  const currentStepValid = step === 1 ? step1Valid : step === 2 ? step2Valid : step3Valid
+  // Quiz é opcional — não bloqueia a conclusão do cadastro.
+  const currentStepValid = step === 1 ? step1Valid : step === 2 ? step2Valid : true
 
   function handleBusinessNameChange(value: string) {
     setBusinessName(value)
@@ -356,25 +301,21 @@ export function RegisterPage() {
     if (!businessType) return
     setSubmitError(null)
     setIsSubmitting(true)
+    // Contato público: reaproveita o pessoal ou usa o informado especificamente.
+    const contactWhatsapp = sameContact ? onlyDigits(personalPhone) : onlyDigits(bizWhatsapp)
+    const contactEmail = sameContact ? email.trim() : bizEmail.trim()
     try {
       await register({
         name: name.trim(),
         email: email.trim(),
         password,
-        cpf,
-        phone: personalPhone,
+        ...(personalPhone ? { phone: personalPhone } : {}),
         establishment: {
           name: businessName.trim(),
           slug,
           businessType,
-          document,
-          address: address.trim(),
-          ...(addressNumber.trim() ? { addressNumber: addressNumber.trim() } : {}),
-          ...(neighborhood.trim() ? { neighborhood: neighborhood.trim() } : {}),
-          ...(city.trim() ? { city: city.trim() } : {}),
-          ...(uf.trim() ? { state: uf.trim() } : {}),
-          ...(cep ? { cep } : {}),
-          ...(phone ? { phone } : {}),
+          ...(contactEmail ? { email: contactEmail } : {}),
+          ...(contactWhatsapp ? { socials: { whatsapp: contactWhatsapp } } : {}),
         },
         quiz,
       })
@@ -507,29 +448,20 @@ export function RegisterPage() {
                         setEmailApiError(null)
                       }}
                       error={emailApiError ?? emailFormatError}
+                      hint="Você usa este e-mail para entrar."
                     />
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <Input
-                        label="Seu CPF"
-                        inputMode="numeric"
-                        placeholder="000.000.000-00"
-                        leftIcon={<Fingerprint className="h-4 w-4" />}
-                        value={cpf}
-                        onChange={(e) => setCpf(formatCpf(e.target.value))}
-                        error={cpfError}
-                      />
-                      <Input
-                        label="Telefone pessoal"
-                        type="tel"
-                        inputMode="tel"
-                        autoComplete="tel"
-                        placeholder="(11) 98765-4321"
-                        leftIcon={<Smartphone className="h-4 w-4" />}
-                        value={personalPhone}
-                        onChange={(e) => setPersonalPhone(formatPhone(e.target.value))}
-                        error={personalPhoneError}
-                      />
-                    </div>
+                    <Input
+                      label="Telefone"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      placeholder="(11) 98765-4321"
+                      leftIcon={<Smartphone className="h-4 w-4" />}
+                      value={personalPhone}
+                      onChange={(e) => setPersonalPhone(formatPhone(e.target.value))}
+                      error={personalPhoneError}
+                      hint="Opcional — para você acessar sua conta e receber avisos."
+                    />
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <PasswordField
                         label="Senha"
@@ -590,84 +522,6 @@ export function RegisterPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <Input
-                        label="CNPJ"
-                        inputMode="numeric"
-                        placeholder="00.000.000/0000-00"
-                        leftIcon={<FileText className="h-4 w-4" />}
-                        value={document}
-                        onChange={(e) => setDocument(formatCnpj(e.target.value))}
-                        error={documentError}
-                      />
-                      <Input
-                        label="Telefone comercial"
-                        type="tel"
-                        inputMode="tel"
-                        placeholder="(11) 3333-4444"
-                        leftIcon={<Phone className="h-4 w-4" />}
-                        value={phone}
-                        onChange={(e) => setPhone(formatPhone(e.target.value))}
-                        error={phoneError}
-                        hint="Opcional"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <Input
-                        label="CEP"
-                        inputMode="numeric"
-                        placeholder="00000-000"
-                        leftIcon={<MapPin className="h-4 w-4" />}
-                        value={cep}
-                        onChange={(e) => setCep(formatCep(e.target.value))}
-                        error={
-                          cepError ?? (cepStatus === 'notfound' ? 'CEP não encontrado' : undefined)
-                        }
-                        hint={
-                          cepStatus === 'loading'
-                            ? 'Buscando endereço…'
-                            : 'Preenche o endereço automaticamente'
-                        }
-                      />
-                      <Input
-                        label="Número"
-                        placeholder="Nº"
-                        value={addressNumber}
-                        onChange={(e) => setAddressNumber(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <Input
-                        label="Endereço"
-                        placeholder="Rua, avenida…"
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
-                      />
-                      <Input
-                        label="Bairro"
-                        placeholder="Bairro"
-                        value={neighborhood}
-                        onChange={(e) => setNeighborhood(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <Input
-                        label="Cidade"
-                        placeholder="Cidade"
-                        value={city}
-                        onChange={(e) => setCity(e.target.value)}
-                      />
-                      <Input
-                        label="Estado"
-                        placeholder="UF"
-                        value={uf}
-                        onChange={(e) => setUf(e.target.value.toUpperCase().slice(0, 2))}
-                      />
-                    </div>
-
                     <div>
                       <label
                         htmlFor="register-slug"
@@ -721,6 +575,51 @@ export function RegisterPage() {
                         <p className="mt-1 text-xs text-ink-tertiary">
                           Seus clientes vão agendar por este link.
                         </p>
+                      )}
+                    </div>
+
+                    {/* Contato do estabelecimento — o que o cliente vê no link público */}
+                    <div className="rounded-lg border border-line bg-background/60 p-3">
+                      <label className="flex cursor-pointer items-start gap-2.5">
+                        <input
+                          type="checkbox"
+                          checked={sameContact}
+                          onChange={(e) => setSameContact(e.target.checked)}
+                          className="mt-0.5 h-4 w-4 shrink-0 rounded border-line text-primary focus:ring-2 focus:ring-secondary-light"
+                        />
+                        <span className="text-[13px] leading-snug text-ink-secondary">
+                          Usar meu telefone e e-mail como contato do estabelecimento
+                          <span className="mt-0.5 block text-xs text-ink-tertiary">
+                            É o contato que seus clientes veem na página de agendamento. Você pode
+                            alterar depois nas configurações.
+                          </span>
+                        </span>
+                      </label>
+
+                      {!sameContact && (
+                        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          <Input
+                            label="WhatsApp do estabelecimento"
+                            type="tel"
+                            inputMode="tel"
+                            placeholder="(11) 98765-4321"
+                            leftIcon={<Phone className="h-4 w-4" />}
+                            value={bizWhatsapp}
+                            onChange={(e) => setBizWhatsapp(formatPhone(e.target.value))}
+                            error={bizWhatsappError}
+                            hint="Opcional"
+                          />
+                          <Input
+                            label="E-mail do estabelecimento"
+                            type="email"
+                            placeholder="contato@exemplo.com"
+                            leftIcon={<Mail className="h-4 w-4" />}
+                            value={bizEmail}
+                            onChange={(e) => setBizEmail(e.target.value)}
+                            error={bizEmailError}
+                            hint="Opcional"
+                          />
+                        </div>
                       )}
                     </div>
                   </div>

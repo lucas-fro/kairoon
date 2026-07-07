@@ -8,6 +8,7 @@ import { ClientDetailPage } from './pages/panel/ClientDetailPage'
 import { ClientsPage } from './pages/panel/ClientsPage'
 import { DashboardPage } from './pages/panel/DashboardPage'
 import { FinancePage } from './pages/panel/FinancePage'
+import { MarketingPage } from './pages/panel/MarketingPage'
 import { ReportsPage } from './pages/panel/ReportsPage'
 import { SettingsPage } from './pages/panel/SettingsPage'
 import { StockPage } from './pages/panel/StockPage'
@@ -34,6 +35,7 @@ export function App() {
           <Route path="clientes" element={<ClientsPage />} />
           <Route path="clientes/:id" element={<ClientDetailPage />} />
           <Route path="estoque" element={<StockPage />} />
+          <Route path="fidelidade" element={<MarketingPage />} />
           <Route path="relatorios" element={<ReportsPage />} />
           <Route path="financeiro" element={<FinancePage />} />
           {/* Serviços agora vivem dentro de Configurações (aba própria) */}

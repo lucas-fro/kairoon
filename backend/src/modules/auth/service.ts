@@ -61,6 +61,8 @@ export async function registerOwner(input: RegisterInput) {
         slug: input.establishment.slug,
         businessType: input.establishment.businessType,
         phone: input.establishment.phone,
+        email: input.establishment.email,
+        socials: input.establishment.socials,
         document: input.establishment.document,
         address: input.establishment.address,
         addressNumber: input.establishment.addressNumber,

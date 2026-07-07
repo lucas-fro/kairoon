@@ -4,6 +4,7 @@ import {
   appointments,
   clients,
   commissionEntries,
+  couponRedemptions,
   employeeCommissions,
   employees,
   products,
@@ -11,9 +12,12 @@ import {
   transactions,
 } from '../../db/schema'
 import { addMinutesToTime } from '../../lib/datetime'
-import { lockEmployeeDay } from '../../lib/locks'
+import { lockClientLoyalty, lockEmployeeDay } from '../../lib/locks'
 import { isValidPhone, normalizePhone, timesOverlap } from '../../lib/slots'
 import { AppError } from '../../lib/errors'
+import { resolveCouponForCheckout } from '../coupons/service'
+import { syncLoyaltyStamp } from '../loyalty/service'
+import { syncPointsEntry } from '../points/service'
 import type {
   CreateAppointmentInput,
   ListAppointmentsQuery,
@@ -372,16 +376,9 @@ export async function updateAppointment(
     0,
   )
   const subtotalCents = priceCents + productsCents
-  if (discountToStore > subtotalCents) {
-    throw new AppError('O desconto não pode ser maior que o total', 400)
-  }
-  const finalCents = Math.max(0, subtotalCents - discountToStore)
-  if (newStatus === 'completed' && paymentsToStore && paymentsToStore.length > 0) {
-    const sum = paymentsToStore.reduce((acc, p) => acc + p.amountCents, 0)
-    if (sum !== finalCents) {
-      throw new AppError('A soma das formas de pagamento deve ser igual ao total final', 400)
-    }
-  }
+  // A validação de desconto/pagamentos acontece dentro da transação: o cupom
+  // (código digitado ou campanha automática) é resolvido lá e redefine o
+  // desconto antes do cálculo do total final.
 
   const rescheduled =
     newDate !== appointment.date ||
@@ -406,6 +403,48 @@ export async function updateAppointment(
       })
     }
 
+    // Cupom: estorna o resgate anterior e (re)aplica no fechamento. Quando um
+    // cupom vale, ele é a fonte da verdade do desconto; sem cupom, vale o
+    // desconto manual digitado. Remarcar um atendimento que segue concluído
+    // sem reenviar o fechamento não mexe no resgate existente. lockCoupon é
+    // adquirido dentro do resolve, sempre depois do lockEmployeeDay acima.
+    const reclosing =
+      input.couponCode !== undefined ||
+      input.discountCents !== undefined ||
+      input.payments !== undefined ||
+      input.saleProducts !== undefined
+    const shouldResolveCoupon =
+      newStatus === 'completed' && (appointment.status !== 'completed' || reclosing)
+    if (newStatus !== 'completed' || shouldResolveCoupon) {
+      await tx.delete(couponRedemptions).where(eq(couponRedemptions.appointmentId, id))
+    }
+    let appliedCoupon: Awaited<ReturnType<typeof resolveCouponForCheckout>> = null
+    if (shouldResolveCoupon) {
+      appliedCoupon = await resolveCouponForCheckout(tx, {
+        establishmentId,
+        clientId: appointment.clientId,
+        serviceId: appointment.serviceId,
+        servicePriceCents: priceCents,
+        subtotalCents,
+        date: newDate,
+        excludeAppointmentId: id,
+        couponCode: input.couponCode,
+        manualDiscountCents: discountToStore,
+      })
+      if (appliedCoupon) discountToStore = appliedCoupon.discountCents
+    }
+
+    if (discountToStore > subtotalCents) {
+      throw new AppError('O desconto não pode ser maior que o total', 400)
+    }
+    const finalCents = Math.max(0, subtotalCents - discountToStore)
+    if (newStatus === 'completed' && paymentsToStore && paymentsToStore.length > 0) {
+      const sum = paymentsToStore.reduce((acc, p) => acc + p.amountCents, 0)
+      if (sum !== finalCents) {
+        throw new AppError('A soma das formas de pagamento deve ser igual ao total final', 400)
+      }
+    }
+
     const [updated] = await tx
       .update(appointments)
       .set({
@@ -421,6 +460,16 @@ export async function updateAppointment(
       .where(and(eq(appointments.id, id), eq(appointments.establishmentId, establishmentId)))
       .returning()
     if (!updated) throw new AppError('Agendamento não encontrado', 404)
+
+    if (appliedCoupon) {
+      await tx.insert(couponRedemptions).values({
+        establishmentId,
+        couponId: appliedCoupon.couponId,
+        clientId: appointment.clientId,
+        appointmentId: id,
+        discountCents: appliedCoupon.discountCents,
+      })
+    }
 
     // Ajuste de estoque: repõe os produtos do estado anterior (se estava
     // concluído) e baixa os do novo fechamento. Cobre finalizar, reabrir e
@@ -506,6 +555,20 @@ export async function updateAppointment(
         })
       }
     }
+
+    // Fidelidade e pontos: acumulam sobre o valor realmente pago (finalCents),
+    // mesmo padrão da comissão (delete incondicional + insert se concluído).
+    // O lock serializa contra resgates concorrentes do mesmo cliente.
+    await lockClientLoyalty(tx, appointment.clientId)
+    const accrualParams = {
+      establishmentId,
+      appointmentId: id,
+      clientId: appointment.clientId,
+      completed: newStatus === 'completed',
+      finalCents,
+    }
+    await syncLoyaltyStamp(tx, accrualParams)
+    await syncPointsEntry(tx, accrualParams)
   })
 
   return getAppointment(establishmentId, id)

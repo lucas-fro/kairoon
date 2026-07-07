@@ -127,6 +127,13 @@
       "when": 1783372062754,
       "tag": "0017_daily_warbound",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1783380070609,
+      "tag": "0018_warm_cobalt_man",
+      "breakpoints": true
     }
   ]
 }

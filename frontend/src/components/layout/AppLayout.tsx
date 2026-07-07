@@ -3,6 +3,7 @@ import {
   BarChart3,
   Boxes,
   Calendar,
+  Gift,
   LayoutDashboard,
   Settings,
   Users,
@@ -28,6 +29,7 @@ const NAV_GROUPS = [
     label: 'Gestão',
     items: [
       { to: '/app/clientes', label: 'Clientes', icon: Users },
+      { to: '/app/fidelidade', label: 'Fidelidade', icon: Gift },
       { to: '/app/estoque', label: 'Estoque', icon: Boxes },
       { to: '/app/financeiro', label: 'Financeiro', icon: Wallet },
       { to: '/app/relatorios', label: 'Relatórios', icon: BarChart3 },

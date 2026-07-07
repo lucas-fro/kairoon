@@ -5,15 +5,17 @@ export interface RegisterPayload {
   name: string
   email: string
   password: string
-  cpf: string
-  phone: string
+  cpf?: string
+  phone?: string
   establishment: {
     name: string
     slug: string
     businessType: string
     phone?: string
-    document: string
-    address: string
+    email?: string
+    socials?: { instagram?: string; whatsapp?: string }
+    document?: string
+    address?: string
     addressNumber?: string
     neighborhood?: string
     city?: string
