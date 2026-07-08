@@ -154,7 +154,7 @@ export function NotificationsBell() {
           icon: AlertTriangle,
           tone: 'error',
           title: 'Atendimento não fechado',
-          description: `${a.client.name} · ${a.startTime} — conclua ou remarque`,
+          description: `${a.client.name} · ${a.startTime} · conclua ou remarque`,
           onClick: () => go('/app/agenda'),
         })
       }

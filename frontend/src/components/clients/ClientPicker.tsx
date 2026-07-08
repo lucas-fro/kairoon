@@ -7,7 +7,15 @@ import { formatPhone, isValidPhone, onlyDigits } from '../../lib/format'
 import { Button } from '../ui/Button'
 import { DialogActions } from '../ui/DialogActions'
 import { Input } from '../ui/Input'
-import { Select } from '../ui/Select'
+import { SelectMenu } from '../ui/SelectMenu'
+import type { SelectMenuOption } from '../ui/SelectMenu'
+
+const GENDER_OPTIONS: SelectMenuOption[] = [
+  { value: '', label: 'Não informar' },
+  { value: 'masculino', label: 'Masculino' },
+  { value: 'feminino', label: 'Feminino' },
+  { value: 'outro', label: 'Outro' },
+]
 
 export interface SelectedClient {
   id: string
@@ -219,16 +227,12 @@ export function ClientPicker({ value, onChange, autoFocus, disabled }: ClientPic
               value={newBirthDate}
               onChange={(e) => setNewBirthDate(e.target.value)}
             />
-            <Select
+            <SelectMenu
               label="Sexo (opcional)"
               value={newGender}
-              onChange={(e) => setNewGender(e.target.value)}
-            >
-              <option value="">Não informar</option>
-              <option value="masculino">Masculino</option>
-              <option value="feminino">Feminino</option>
-              <option value="outro">Outro</option>
-            </Select>
+              onChange={setNewGender}
+              options={GENDER_OPTIONS}
+            />
           </div>
           {newError && <p className="text-xs text-error-dark">{newError}</p>}
           <DialogActions>

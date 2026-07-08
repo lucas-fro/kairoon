@@ -11,7 +11,7 @@ import type { LoyaltyRewardType } from '../../types/api'
 import { Button } from '../ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import { Input } from '../ui/Input'
-import { Select } from '../ui/Select'
+import { SelectMenu } from '../ui/SelectMenu'
 import { SkeletonList } from '../ui/Skeleton'
 import { Switch } from '../ui/Switch'
 import { useToast } from '../ui/Toast'
@@ -234,18 +234,18 @@ export function LoyaltyCardTab() {
 
                     <div className="min-w-0 flex-1">
                       {rewardType === 'free_service' ? (
-                        <Select
-                          aria-label="Serviço da recompensa"
+                        <SelectMenu
+                          ariaLabel="Serviço da recompensa"
                           value={rewardServiceId}
-                          onChange={(e) => setRewardServiceId(e.target.value)}
-                        >
-                          <option value="">Qualquer serviço</option>
-                          {serviceOptions.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.name} — {formatBRL(s.priceCents)}
-                            </option>
-                          ))}
-                        </Select>
+                          onChange={setRewardServiceId}
+                          options={[
+                            { value: '', label: 'Qualquer serviço' },
+                            ...serviceOptions.map((s) => ({
+                              value: s.id,
+                              label: `${s.name} · ${formatBRL(s.priceCents)}`,
+                            })),
+                          ]}
+                        />
                       ) : (
                         <div className="relative">
                           {rewardType === 'fixed' && (

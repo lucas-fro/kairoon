@@ -9,7 +9,7 @@ import { Button } from '../ui/Button'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { Dialog } from '../ui/Dialog'
 import { Input } from '../ui/Input'
-import { Select } from '../ui/Select'
+import { SelectMenu } from '../ui/SelectMenu'
 import { useToast } from '../ui/Toast'
 import { todayStr } from '../../lib/dates'
 import { formatBRL, formatDate, formatDuration, formatPhone } from '../../lib/format'
@@ -112,32 +112,32 @@ export function WaitlistDialog({
           <div className="space-y-3 rounded-lg border border-line bg-background p-3">
             <p className="text-[13px] font-medium text-ink-secondary">Novo na fila</p>
             <ClientPicker value={client} onChange={setClient} disabled={addMutation.isPending} />
-            <Select
+            <SelectMenu
               label="Serviço"
               value={serviceId}
-              onChange={(e) => setServiceId(e.target.value)}
-            >
-              <option value="">Selecione o serviço</option>
-              {activeServices.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} · {formatDuration(s.durationMinutes)} · {formatBRL(s.priceCents)}
-                </option>
-              ))}
-            </Select>
+              onChange={setServiceId}
+              options={[
+                { value: '', label: 'Selecione o serviço' },
+                ...activeServices.map((s) => ({
+                  value: s.id,
+                  label: `${s.name} · ${formatDuration(s.durationMinutes)} · ${formatBRL(s.priceCents)}`,
+                })),
+              ]}
+            />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {activeEmployees.length > 1 && (
-                <Select
+                <SelectMenu
                   label="Profissional (opcional)"
                   value={preferredEmployeeId}
-                  onChange={(e) => setPreferredEmployeeId(e.target.value)}
-                >
-                  <option value="">Qualquer profissional</option>
-                  {activeEmployees.map((employee) => (
-                    <option key={employee.id} value={employee.id}>
-                      {employee.name}
-                    </option>
-                  ))}
-                </Select>
+                  onChange={setPreferredEmployeeId}
+                  options={[
+                    { value: '', label: 'Qualquer profissional' },
+                    ...activeEmployees.map((employee) => ({
+                      value: employee.id,
+                      label: employee.name,
+                    })),
+                  ]}
+                />
               )}
               <Input
                 label="Dia desejado"

@@ -15,7 +15,7 @@ import { Dialog } from '../ui/Dialog'
 import { DialogActions } from '../ui/DialogActions'
 import { EmptyState } from '../ui/EmptyState'
 import { Input } from '../ui/Input'
-import { Select } from '../ui/Select'
+import { SelectMenu } from '../ui/SelectMenu'
 import { SkeletonList } from '../ui/Skeleton'
 import { Table, TBody, Td, Th, THead, Tr } from '../ui/Table'
 import { useToast } from '../ui/Toast'
@@ -558,13 +558,15 @@ export function ServicesTab() {
             </>
           ) : (
             <>
-              <Select label="Duração" value={duration} onChange={(e) => setDuration(e.target.value)}>
-                {durationOptions.map((minutes) => (
-                  <option key={minutes} value={minutes}>
-                    {formatDuration(minutes)}
-                  </option>
-                ))}
-              </Select>
+              <SelectMenu
+                label="Duração"
+                value={duration}
+                onChange={setDuration}
+                options={durationOptions.map((minutes) => ({
+                  value: String(minutes),
+                  label: formatDuration(minutes),
+                }))}
+              />
               <Input
                 label="Preço"
                 inputMode="decimal"

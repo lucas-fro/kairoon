@@ -35,7 +35,8 @@ import { Dialog } from '../ui/Dialog'
 import { DialogActions } from '../ui/DialogActions'
 import { EmptyState } from '../ui/EmptyState'
 import { Input } from '../ui/Input'
-import { Select } from '../ui/Select'
+import { SelectMenu } from '../ui/SelectMenu'
+import type { SelectMenuOption } from '../ui/SelectMenu'
 import { SkeletonList } from '../ui/Skeleton'
 import { Switch } from '../ui/Switch'
 import { TBody, Table, Td, Th, THead, Tr } from '../ui/Table'
@@ -50,6 +51,13 @@ const UPGRADE_BENEFITS = [
 const STEPS = ['Dados', 'Jornada', 'Comissão', 'Remuneração']
 
 const PAY_DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => i + 1)
+
+const GENDER_OPTIONS: SelectMenuOption[] = [
+  { value: '', label: 'Não informar' },
+  { value: 'masculino', label: 'Masculino' },
+  { value: 'feminino', label: 'Feminino' },
+  { value: 'outro', label: 'Outro' },
+]
 
 function getErrorMessage(err: unknown): string {
   return err instanceof ApiError ? err.message : 'Erro inesperado'
@@ -720,16 +728,12 @@ export function EmployeesTab() {
                 value={form.birthDate}
                 onChange={(e) => setForm((f) => ({ ...f, birthDate: e.target.value }))}
               />
-              <Select
+              <SelectMenu
                 label="Sexo (opcional)"
                 value={form.gender}
-                onChange={(e) => setForm((f) => ({ ...f, gender: e.target.value }))}
-              >
-                <option value="">Não informar</option>
-                <option value="masculino">Masculino</option>
-                <option value="feminino">Feminino</option>
-                <option value="outro">Outro</option>
-              </Select>
+                onChange={(v) => setForm((f) => ({ ...f, gender: v }))}
+                options={GENDER_OPTIONS}
+              />
             </div>
             <Input
               label="URL da foto (opcional)"
@@ -1107,17 +1111,15 @@ export function EmployeesTab() {
                   <span className="font-semibold text-ink">{formatBRL(payrollTotalCents(form))}</span>
                   <span className="text-ink-secondary">no dia</span>
                   <div className="w-24">
-                    <Select
+                    <SelectMenu
                       className="!h-9"
                       value={form.paymentDay1}
-                      onChange={(e) => setForm((f) => ({ ...f, paymentDay1: e.target.value }))}
-                    >
-                      {PAY_DAY_OPTIONS.map((day) => (
-                        <option key={day} value={day}>
-                          {day}
-                        </option>
-                      ))}
-                    </Select>
+                      onChange={(v) => setForm((f) => ({ ...f, paymentDay1: v }))}
+                      options={PAY_DAY_OPTIONS.map((day) => ({
+                        value: String(day),
+                        label: String(day),
+                      }))}
+                    />
                   </div>
                 </div>
               )}
@@ -1149,20 +1151,16 @@ export function EmployeesTab() {
                   ).map((row) => (
                     <div key={row.dayKey} className="flex items-end gap-2">
                       <div className="w-24 shrink-0">
-                        <Select
+                        <SelectMenu
                           label={row.label}
                           className="!h-9"
                           value={form[row.dayKey]}
-                          onChange={(e) =>
-                            setForm((f) => ({ ...f, [row.dayKey]: e.target.value }))
-                          }
-                        >
-                          {PAY_DAY_OPTIONS.map((day) => (
-                            <option key={day} value={day}>
-                              Dia {day}
-                            </option>
-                          ))}
-                        </Select>
+                          onChange={(v) => setForm((f) => ({ ...f, [row.dayKey]: v }))}
+                          options={PAY_DAY_OPTIONS.map((day) => ({
+                            value: String(day),
+                            label: `Dia ${day}`,
+                          }))}
+                        />
                       </div>
                       <Input
                         inputMode="decimal"

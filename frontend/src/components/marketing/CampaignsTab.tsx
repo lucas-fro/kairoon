@@ -218,8 +218,8 @@ export function CampaignsTab() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <p className="max-w-2xl text-sm text-ink-secondary">
           Campanhas aplicam o desconto sozinhas no fechamento do atendimento quando as condições
-          casam (ex.: primeira visita). Se mais de uma casar, vale a de maior desconto — cupom
-          digitado ou desconto manual têm prioridade.
+          casam (ex.: primeira visita). Se mais de uma casar, vale a de maior desconto (cupom
+          digitado ou desconto manual têm prioridade).
         </p>
         <Button onClick={() => openCreate()} leftIcon={<Plus className="h-4 w-4" />}>
           Nova campanha

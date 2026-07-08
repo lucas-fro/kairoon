@@ -157,7 +157,7 @@ export function AccountTab() {
           onClose={() => setConfirmOpen(false)}
           onConfirm={() => deleteMutation.mutate()}
           title="Excluir conta permanentemente?"
-          description="Esta ação é irreversível. Todos os seus dados — agendamentos, clientes, serviços, funcionários e histórico financeiro — serão apagados definitivamente e você perderá o acesso ao seu link público."
+          description="Esta ação é irreversível. Todos os seus dados (agendamentos, clientes, serviços, funcionários e histórico financeiro) serão apagados definitivamente e você perderá o acesso ao seu link público."
           confirmLabel="Sim, excluir tudo"
           cancelLabel="Cancelar"
           danger

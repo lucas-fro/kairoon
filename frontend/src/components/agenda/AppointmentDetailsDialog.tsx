@@ -37,7 +37,7 @@ import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { Dialog } from '../ui/Dialog'
 import { DialogActions } from '../ui/DialogActions'
 import { Input } from '../ui/Input'
-import { Select } from '../ui/Select'
+import { SelectMenu } from '../ui/SelectMenu'
 import { Switch } from '../ui/Switch'
 import { useToast } from '../ui/Toast'
 import { describeCouponDiscount } from '../../lib/coupons'
@@ -151,7 +151,7 @@ export function AppointmentDetailsDialog({
       queryClient.invalidateQueries({ queryKey: ['points'] })
       const message =
         variables.status === 'completed'
-          ? 'Atendimento finalizado — entrada lançada no financeiro'
+          ? 'Atendimento finalizado, entrada lançada no financeiro'
           : variables.status === 'cancelled'
             ? 'Agendamento cancelado'
             : variables.date
@@ -342,17 +342,12 @@ export function AppointmentDetailsDialog({
                   value={newDate}
                   onChange={(e) => setNewDate(e.target.value)}
                 />
-                <Select
+                <SelectMenu
                   label="Novo horário"
                   value={newTime}
-                  onChange={(e) => setNewTime(e.target.value)}
-                >
-                  {timeOptions.map((time) => (
-                    <option key={time} value={time}>
-                      {time}
-                    </option>
-                  ))}
-                </Select>
+                  onChange={setNewTime}
+                  options={timeOptions.map((time) => ({ value: time, label: time }))}
+                />
               </div>
             )}
 
@@ -1052,20 +1047,15 @@ function PaymentCheckout({
                     </label>
                     {isOn && method === 'credit' && (
                       <div className="w-20 shrink-0">
-                        <Select
-                          aria-label="Parcelas"
+                        <SelectMenu
+                          ariaLabel="Parcelas"
                           value={String(creditInstallments)}
-                          onChange={(e) => setCreditInstallments(Number(e.target.value))}
-                        >
-                          {Array.from(
+                          onChange={(v) => setCreditInstallments(Number(v))}
+                          options={Array.from(
                             { length: Math.max(1, maxInstallments) },
                             (_, i) => i + 1,
-                          ).map((n) => (
-                            <option key={n} value={n}>
-                              {n}x
-                            </option>
-                          ))}
-                        </Select>
+                          ).map((n) => ({ value: String(n), label: `${n}x` }))}
+                        />
                       </div>
                     )}
                     {isOn && (

@@ -15,6 +15,8 @@ interface SelectMenuProps {
   onChange: (value: string) => void
   options: SelectMenuOption[]
   label?: string
+  /** Nome acessível quando não há `label` visível (ex.: selects compactos em toolbars). */
+  ariaLabel?: string
   placeholder?: string
   disabled?: boolean
   className?: string
@@ -37,6 +39,7 @@ export function SelectMenu({
   onChange,
   options,
   label,
+  ariaLabel,
   placeholder = 'Selecione…',
   disabled,
   className,
@@ -55,7 +58,10 @@ export function SelectMenu({
     const r = el.getBoundingClientRect()
     const spaceBelow = window.innerHeight - r.bottom
     const openUp = spaceBelow < 240 && r.top > spaceBelow
-    setRect({ left: r.left, top: openUp ? r.top : r.bottom, width: r.width, openUp })
+    // Trava horizontal: nunca deixa o menu nascer fora da viewport (ex.: perto
+    // da borda direita numa tabela/área com scroll lateral).
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - r.width - 8))
+    setRect({ left, top: openUp ? r.top : r.bottom, width: r.width, openUp })
   }
 
   useLayoutEffect(() => {
@@ -149,6 +155,7 @@ export function SelectMenu({
         onKeyDown={handleKeyDown}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-label={ariaLabel}
         className={cn(
           'flex h-10 w-full items-center justify-between gap-2 rounded-lg border bg-surface px-3 text-left text-sm transition-shadow duration-150',
           'focus:outline-none focus:ring-[3px] focus:ring-secondary-light',

@@ -5,10 +5,18 @@ import { identifyClient } from '../../api/public'
 import { formatPhone, isValidPhone, onlyDigits } from '../../lib/format'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
-import { Select } from '../ui/Select'
+import { SelectMenu } from '../ui/SelectMenu'
+import type { SelectMenuOption } from '../ui/SelectMenu'
 import { useToast } from '../ui/Toast'
 
 const EMAIL_REGEX = /^\S+@\S+\.\S+$/
+
+const GENDER_OPTIONS: SelectMenuOption[] = [
+  { value: '', label: 'Não informar' },
+  { value: 'masculino', label: 'Masculino' },
+  { value: 'feminino', label: 'Feminino' },
+  { value: 'outro', label: 'Outro' },
+]
 
 type Phase = 'phone' | 'details'
 
@@ -170,12 +178,12 @@ export function ClientStep({
           value={birthDate}
           onChange={(e) => setBirthDate(e.target.value)}
         />
-        <Select label="Sexo (opcional)" value={gender} onChange={(e) => setGender(e.target.value)}>
-          <option value="">Não informar</option>
-          <option value="masculino">Masculino</option>
-          <option value="feminino">Feminino</option>
-          <option value="outro">Outro</option>
-        </Select>
+        <SelectMenu
+          label="Sexo (opcional)"
+          value={gender}
+          onChange={setGender}
+          options={GENDER_OPTIONS}
+        />
       </div>
 
       <div className="mt-auto pt-4">

@@ -46,6 +46,22 @@ export function addDays(dateStr: string, days: number): string {
   return toDateStr(d)
 }
 
+/**
+ * Avança `months` meses limitando o dia ao último dia do mês-alvo (ex.: 31/01 +
+ * 1 mês = 28/02). Usado para agendar as parcelas do crédito recebido mês a mês.
+ */
+export function addMonthsClamped(dateStr: string, months: number): string {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const lastDayOfTarget = new Date(year, month - 1 + months + 1, 0).getDate()
+  return toDateStr(new Date(year, month - 1 + months, Math.min(day, lastDayOfTarget)))
+}
+
+/** Último dia do mês da data ('YYYY-MM-DD'). */
+export function endOfMonth(dateStr: string): string {
+  const [year, month] = dateStr.split('-').map(Number)
+  return toDateStr(new Date(year, month, 0))
+}
+
 export const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
 export const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/
 

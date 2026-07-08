@@ -28,7 +28,8 @@ import { Dialog } from '../../components/ui/Dialog'
 import { DialogActions } from '../../components/ui/DialogActions'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Input } from '../../components/ui/Input'
-import { Select } from '../../components/ui/Select'
+import { SelectMenu } from '../../components/ui/SelectMenu'
+import type { SelectMenuOption } from '../../components/ui/SelectMenu'
 import { PageLoader } from '../../components/ui/Spinner'
 import { useToast } from '../../components/ui/Toast'
 import { describeCouponDiscount, describeCouponValidity } from '../../lib/coupons'
@@ -48,6 +49,13 @@ const GENDER_LABEL: Record<string, string> = {
   feminino: 'Feminino',
   outro: 'Outro',
 }
+
+const GENDER_OPTIONS: SelectMenuOption[] = [
+  { value: '', label: 'Não informar' },
+  { value: 'masculino', label: 'Masculino' },
+  { value: 'feminino', label: 'Feminino' },
+  { value: 'outro', label: 'Outro' },
+]
 
 const STATUS_BADGE: Record<
   AppointmentStatus,
@@ -149,12 +157,12 @@ function EditClientDialog({ open, onClose, client }: EditClientDialogProps) {
             value={birthDate}
             onChange={(e) => setBirthDate(e.target.value)}
           />
-          <Select label="Sexo (opcional)" value={gender} onChange={(e) => setGender(e.target.value)}>
-            <option value="">Não informar</option>
-            <option value="masculino">Masculino</option>
-            <option value="feminino">Feminino</option>
-            <option value="outro">Outro</option>
-          </Select>
+          <SelectMenu
+            label="Sexo (opcional)"
+            value={gender}
+            onChange={setGender}
+            options={GENDER_OPTIONS}
+          />
         </div>
         <DialogActions className="pt-2">
           <Button type="button" variant="outline" onClick={onClose} disabled={mutation.isPending}>

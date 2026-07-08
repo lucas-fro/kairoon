@@ -195,8 +195,8 @@ export function WeekGrid({
                       onClick={() => column.onSlotClick(time)}
                       aria-label={
                         column.isClosed
-                          ? `Indisponível — ${column.slotLabel}`
-                          : `Novo agendamento — ${column.slotLabel} às ${time}`
+                          ? `Indisponível: ${column.slotLabel}`
+                          : `Novo agendamento: ${column.slotLabel} às ${time}`
                       }
                       className={cn(
                         'absolute inset-x-0 border-t transition-colors duration-150',

@@ -20,17 +20,23 @@ import type { Establishment, PaymentSettings } from '../../types/api'
 import { Button } from '../ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import { Input } from '../ui/Input'
-import { Select } from '../ui/Select'
+import { SelectMenu } from '../ui/SelectMenu'
+import type { SelectMenuOption } from '../ui/SelectMenu'
 import { Spinner } from '../ui/Spinner'
 import { Switch } from '../ui/Switch'
 import { Textarea } from '../ui/Textarea'
 import { useToast } from '../ui/Toast'
 
-const BUSINESS_TYPE_OPTIONS = [
+const BUSINESS_TYPE_OPTIONS: SelectMenuOption[] = [
   { value: 'barbearia', label: 'Barbearia' },
   { value: 'salao', label: 'Salão de beleza' },
   { value: 'clinica', label: 'Clínica' },
   { value: 'outro', label: 'Outro' },
+]
+
+const RECEIPT_MODE_OPTIONS: SelectMenuOption[] = [
+  { value: 'upfront', label: 'Adiantado' },
+  { value: 'monthly', label: 'Mês a mês' },
 ]
 
 const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
@@ -41,7 +47,7 @@ const DEFAULT_PAYMENTS: PaymentSettings = {
   cash: true,
   pix: true,
   debit: true,
-  credit: { enabled: true, maxInstallments: 12 },
+  credit: { enabled: true, maxInstallments: 12, receiptMode: 'upfront' },
 }
 
 const INSTALLMENT_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1)
@@ -314,17 +320,12 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
 
             {/* Linha 2 (PC): tipo de negócio, CNPJ, CEP */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <Select
+              <SelectMenu
                 label="Tipo de negócio"
                 value={businessType}
-                onChange={(e) => setBusinessType(e.target.value)}
-              >
-                {BUSINESS_TYPE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </Select>
+                onChange={setBusinessType}
+                options={BUSINESS_TYPE_OPTIONS}
+              />
               <Input
                 label="CNPJ"
                 inputMode="numeric"
@@ -596,22 +597,49 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
               <div className="flex items-center justify-between gap-4">
                 <p className="text-sm font-medium text-ink">Máximo de parcelas</p>
                 <div className="w-24 shrink-0">
-                  <Select
-                    aria-label="Máximo de parcelas"
+                  <SelectMenu
+                    ariaLabel="Máximo de parcelas"
                     value={String(payments.credit.maxInstallments)}
-                    onChange={(e) =>
+                    onChange={(v) =>
                       setPayments((p) => ({
                         ...p,
-                        credit: { ...p.credit, maxInstallments: Number(e.target.value) },
+                        credit: { ...p.credit, maxInstallments: Number(v) },
                       }))
                     }
-                  >
-                    {INSTALLMENT_OPTIONS.map((n) => (
-                      <option key={n} value={n}>
-                        {n}x
-                      </option>
-                    ))}
-                  </Select>
+                    options={INSTALLMENT_OPTIONS.map((n) => ({
+                      value: String(n),
+                      label: `${n}x`,
+                    }))}
+                  />
+                </div>
+              </div>
+            )}
+
+            {payments.credit.enabled && (
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-ink">Recebimento</p>
+                  <p className="mt-0.5 text-xs text-ink-tertiary">
+                    Depende da sua maquininha, não do Kairoon: se ela antecipa e cai tudo de uma
+                    vez, use Adiantado; se ela repassa parcela por parcela, use Mês a mês. O
+                    financeiro lança o recebimento igual ao que você recebe.
+                  </p>
+                </div>
+                <div className="w-40 shrink-0">
+                  <SelectMenu
+                    ariaLabel="Recebimento do crédito"
+                    value={payments.credit.receiptMode ?? 'upfront'}
+                    onChange={(v) =>
+                      setPayments((p) => ({
+                        ...p,
+                        credit: {
+                          ...p.credit,
+                          receiptMode: v as 'upfront' | 'monthly',
+                        },
+                      }))
+                    }
+                    options={RECEIPT_MODE_OPTIONS}
+                  />
                 </div>
               </div>
             )}

@@ -11,8 +11,9 @@ import { Dialog } from '../../components/ui/Dialog'
 import { DialogActions } from '../../components/ui/DialogActions'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Input } from '../../components/ui/Input'
-import { Select } from '../../components/ui/Select'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { SelectMenu } from '../../components/ui/SelectMenu'
+import type { SelectMenuOption } from '../../components/ui/SelectMenu'
 import { SkeletonList } from '../../components/ui/Skeleton'
 import { Table, TBody, Td, Th, THead, Tr } from '../../components/ui/Table'
 import { useToast } from '../../components/ui/Toast'
@@ -26,6 +27,13 @@ function getInitials(name: string): string {
   const last = parts.length > 1 ? parts[parts.length - 1].charAt(0) : ''
   return `${first}${last}`.toUpperCase()
 }
+
+const GENDER_OPTIONS: SelectMenuOption[] = [
+  { value: '', label: 'Não informar' },
+  { value: 'masculino', label: 'Masculino' },
+  { value: 'feminino', label: 'Feminino' },
+  { value: 'outro', label: 'Outro' },
+]
 
 interface NewClientDialogProps {
   open: boolean
@@ -121,12 +129,12 @@ function NewClientDialog({ open, onClose }: NewClientDialogProps) {
             value={birthDate}
             onChange={(e) => setBirthDate(e.target.value)}
           />
-          <Select label="Sexo (opcional)" value={gender} onChange={(e) => setGender(e.target.value)}>
-            <option value="">Não informar</option>
-            <option value="masculino">Masculino</option>
-            <option value="feminino">Feminino</option>
-            <option value="outro">Outro</option>
-          </Select>
+          <SelectMenu
+            label="Sexo (opcional)"
+            value={gender}
+            onChange={setGender}
+            options={GENDER_OPTIONS}
+          />
         </div>
         <DialogActions className="pt-2">
           <Button type="button" variant="outline" onClick={onClose} disabled={mutation.isPending}>

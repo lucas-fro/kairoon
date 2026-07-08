@@ -7,7 +7,6 @@ import { promoteWaitlistEntry } from '../../api/waitlist'
 import { Button } from '../ui/Button'
 import { Dialog } from '../ui/Dialog'
 import { DialogActions } from '../ui/DialogActions'
-import { Select } from '../ui/Select'
 import { SelectMenu } from '../ui/SelectMenu'
 import { useToast } from '../ui/Toast'
 import { timeToMinutes } from '../../lib/dates'
@@ -100,17 +99,15 @@ export function WaitlistPromoteDialog({
         </div>
 
         {activeEmployees.length > 1 && (
-          <Select
+          <SelectMenu
             label="Profissional"
             value={employeeId}
-            onChange={(e) => setEmployeeId(e.target.value)}
-          >
-            {activeEmployees.map((employee) => (
-              <option key={employee.id} value={employee.id}>
-                {employee.name}
-              </option>
-            ))}
-          </Select>
+            onChange={setEmployeeId}
+            options={activeEmployees.map((employee) => ({
+              value: employee.id,
+              label: employee.name,
+            }))}
+          />
         )}
 
         <div>

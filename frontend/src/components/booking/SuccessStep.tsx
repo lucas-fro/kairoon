@@ -39,7 +39,7 @@ function downloadIcs(result: BookingResult) {
     `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').slice(0, 15)}Z`,
     `DTSTART:${toIcsDateTime(appointment.startTime)}`,
     `DTEND:${toIcsDateTime(appointment.endTime)}`,
-    `SUMMARY:${escapeIcsText(`${service.name} — ${establishment.name}`)}`,
+    `SUMMARY:${escapeIcsText(`${service.name} · ${establishment.name}`)}`,
     `LOCATION:${escapeIcsText(establishment.name)}`,
     `DESCRIPTION:${escapeIcsText(`Profissional: ${employee.name}`)}`,
     'END:VEVENT',

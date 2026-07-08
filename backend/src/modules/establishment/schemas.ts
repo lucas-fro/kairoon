@@ -55,6 +55,7 @@ export const updateEstablishmentSchema = z.object({
       credit: z.object({
         enabled: z.boolean(),
         maxInstallments: z.number().int().min(1).max(24),
+        receiptMode: z.enum(['upfront', 'monthly']).optional(),
       }),
     })
     .optional(),

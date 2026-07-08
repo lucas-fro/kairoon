@@ -1,7 +1,7 @@
-import { and, desc, eq, gte, lte } from 'drizzle-orm'
+import { and, desc, eq, gt, gte, isNotNull, lte, sql } from 'drizzle-orm'
 import { db } from '../../db'
 import { transactions } from '../../db/schema'
-import { todayStr } from '../../lib/datetime'
+import { endOfMonth, todayStr } from '../../lib/datetime'
 import { AppError } from '../../lib/errors'
 import type { CreateTransactionInput, ListTransactionsQuery } from './schemas'
 
@@ -20,8 +20,15 @@ export async function listTransactions(establishmentId: string, query: ListTrans
       type: true,
       date: true,
       appointmentId: true,
+      recurringExpenseId: true,
+      employeeId: true,
+      payrollDay: true,
+      installmentNumber: true,
+      installmentTotal: true,
       createdAt: true,
     },
+    // Formas de pagamento (e parcelamento) vivem no fechamento do agendamento.
+    with: { appointment: { columns: { payments: true } } },
     where: and(
       eq(transactions.establishmentId, establishmentId),
       gte(transactions.date, from),
@@ -38,12 +45,35 @@ export async function listTransactions(establishmentId: string, query: ListTrans
     else expenseCents += row.amountCents
   }
 
+  // Contas a receber: parcelas de crédito ainda não vencidas (date > hoje),
+  // independentes do período filtrado — olham o futuro. "Este mês" = as que
+  // ainda vencem até o fim do mês corrente.
+  const sumAmount = sql<string>`coalesce(sum(${transactions.amountCents}), 0)`
+  const receivableWhere = and(
+    eq(transactions.establishmentId, establishmentId),
+    eq(transactions.type, 'income'),
+    isNotNull(transactions.installmentTotal),
+    gt(transactions.date, today),
+  )
+  const [[total], [thisMonth]] = await Promise.all([
+    db.select({ v: sumAmount }).from(transactions).where(receivableWhere),
+    db
+      .select({ v: sumAmount })
+      .from(transactions)
+      .where(and(receivableWhere, lte(transactions.date, endOfMonth(today)))),
+  ])
+
   return {
-    transactions: rows,
+    transactions: rows.map(({ appointment, ...t }) => ({
+      ...t,
+      payments: appointment?.payments ?? null,
+    })),
     summary: {
       incomeCents,
       expenseCents,
       balanceCents: incomeCents - expenseCents,
+      receivableThisMonthCents: Number(thisMonth?.v ?? 0),
+      receivableTotalCents: Number(total?.v ?? 0),
     },
   }
 }

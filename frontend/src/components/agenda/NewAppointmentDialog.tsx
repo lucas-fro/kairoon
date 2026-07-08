@@ -8,7 +8,6 @@ import { Button } from '../ui/Button'
 import { Dialog } from '../ui/Dialog'
 import { DialogActions } from '../ui/DialogActions'
 import { Input } from '../ui/Input'
-import { Select } from '../ui/Select'
 import { SelectMenu } from '../ui/SelectMenu'
 import { timeToMinutes, todayStr } from '../../lib/dates'
 import { formatBRL, formatDuration } from '../../lib/format'
@@ -132,28 +131,29 @@ export function NewAppointmentDialog({
           />
         </div>
 
-        <Select label="Serviço" value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
-          <option value="">Selecione o serviço</option>
-          {activeServices.map((service) => (
-            <option key={service.id} value={service.id}>
-              {service.name} · {formatDuration(service.durationMinutes)} ·{' '}
-              {formatBRL(service.priceCents)}
-            </option>
-          ))}
-        </Select>
+        <SelectMenu
+          label="Serviço"
+          value={serviceId}
+          onChange={setServiceId}
+          options={[
+            { value: '', label: 'Selecione o serviço' },
+            ...activeServices.map((service) => ({
+              value: service.id,
+              label: `${service.name} · ${formatDuration(service.durationMinutes)} · ${formatBRL(service.priceCents)}`,
+            })),
+          ]}
+        />
 
         {activeEmployees.length > 1 && (
-          <Select
+          <SelectMenu
             label="Profissional"
             value={employeeId}
-            onChange={(e) => setEmployeeId(e.target.value)}
-          >
-            {activeEmployees.map((employee) => (
-              <option key={employee.id} value={employee.id}>
-                {employee.name}
-              </option>
-            ))}
-          </Select>
+            onChange={setEmployeeId}
+            options={activeEmployees.map((employee) => ({
+              value: employee.id,
+              label: employee.name,
+            }))}
+          />
         )}
 
         <Input label="Data" type="date" value={date} onChange={(e) => setDate(e.target.value)} />

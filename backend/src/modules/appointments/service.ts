@@ -7,11 +7,12 @@ import {
   couponRedemptions,
   employeeCommissions,
   employees,
+  establishments,
   products,
   services,
   transactions,
 } from '../../db/schema'
-import { addMinutesToTime } from '../../lib/datetime'
+import { addMinutesToTime, addMonthsClamped, todayStr } from '../../lib/datetime'
 import { lockClientLoyalty, lockEmployeeDay } from '../../lib/locks'
 import { isValidPhone, normalizePhone, timesOverlap } from '../../lib/slots'
 import { AppError } from '../../lib/errors'
@@ -595,39 +596,73 @@ export async function updateAppointment(
       await tx.update(products).set({ stockQuantity: newStock }).where(eq(products.id, productId))
     }
 
-    // Sincronização financeira: agendamento concluído gera uma receita
-    // vinculada; desfazer a conclusão remove a receita (estorno).
+    // Sincronização financeira: agendamento concluído gera receita vinculada;
+    // desfazer a conclusão remove tudo (estorno). Sempre delete + insert (em vez
+    // de update-in-place) para cobrir remarcação, refinalização e o parcelamento.
+    await tx
+      .delete(transactions)
+      .where(
+        and(eq(transactions.appointmentId, id), eq(transactions.establishmentId, establishmentId)),
+      )
+
     if (newStatus === 'completed') {
-      const existingIncome = await tx.query.transactions.findFirst({
-        where: and(eq(transactions.appointmentId, id), eq(transactions.type, 'income')),
+      // Modo de recebimento do crédito: 'monthly' difere o crédito parcelado
+      // para os meses seguintes (cada parcela vira uma receita futura, a 1ª no
+      // mês seguinte). Ausente/'upfront' = recebe o total na hora (comportamento
+      // atual). Só afeta pagamentos de crédito com mais de uma parcela.
+      const est = await tx.query.establishments.findFirst({
+        where: eq(establishments.id, establishmentId),
+        columns: { paymentSettings: true },
       })
-      if (existingIncome) {
-        // Remarcação move a receita; mudança de desconto/valor recebido ajusta o total
-        if (existingIncome.date !== updated.date || existingIncome.amountCents !== collectedCents) {
-          await tx
-            .update(transactions)
-            .set({ date: updated.date, amountCents: collectedCents })
-            .where(eq(transactions.id, existingIncome.id))
-        }
-      } else {
-        await tx.insert(transactions).values({
+      const monthly = est?.paymentSettings?.credit?.receiptMode === 'monthly'
+      const deferred = monthly
+        ? (paymentsToStore ?? []).filter((p) => p.method === 'credit' && (p.installments ?? 0) > 1)
+        : []
+      const deferredCents = deferred.reduce((acc, p) => acc + p.amountCents, 0)
+      const immediateCents = collectedCents - deferredCents
+
+      // Fluxo de caixa: o dinheiro entra quando é recebido (no fechamento), não
+      // numa data futura. Ancoramos a receita em min(data do atendimento, hoje)
+      // — atendimento futuro finalizado adiantado cai hoje; retroativo mantém a
+      // data passada. As parcelas do crédito mês a mês contam a partir daí.
+      const today = todayStr()
+      const receivedDate = updated.date > today ? today : updated.date
+
+      const description = `Serviço: ${appointment.service.name} · ${appointment.client.name}`
+      const rows: (typeof transactions.$inferInsert)[] = []
+
+      // Parte recebida na hora (dinheiro/PIX/débito/crédito à vista).
+      if (immediateCents > 0) {
+        rows.push({
           establishmentId,
           appointmentId: id,
-          description: `Serviço: ${appointment.service.name} — ${appointment.client.name}`,
-          amountCents: collectedCents,
+          description,
+          amountCents: immediateCents,
           type: 'income',
-          date: updated.date,
+          date: receivedDate,
         })
       }
-    } else {
-      await tx
-        .delete(transactions)
-        .where(
-          and(
-            eq(transactions.appointmentId, id),
-            eq(transactions.establishmentId, establishmentId),
-          ),
-        )
+
+      // Crédito parcelado mês a mês: N receitas futuras, resto na 1ª parcela.
+      for (const p of deferred) {
+        const n = p.installments ?? 1
+        const base = Math.floor(p.amountCents / n)
+        const remainder = p.amountCents - base * n
+        for (let i = 1; i <= n; i++) {
+          rows.push({
+            establishmentId,
+            appointmentId: id,
+            description,
+            amountCents: i === 1 ? base + remainder : base,
+            type: 'income',
+            date: addMonthsClamped(receivedDate, i),
+            installmentNumber: i,
+            installmentTotal: n,
+          })
+        }
+      }
+
+      if (rows.length > 0) await tx.insert(transactions).values(rows)
     }
 
     // Sincronização da comissão: atendimento concluído gera (ou recalcula) a

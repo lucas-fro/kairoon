@@ -1,7 +1,7 @@
 # Kairoon Design System v1.0
 
 Interface premium, clean e respirável para o Kairoon (sistema de agendamentos).
-Regra estética central: **80% neutro + 15% brand + 5% status/accent** — muita
+Regra estética central: **60% neutro + 30% brand + 10% status/accent** — muita
 superfície branca/cinza claro, azul escuro só onde importa, cores vivas apenas
 para feedback.
 

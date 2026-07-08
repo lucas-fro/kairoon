@@ -18,7 +18,9 @@ export interface PaymentSettings {
   cash: boolean
   pix: boolean
   debit: boolean
-  credit: { enabled: boolean; maxInstallments: number }
+  /** receiptMode: 'upfront' recebe o total na hora; 'monthly' recebe o crédito
+   *  parcelado mês a mês. Ausente = 'upfront'. */
+  credit: { enabled: boolean; maxInstallments: number; receiptMode?: 'upfront' | 'monthly' }
 }
 
 export interface Payment {
@@ -360,6 +362,13 @@ export interface Transaction {
   date: string
   appointmentId: string | null
   recurringExpenseId?: string | null
+  employeeId?: string | null
+  payrollDay?: number | null
+  /** formas de pagamento do fechamento (só em lançamentos de agendamento) */
+  payments?: Payment[] | null
+  /** parcela do crédito recebido mês a mês (null em lançamentos normais) */
+  installmentNumber?: number | null
+  installmentTotal?: number | null
   createdAt: string
 }
 
@@ -410,6 +419,10 @@ export interface TransactionsResponse {
     incomeCents: number
     expenseCents: number
     balanceCents: number
+    /** parcelas de crédito a receber neste mês (ainda não vencidas) */
+    receivableThisMonthCents?: number
+    /** total a receber somando todas as parcelas futuras */
+    receivableTotalCents?: number
   }
 }
 
@@ -429,13 +442,34 @@ export interface CommissionsReport {
   byEmployee: CommissionByEmployee[]
 }
 
-export interface DashboardSummary {
-  todayAppointments: number
-  todayRevenueCents: number
-  monthRevenueCents: number
-  newClientsThisMonth: number
+export interface DashboardMonthSummary {
+  revenueCents: number
+  /** variação vs. mesmo período do mês anterior; null sem base de comparação */
+  revenueChangePct: number | null
+  /** atendimentos concluídos no período — denominador do ticket médio */
+  completedCount: number
+  appointmentsCount: number
+  appointmentsChangePct: number | null
+  newClients: number
+  newClientsChangePct: number | null
+  /** 0–1, mês corrente */
   occupancyRate: number
-  nextAppointments: {
+  occupancyChangePct: number | null
+  /** 0–1, apenas hoje */
+  todayOccupancyRate: number
+}
+
+export interface DashboardTrendPoint {
+  date: string
+  appointmentsCount: number
+  newClientsCount: number
+}
+
+export interface DashboardSummary {
+  month: DashboardMonthSummary
+  /** série diária do mês (agendamentos e novos clientes) para o gráfico */
+  trend: DashboardTrendPoint[]
+  todayAppointments: {
     id: string
     startTime: string
     endTime: string

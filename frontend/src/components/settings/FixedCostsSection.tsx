@@ -19,12 +19,16 @@ import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { Dialog } from '../ui/Dialog'
 import { DialogActions } from '../ui/DialogActions'
 import { Input } from '../ui/Input'
-import { Select } from '../ui/Select'
+import { SelectMenu } from '../ui/SelectMenu'
+import type { SelectMenuOption } from '../ui/SelectMenu'
 import { SkeletonList } from '../ui/Skeleton'
 import { Table, TBody, Td, Th, THead, Tr } from '../ui/Table'
 import { useToast } from '../ui/Toast'
 
-const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => i + 1)
+const DAY_OPTIONS: SelectMenuOption[] = Array.from({ length: 31 }, (_, i) => i + 1).map((day) => ({
+  value: String(day),
+  label: `Dia ${day}`,
+}))
 
 function errorMessage(err: unknown): string {
   return err instanceof ApiError ? err.message : 'Erro inesperado'
@@ -283,17 +287,12 @@ export function FixedCostsSection() {
               onChange={(e) => setAmount(e.target.value)}
               error={formErrors.amount}
             />
-            <Select
+            <SelectMenu
               label="Dia do vencimento"
               value={dayOfMonth}
-              onChange={(e) => setDayOfMonth(e.target.value)}
-            >
-              {DAY_OPTIONS.map((day) => (
-                <option key={day} value={day}>
-                  Dia {day}
-                </option>
-              ))}
-            </Select>
+              onChange={setDayOfMonth}
+              options={DAY_OPTIONS}
+            />
           </div>
 
           <DialogActions className="pt-2">

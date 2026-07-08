@@ -41,7 +41,7 @@ async function main() {
       businessType: 'barbearia',
       phone: '11987654321',
       document: '12.345.678/0001-90',
-      address: 'Av. Paulista, 1000 — Bela Vista, São Paulo/SP',
+      address: 'Av. Paulista, 1000 · Bela Vista, São Paulo/SP',
       cep: '01310-100',
       socials: {
         instagram: 'navalhadeouro',
@@ -294,7 +294,7 @@ async function main() {
       await db.insert(schema.transactions).values({
         establishmentId: establishment.id,
         appointmentId: appointment.id,
-        description: `Serviço: ${service.name} — ${client.name}`,
+        description: `Serviço: ${service.name} · ${client.name}`,
         amountCents: service.priceCents,
         type: 'income',
         date,

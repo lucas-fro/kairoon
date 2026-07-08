@@ -17,7 +17,8 @@ import { Dialog } from '../ui/Dialog'
 import { DialogActions } from '../ui/DialogActions'
 import { EmptyState } from '../ui/EmptyState'
 import { Input } from '../ui/Input'
-import { Select } from '../ui/Select'
+import { SelectMenu } from '../ui/SelectMenu'
+import type { SelectMenuOption } from '../ui/SelectMenu'
 import { SkeletonList } from '../ui/Skeleton'
 import { Switch } from '../ui/Switch'
 import { Table, TBody, Td, Th, THead, Tr } from '../ui/Table'
@@ -29,6 +30,11 @@ const DISCOUNT_TYPE_OPTIONS: { key: CouponDiscountType; label: string }[] = [
   { key: 'percent', label: '%' },
   { key: 'fixed', label: 'R$' },
   { key: 'free_service', label: 'Grátis' },
+]
+
+const APPLIES_TO_OPTIONS: SelectMenuOption[] = [
+  { value: 'total', label: 'Total do atendimento' },
+  { value: 'service', label: 'Só o serviço' },
 ]
 
 export function CouponsTab() {
@@ -417,14 +423,12 @@ export function CouponsTab() {
           </div>
 
           {discountType !== 'free_service' && (
-            <Select
+            <SelectMenu
               label="Aplica em"
               value={appliesTo}
-              onChange={(e) => setAppliesTo(e.target.value as CouponAppliesTo)}
-            >
-              <option value="total">Total do atendimento</option>
-              <option value="service">Só o serviço</option>
-            </Select>
+              onChange={(v) => setAppliesTo(v as CouponAppliesTo)}
+              options={APPLIES_TO_OPTIONS}
+            />
           )}
 
           <div>

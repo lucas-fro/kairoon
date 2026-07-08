@@ -88,7 +88,7 @@ export function TimeBlocksCard() {
       </CardHeader>
       <CardContent className="space-y-5">
         <p className="text-sm text-ink-secondary">
-          Datas ou horários em que não haverá atendimento — feriados, folgas ou compromissos. Esses
+          Datas ou horários em que não haverá atendimento: feriados, folgas ou compromissos. Esses
           períodos ficam indisponíveis no link público de agendamento.
         </p>
 

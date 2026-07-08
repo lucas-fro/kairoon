@@ -24,7 +24,7 @@ import { Dialog } from '../ui/Dialog'
 import { DialogActions } from '../ui/DialogActions'
 import { EmptyState } from '../ui/EmptyState'
 import { Input } from '../ui/Input'
-import { Select } from '../ui/Select'
+import { SelectMenu } from '../ui/SelectMenu'
 import { SkeletonList } from '../ui/Skeleton'
 import { Switch } from '../ui/Switch'
 import { Table, TBody, Td, Th, THead, Tr } from '../ui/Table'
@@ -339,7 +339,7 @@ export function PointsTab() {
         <EmptyState
           icon={Gift}
           title="Nenhuma recompensa cadastrada"
-          description="Crie níveis de resgate para os pontos — por exemplo: 300 pontos = R$ 20 de desconto."
+          description="Crie níveis de resgate para os pontos. Por exemplo: 300 pontos = R$ 20 de desconto."
           action={
             <Button onClick={openCreate} leftIcon={<Plus className="h-4 w-4" />}>
               Nova recompensa
@@ -511,18 +511,18 @@ export function PointsTab() {
           </div>
 
           {rewardType === 'free_service' && (
-            <Select
+            <SelectMenu
               label="Serviço grátis"
               value={rewardServiceId}
-              onChange={(e) => setRewardServiceId(e.target.value)}
-            >
-              <option value="">Qualquer serviço</option>
-              {serviceOptions.map((service) => (
-                <option key={service.id} value={service.id}>
-                  {service.name} · {formatBRL(service.priceCents)}
-                </option>
-              ))}
-            </Select>
+              onChange={setRewardServiceId}
+              options={[
+                { value: '', label: 'Qualquer serviço' },
+                ...serviceOptions.map((service) => ({
+                  value: service.id,
+                  label: `${service.name} · ${formatBRL(service.priceCents)}`,
+                })),
+              ]}
+            />
           )}
 
           {/* Prévia do nível de resgate */}

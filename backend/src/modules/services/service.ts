@@ -37,7 +37,7 @@ async function resolvePackage(
     )
   if (components.length !== uniqueIds.length) {
     throw new AppError(
-      'Selecione serviços válidos — um pacote não pode conter outro pacote',
+      'Selecione serviços válidos: um pacote não pode conter outro pacote',
       400,
     )
   }

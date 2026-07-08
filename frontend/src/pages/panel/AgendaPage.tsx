@@ -21,7 +21,7 @@ import {
 import type { PendingAppointmentView } from '../../components/realtime/PendingAppointmentDialog'
 import { Button } from '../../components/ui/Button'
 import { PageHeader } from '../../components/ui/PageHeader'
-import { Select } from '../../components/ui/Select'
+import { SelectMenu } from '../../components/ui/SelectMenu'
 import { Skeleton } from '../../components/ui/Skeleton'
 import {
   MONTH_LABELS,
@@ -157,6 +157,12 @@ export function AgendaPage() {
       closedWeekdays: new Set(hours.filter((h) => h.isClosed).map((h) => h.dayOfWeek)),
     }
   }, [workingHoursQuery.data])
+
+  // Só para desenhar o grid: +1h além do fechamento, para que agendamentos
+  // feitos perto do fechamento (que ultrapassam o horário) continuem visíveis
+  // em vez de ficarem recortados/ocultos. Os seletores de horário (novo
+  // agendamento, reagendar, fila de espera) continuam limitados a endMinutes.
+  const gridEndMinutes = Math.min(endMinutes + 60, 1440)
 
   const employees = employeesQuery.data ?? []
   const activeEmployees = employees.filter((e) => e.active)
@@ -345,18 +351,18 @@ export function AgendaPage() {
         <div className="ml-auto flex flex-wrap items-center gap-4">
           {activeEmployees.length > 1 && (
             <div className="w-48">
-              <Select
+              <SelectMenu
                 className="!h-8 text-[13px]"
                 value={employeeFilter}
-                onChange={(e) => setEmployeeFilter(e.target.value)}
-              >
-                <option value="">Todos os profissionais</option>
-                {activeEmployees.map((employee) => (
-                  <option key={employee.id} value={employee.id}>
-                    {employee.name}
-                  </option>
-                ))}
-              </Select>
+                onChange={setEmployeeFilter}
+                options={[
+                  { value: '', label: 'Todos os profissionais' },
+                  ...activeEmployees.map((employee) => ({
+                    value: employee.id,
+                    label: employee.name,
+                  })),
+                ]}
+              />
             </div>
           )}
         </div>
@@ -389,7 +395,7 @@ export function AgendaPage() {
           <WeekGrid
             columns={columns}
             startMinutes={startMinutes}
-            endMinutes={endMinutes}
+            endMinutes={gridEndMinutes}
             showEmployee={showEmployeeInBlock}
             nowMinutes={nowMin}
             onAppointmentClick={openAppointment}

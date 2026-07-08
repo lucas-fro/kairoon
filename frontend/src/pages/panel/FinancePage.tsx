@@ -7,7 +7,6 @@ import {
   Check,
   Percent,
   Plus,
-  Trash2,
   Wallet,
 } from 'lucide-react'
 import { ApiError } from '../../api/client'
@@ -21,23 +20,56 @@ import { createTransaction, deleteTransaction, listTransactions } from '../../ap
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
-import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { Dialog } from '../../components/ui/Dialog'
 import { DialogActions } from '../../components/ui/DialogActions'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Input } from '../../components/ui/Input'
 import { PageHeader } from '../../components/ui/PageHeader'
-import { Select } from '../../components/ui/Select'
+import { SelectMenu } from '../../components/ui/SelectMenu'
 import { Skeleton, SkeletonList } from '../../components/ui/Skeleton'
 import { Table, TBody, Td, Th, THead, Tr } from '../../components/ui/Table'
 import { useToast } from '../../components/ui/Toast'
 import { addDays, todayStr } from '../../lib/dates'
 import { cn, formatBRL, formatDate, formatMonthLabel, parseBRLToCents } from '../../lib/format'
 import type { LucideIcon } from 'lucide-react'
-import type { RecurringExpenseForecastItem, Transaction, TransactionType } from '../../types/api'
+import type {
+  Payment,
+  PaymentMethod,
+  RecurringExpenseForecastItem,
+  Transaction,
+  TransactionType,
+} from '../../types/api'
 
 function errorMessage(err: unknown): string {
   return err instanceof ApiError ? err.message : 'Erro inesperado'
+}
+
+const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  cash: 'Dinheiro',
+  pix: 'PIX',
+  debit: 'Débito',
+  credit: 'Crédito',
+}
+
+/** Origem do lançamento — dirige o badge da coluna "Tipo". */
+function transactionKind(t: Transaction): 'appointment' | 'fixed' | 'manual' {
+  if (t.appointmentId) return 'appointment'
+  if (t.recurringExpenseId || (t.employeeId && t.payrollDay != null)) return 'fixed'
+  return 'manual'
+}
+
+/** Formas de pagamento distintas do fechamento, ou null se não houver. */
+function paymentMethodLabel(payments: Payment[] | null | undefined): string | null {
+  if (!payments || payments.length === 0) return null
+  return [...new Set(payments.map((p) => PAYMENT_METHOD_LABELS[p.method]))].join(' · ')
+}
+
+/** "Nx de R$ Y" quando algum pagamento foi no crédito parcelado (Y = valor da parcela). */
+function installmentLabel(payments: Payment[] | null | undefined): string | null {
+  if (!payments) return null
+  const credit = payments.find((p) => p.method === 'credit' && (p.installments ?? 0) > 1)
+  if (!credit?.installments) return null
+  return `${credit.installments}x de ${formatBRL(Math.round(credit.amountCents / credit.installments))}`
 }
 
 interface NewTransactionForm {
@@ -56,11 +88,13 @@ function StatCard({
   icon: Icon,
   value,
   valueClassName,
+  sub,
 }: {
   label: string
   icon: LucideIcon
   value: string
   valueClassName: string
+  sub?: string
 }) {
   return (
     <Card className="p-6">
@@ -71,6 +105,7 @@ function StatCard({
       <p className={cn('mt-2 font-display text-[28px] font-bold leading-tight tabular-nums', valueClassName)}>
         {value}
       </p>
+      {sub && <p className="mt-1 text-xs tabular-nums text-ink-tertiary">{sub}</p>}
     </Card>
   )
 }
@@ -353,7 +388,6 @@ export function FinancePage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState<NewTransactionForm>(emptyForm)
   const [formErrors, setFormErrors] = useState<{ description?: string; amount?: string; date?: string }>({})
-  const [toDelete, setToDelete] = useState<Transaction | null>(null)
 
   const query = useQuery({
     queryKey: ['transactions', from, to, typeFilter],
@@ -370,19 +404,6 @@ export function FinancePage() {
       setDialogOpen(false)
       setForm(emptyForm())
       setFormErrors({})
-    },
-    onError: (err) => toast.error(errorMessage(err)),
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteTransaction,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] })
-      // Excluir a saída de um custo fixo baixado o devolve para "a pagar".
-      queryClient.invalidateQueries({ queryKey: ['recurring-expenses-forecast'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      toast.success('Lançamento excluído.')
-      setToDelete(null)
     },
     onError: (err) => toast.error(errorMessage(err)),
   })
@@ -413,6 +434,7 @@ export function FinancePage() {
   const summary = query.data?.summary
   const transactions = query.data?.transactions ?? []
   const balanceNegative = (summary?.balanceCents ?? 0) < 0
+  const hasReceivable = (summary?.receivableTotalCents ?? 0) > 0
 
   return (
     <div>
@@ -471,15 +493,16 @@ export function FinancePage() {
         </div>
 
         <div className="w-40">
-          <Select
-            aria-label="Tipo de lançamento"
+          <SelectMenu
+            ariaLabel="Tipo de lançamento"
             value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as TransactionType | '')}
-          >
-            <option value="">Todos</option>
-            <option value="income">Entradas</option>
-            <option value="expense">Saídas</option>
-          </Select>
+            onChange={(v) => setTypeFilter(v as TransactionType | '')}
+            options={[
+              { value: '', label: 'Todos' },
+              { value: 'income', label: 'Entradas' },
+              { value: 'expense', label: 'Saídas' },
+            ]}
+          />
         </div>
       </div>
 
@@ -502,7 +525,12 @@ export function FinancePage() {
       ) : (
         <>
           {/* Resumo do período */}
-          <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div
+            className={cn(
+              'mb-4 grid grid-cols-1 gap-4',
+              hasReceivable ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3',
+            )}
+          >
             <StatCard
               label="Entradas"
               icon={ArrowUpCircle}
@@ -521,6 +549,15 @@ export function FinancePage() {
               value={formatBRL(summary?.balanceCents ?? 0)}
               valueClassName={balanceNegative ? 'text-error-dark' : 'text-ink'}
             />
+            {hasReceivable && (
+              <StatCard
+                label="A receber este mês"
+                icon={CalendarClock}
+                value={formatBRL(summary?.receivableThisMonthCents ?? 0)}
+                valueClassName="text-ink"
+                sub={`Total: ${formatBRL(summary?.receivableTotalCents ?? 0)}`}
+              />
+            )}
           </div>
 
           {/* Lista de lançamentos */}
@@ -537,56 +574,83 @@ export function FinancePage() {
             />
           ) : (
             <Card>
-              <Table>
-                <THead>
-                  <tr>
-                    <Th className="w-32">Data</Th>
-                    <Th>Descrição</Th>
-                    <Th className="text-right">Valor</Th>
-                    <Th className="w-16">
-                      <span className="sr-only">Ações</span>
-                    </Th>
-                  </tr>
-                </THead>
-                <TBody>
-                  {transactions.map((t) => {
-                    const isIncome = t.type === 'income'
-                    return (
-                      <Tr key={t.id}>
-                        <Td className="whitespace-nowrap">{formatDate(t.date)}</Td>
-                        <Td>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-medium text-ink">{t.description}</span>
-                            {t.appointmentId != null && <Badge tone="brand">Agendamento</Badge>}
-                          </div>
-                        </Td>
-                        <Td className="whitespace-nowrap text-right">
-                          <span
-                            className={cn(
-                              'font-semibold tabular-nums',
-                              isIncome ? 'text-success-dark' : 'text-error-dark',
+              <div className="max-h-[600px] overflow-y-auto">
+                <Table>
+                  <THead className="sticky top-0 z-10 bg-surface">
+                    <tr>
+                      <Th className="w-24 !h-9 !px-3">Data</Th>
+                      <Th className="!h-9 !px-3">Descrição</Th>
+                      <Th className="w-28 !h-9 !px-3">Tipo</Th>
+                      <Th className="w-36 !h-9 !px-3">Pagamento</Th>
+                      <Th className="!h-9 !px-3 text-right">Valor</Th>
+                    </tr>
+                  </THead>
+                  <TBody>
+                    {transactions.map((t) => {
+                      const isIncome = t.type === 'income'
+                      const kind = transactionKind(t)
+                      const method = paymentMethodLabel(t.payments)
+                      const installment = installmentLabel(t.payments)
+                      const isInstallment = t.installmentTotal != null
+                      return (
+                        <Tr key={t.id}>
+                          <Td className="!h-auto !px-3 !py-2 whitespace-nowrap text-[13px] text-ink-secondary">
+                            {formatDate(t.date)}
+                          </Td>
+                          <Td className="!h-auto !px-3 !py-2 text-[13px] font-medium text-ink">
+                            {t.description}
+                          </Td>
+                          <Td className="!h-auto !px-3 !py-2">
+                            {kind === 'appointment' ? (
+                              <Badge tone="brand" className="!h-5 !px-1.5 !text-[11px]">
+                                Agendamento
+                              </Badge>
+                            ) : kind === 'fixed' ? (
+                              <Badge tone="info" className="!h-5 !px-1.5 !text-[11px]">
+                                Gasto fixo
+                              </Badge>
+                            ) : (
+                              <Badge tone="neutral" className="!h-5 !px-1.5 !text-[11px]">
+                                Manual
+                              </Badge>
                             )}
-                          >
-                            {isIncome ? '+ ' : '− '}
-                            {formatBRL(t.amountCents)}
-                          </span>
-                        </Td>
-                        <Td className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="px-2 text-ink-tertiary"
-                            aria-label="Excluir lançamento"
-                            onClick={() => setToDelete(t)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </Td>
-                      </Tr>
-                    )
-                  })}
-                </TBody>
-              </Table>
+                          </Td>
+                          <Td className="!h-auto !px-3 !py-2 whitespace-nowrap text-[13px] text-ink-secondary">
+                            {method ?? <span className="text-ink-tertiary">—</span>}
+                          </Td>
+                          <Td className="!h-auto !px-3 !py-2 whitespace-nowrap text-right">
+                            <div
+                              className={cn(
+                                'text-[13px] font-semibold tabular-nums',
+                                isIncome ? 'text-success-dark' : 'text-error-dark',
+                              )}
+                            >
+                              {isIncome ? '+ ' : '− '}
+                              {formatBRL(t.amountCents)}
+                            </div>
+                            {isInstallment ? (
+                              <div className="flex items-center justify-end gap-1.5 text-[11px] text-ink-tertiary">
+                                <span>
+                                  Parcela {t.installmentNumber}/{t.installmentTotal}
+                                </span>
+                                {t.date > today && (
+                                  <Badge tone="warning" className="!h-4 !px-1 !text-[10px]">
+                                    A receber
+                                  </Badge>
+                                )}
+                              </div>
+                            ) : installment ? (
+                              <div className="text-[11px] font-normal text-ink-tertiary">
+                                {installment}
+                              </div>
+                            ) : null}
+                          </Td>
+                        </Tr>
+                      )
+                    })}
+                  </TBody>
+                </Table>
+              </div>
             </Card>
           )}
         </>
@@ -701,26 +765,6 @@ export function FinancePage() {
           </DialogActions>
         </form>
       </Dialog>
-
-      {/* Confirmação de exclusão */}
-      <ConfirmDialog
-        open={toDelete !== null}
-        onClose={() => {
-          if (!deleteMutation.isPending) setToDelete(null)
-        }}
-        onConfirm={() => {
-          if (toDelete) deleteMutation.mutate(toDelete.id)
-        }}
-        title="Excluir lançamento?"
-        description={
-          toDelete
-            ? `"${toDelete.description}" (${formatBRL(toDelete.amountCents)}) será removido do fluxo de caixa.`
-            : undefined
-        }
-        confirmLabel="Excluir"
-        danger
-        isLoading={deleteMutation.isPending}
-      />
     </div>
   )
 }

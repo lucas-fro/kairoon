@@ -107,14 +107,16 @@ export const establishments = pgTable('establishments', {
       cash: boolean
       pix: boolean
       debit: boolean
-      credit: { enabled: boolean; maxInstallments: number }
+      // receiptMode: 'upfront' recebe o total na hora; 'monthly' recebe o crédito
+      // parcelado mês a mês (parcelas viram receitas futuras). Ausente = 'upfront'.
+      credit: { enabled: boolean; maxInstallments: number; receiptMode?: 'upfront' | 'monthly' }
     }>()
     .notNull()
     .default({
       cash: true,
       pix: true,
       debit: true,
-      credit: { enabled: true, maxInstallments: 12 },
+      credit: { enabled: true, maxInstallments: 12, receiptMode: 'upfront' },
     }),
   quiz: jsonb('quiz').$type<Record<string, string>>(),
   plan: text('plan').notNull().default('free'),
@@ -387,6 +389,11 @@ export const transactions = pgTable(
     // Identifica a parcela mesmo quando o vencimento "encurta" para o mesmo dia
     // do mês (ex.: dias 30 e 31 em fevereiro caem ambos no último dia).
     payrollDay: integer('payroll_day'),
+    // Crédito parcelado recebido mês a mês: cada parcela é uma receita futura
+    // datada no seu mês. installmentTotal não-nulo marca a linha como parcela;
+    // number é 1..total. Nulos em lançamentos normais.
+    installmentNumber: integer('installment_number'),
+    installmentTotal: integer('installment_total'),
     description: text('description').notNull(),
     amountCents: integer('amount_cents').notNull(),
     type: transactionTypeEnum('type').notNull(),
