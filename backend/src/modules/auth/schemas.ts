@@ -89,6 +89,12 @@ export const updateProfileSchema = z.object({
   cpf: emptyToNull(cpfSchema),
 })
 
+export const confirmPasswordResetSchema = z.object({
+  code: z.string().trim().regex(/^\d{6}$/, 'O código deve ter 6 dígitos'),
+  newPassword: z.string().min(6, 'A senha deve ter no mínimo 6 caracteres'),
+})
+
 export type RegisterInput = z.infer<typeof registerSchema>
 export type LoginInput = z.infer<typeof loginSchema>
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>
+export type ConfirmPasswordResetInput = z.infer<typeof confirmPasswordResetSchema>

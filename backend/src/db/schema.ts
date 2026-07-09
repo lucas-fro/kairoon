@@ -64,6 +64,10 @@ export const users = pgTable('users', {
   phone: text('phone'),
   birthDate: date('birth_date', { mode: 'string' }),
   cpf: text('cpf'),
+  // Redefinição de senha por código enviado no e-mail (hash bcrypt do código +
+  // validade). Limpos após uso ou expiração. Ver modules/auth.
+  passwordResetCodeHash: text('password_reset_code_hash'),
+  passwordResetExpiresAt: timestamp('password_reset_expires_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

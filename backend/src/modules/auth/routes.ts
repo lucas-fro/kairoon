@@ -1,5 +1,11 @@
 import type { FastifyInstance } from 'fastify'
-import { loginSchema, registerSchema, slugAvailabilitySchema, updateProfileSchema } from './schemas'
+import {
+  confirmPasswordResetSchema,
+  loginSchema,
+  registerSchema,
+  slugAvailabilitySchema,
+  updateProfileSchema,
+} from './schemas'
 import * as authService from './service'
 
 export async function authRoutes(app: FastifyInstance) {
@@ -36,4 +42,23 @@ export async function authRoutes(app: FastifyInstance) {
     const input = updateProfileSchema.parse(request.body)
     return authService.updateProfile(request.user.sub, input)
   })
+
+  // Redefinição de senha por código no e-mail (usuário logado, na aba Conta).
+  // Rate limit protege contra spam de e-mail e força bruta do código.
+  app.post(
+    '/password-reset/request',
+    { preHandler: [app.authenticate], config: { rateLimit: { max: 3, timeWindow: '5 minutes' } } },
+    async (request) => {
+      return authService.requestPasswordReset(request.user.sub)
+    },
+  )
+
+  app.post(
+    '/password-reset/confirm',
+    { preHandler: [app.authenticate], config: { rateLimit: { max: 6, timeWindow: '5 minutes' } } },
+    async (request) => {
+      const { code, newPassword } = confirmPasswordResetSchema.parse(request.body)
+      return authService.confirmPasswordReset(request.user.sub, code, newPassword)
+    },
+  )
 }

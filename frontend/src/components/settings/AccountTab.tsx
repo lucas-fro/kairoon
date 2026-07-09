@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { Save, Trash2 } from 'lucide-react'
+import { AlertTriangle, KeyRound, Save, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { updateProfile } from '../../api/auth'
 import { ApiError } from '../../api/client'
@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { Input } from '../ui/Input'
 import { useToast } from '../ui/Toast'
+import { PasswordResetDialog } from './PasswordResetDialog'
 
 const EMAIL_REGEX = /^\S+@\S+\.\S+$/
 
@@ -21,6 +22,7 @@ export function AccountTab() {
   const navigate = useNavigate()
   const toast = useToast()
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [resetOpen, setResetOpen] = useState(false)
 
   const [name, setName] = useState(user?.name ?? '')
   const [email, setEmail] = useState(user?.email ?? '')
@@ -132,22 +134,64 @@ export function AccountTab() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-error-dark">Zona de perigo</CardTitle>
-        </CardHeader>
         <CardContent>
-          <p className="text-sm text-ink-secondary">
-            Excluir sua conta remove permanentemente o estabelecimento, agendamentos, clientes,
-            serviços, funcionários e todo o histórico financeiro. Essa ação não pode ser desfeita.
-          </p>
-          <div className="mt-4 flex justify-end">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary-light text-primary">
+                <KeyRound className="h-5 w-5" strokeWidth={1.9} />
+              </div>
+              <div className="min-w-0">
+                <p className="font-display text-base font-semibold text-ink">Senha</p>
+                <p className="mt-0.5 text-sm text-ink-secondary">
+                  Troque sua senha com um código de confirmação enviado por e-mail, válido por 5
+                  minutos.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setResetOpen(true)}
+              className="shrink-0"
+            >
+              Redefinir senha
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <PasswordResetDialog
+        open={resetOpen}
+        onClose={() => setResetOpen(false)}
+        email={user?.email ?? ''}
+      />
+
+      <Card className="border border-error/30">
+        <CardContent>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-error-light text-error-dark">
+                <AlertTriangle className="h-5 w-5" strokeWidth={1.9} />
+              </div>
+              <div className="min-w-0">
+                <p className="font-display text-base font-semibold text-error-dark">
+                  Zona de perigo
+                </p>
+                <p className="mt-0.5 text-sm text-ink-secondary">
+                  Excluir sua conta remove permanentemente o estabelecimento, agendamentos,
+                  clientes, serviços, funcionários e todo o histórico financeiro. Essa ação não
+                  pode ser desfeita.
+                </p>
+              </div>
+            </div>
             <Button
               type="button"
               variant="danger"
               onClick={() => setConfirmOpen(true)}
               leftIcon={<Trash2 className="h-4 w-4" />}
+              className="shrink-0"
             >
-              Excluir conta e todos os dados
+              Excluir conta
             </Button>
           </div>
         </CardContent>

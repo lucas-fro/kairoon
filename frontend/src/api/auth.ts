@@ -54,3 +54,13 @@ export function checkSlugAvailability(slug: string) {
 export function getMe() {
   return api<{ user: User; establishment: Establishment }>('/auth/me')
 }
+
+/** Envia um código de redefinição de senha para o e-mail do usuário logado. */
+export function requestPasswordReset() {
+  return api<{ email: string }>('/auth/password-reset/request', { method: 'POST' })
+}
+
+/** Confere o código e troca a senha. */
+export function confirmPasswordReset(data: { code: string; newPassword: string }) {
+  return api<{ ok: true }>('/auth/password-reset/confirm', { method: 'POST', body: data })
+}

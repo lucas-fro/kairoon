@@ -1,9 +1,14 @@
+import { randomInt } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { and, eq, ne } from 'drizzle-orm'
 import { db } from '../../db'
 import { employees, establishments, users, workingHours } from '../../db/schema'
 import { AppError } from '../../lib/errors'
+import { sendPasswordResetEmail, sendWelcomeEmail } from '../../lib/mailer'
 import type { LoginInput, RegisterInput, UpdateProfileInput } from './schemas'
+
+/** Código de redefinição de senha válido por 5 minutos. */
+const RESET_CODE_TTL_MS = 5 * 60 * 1000
 
 const DEFAULT_WORKING_HOURS = [
   { dayOfWeek: 0, opensAt: '09:00', closesAt: '18:00', isClosed: true },
@@ -47,7 +52,7 @@ export async function registerOwner(input: RegisterInput) {
 
   const passwordHash = await bcrypt.hash(input.password, 10)
 
-  return db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     const [user] = await tx
       .insert(users)
       .values({ name: input.name.trim(), email, passwordHash, cpf: input.cpf, phone: input.phone })
@@ -84,6 +89,14 @@ export async function registerOwner(input: RegisterInput) {
 
     return { user: sanitizeUser(user), establishment }
   })
+
+  // E-mail de boas-vindas: fire-and-forget — nunca deve travar o cadastro nem
+  // falhar por causa do envio (ex.: e-mail indisponível).
+  void sendWelcomeEmail(result.user.email, result.user.name, result.establishment.name).catch(
+    (err) => console.error('[auth] falha ao enviar e-mail de boas-vindas:', err),
+  )
+
+  return result
 }
 
 export async function authenticateOwner(input: LoginInput) {
@@ -136,4 +149,61 @@ export async function getProfile(userId: string) {
   if (!establishment) throw new AppError('Nenhum estabelecimento vinculado a esta conta', 404)
 
   return { user: sanitizeUser(user), establishment }
+}
+
+/**
+ * Gera um código de 6 dígitos, guarda o hash + validade (5 min) no usuário e
+ * envia por e-mail. Sobrescreve qualquer código anterior. Devolve o e-mail de
+ * destino (o próprio do usuário logado) para a UI exibir.
+ */
+export async function requestPasswordReset(userId: string) {
+  const user = await db.query.users.findFirst({ where: eq(users.id, userId) })
+  if (!user) throw new AppError('Usuário não encontrado', 404)
+
+  const code = String(randomInt(0, 1_000_000)).padStart(6, '0')
+  const passwordResetCodeHash = await bcrypt.hash(code, 10)
+  const passwordResetExpiresAt = new Date(Date.now() + RESET_CODE_TTL_MS)
+
+  await db
+    .update(users)
+    .set({ passwordResetCodeHash, passwordResetExpiresAt })
+    .where(eq(users.id, userId))
+
+  // Awaited: se o envio falhar (Resend configurado mas com erro), o erro sobe e
+  // a UI avisa. Sem RESEND_API_KEY, o mailer loga o código e não lança (dev).
+  await sendPasswordResetEmail(user.email, user.name, code)
+
+  return { email: user.email }
+}
+
+/**
+ * Confere o código (válido e não expirado) e troca a senha. Consome o código
+ * (limpa os campos) em qualquer desfecho terminal — sucesso ou expiração.
+ */
+export async function confirmPasswordReset(userId: string, code: string, newPassword: string) {
+  const user = await db.query.users.findFirst({ where: eq(users.id, userId) })
+  if (!user) throw new AppError('Usuário não encontrado', 404)
+
+  if (!user.passwordResetCodeHash || !user.passwordResetExpiresAt) {
+    throw new AppError('Solicite um novo código de redefinição', 400)
+  }
+
+  if (user.passwordResetExpiresAt.getTime() < Date.now()) {
+    await db
+      .update(users)
+      .set({ passwordResetCodeHash: null, passwordResetExpiresAt: null })
+      .where(eq(users.id, userId))
+    throw new AppError('O código expirou. Solicite um novo.', 400)
+  }
+
+  const matches = await bcrypt.compare(code, user.passwordResetCodeHash)
+  if (!matches) throw new AppError('Código inválido', 400)
+
+  const passwordHash = await bcrypt.hash(newPassword, 10)
+  await db
+    .update(users)
+    .set({ passwordHash, passwordResetCodeHash: null, passwordResetExpiresAt: null })
+    .where(eq(users.id, userId))
+
+  return { ok: true as const }
 }
