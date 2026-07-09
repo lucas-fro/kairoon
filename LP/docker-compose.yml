@@ -1,0 +1,17 @@
+services:
+  landing:
+    build: .
+    image: kairoon-lp
+    container_name: kairoon-lp
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+    # --- Alternativa para desenvolvimento (editar e ver ao vivo, sem rebuild) ---
+    # Comente o "build: ." acima, descomente as duas linhas abaixo e use
+    # a imagem oficial do nginx montando a pasta como volume somente-leitura:
+    #
+    # image: nginx:1.27-alpine
+    # volumes:
+    #   - ./:/usr/share/nginx/html:ro
+    #   - ./default.conf:/etc/nginx/conf.d/default.conf:ro

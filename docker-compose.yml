@@ -1,0 +1,53 @@
+name: kairoon
+
+# Sobe a aplicação inteira (backend + frontend + landing) na rede externa "web".
+# Nessa mesma rede vivem, em OUTRO compose, o Postgres e o Caddy.
+#   - Caddy roteia:  kairoon.com.br      -> kairoon-lp:80
+#                    app.kairoon.com.br  -> kairoon-frontend:80
+#   - O backend NÃO é exposto ao Caddy: o nginx do frontend faz proxy de /api.
+# Por isso nenhum serviço publica portas no host — o ingress é todo pelo Caddy.
+
+services:
+  backend:
+    build: ./backend
+    image: kairoon-backend
+    container_name: kairoon-backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: 3333
+    networks:
+      - web
+    expose:
+      - "3333"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Mesma origem: o nginx desta imagem faz proxy de /api -> backend
+        VITE_API_URL: /api
+    image: kairoon-frontend
+    container_name: kairoon-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - web
+    expose:
+      - "80"
+
+  lp:
+    build: ./LP
+    image: kairoon-lp
+    container_name: kairoon-lp
+    restart: unless-stopped
+    networks:
+      - web
+    expose:
+      - "80"
+
+networks:
+  web:
+    external: true
