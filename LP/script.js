@@ -1,160 +1,162 @@
-/* Kairoon — Landing Page
-   Interações discretas: header, reveal on scroll, menu mobile,
-   accordion do FAQ e carrossel de depoimentos. */
-
 (function () {
-  'use strict';
+  var header = document.getElementById('siteHeader');
+  var navToggle = document.getElementById('navToggle');
+  var mobileMenu = document.getElementById('mobileMenu');
 
-  /* ---------- Header: fundo ao rolar ---------- */
-  var header = document.getElementById('header');
-
-  function onScroll() {
+  function setScrolled() {
     header.classList.toggle('is-scrolled', window.scrollY > 8);
   }
+  setScrolled();
+  window.addEventListener('scroll', setScrolled, { passive: true });
 
-  window.addEventListener('scroll', onScroll, { passive: true });
-  onScroll();
-
-  /* ---------- Menu mobile ---------- */
-  var navToggle = document.getElementById('navToggle');
-  var nav = document.getElementById('nav');
+  function closeMenu() {
+    navToggle.classList.remove('is-open');
+    mobileMenu.classList.remove('is-open');
+    navToggle.setAttribute('aria-expanded', 'false');
+  }
 
   navToggle.addEventListener('click', function () {
-    var open = document.body.classList.toggle('nav-open');
-    navToggle.setAttribute('aria-expanded', String(open));
-    navToggle.setAttribute('aria-label', open ? 'Fechar menu' : 'Abrir menu');
+    var isOpen = mobileMenu.classList.toggle('is-open');
+    navToggle.classList.toggle('is-open', isOpen);
+    navToggle.setAttribute('aria-expanded', String(isOpen));
   });
 
-  nav.addEventListener('click', function (event) {
-    if (event.target.closest('a')) {
-      document.body.classList.remove('nav-open');
-      navToggle.setAttribute('aria-expanded', 'false');
-    }
+  mobileMenu.querySelectorAll('a').forEach(function (link) {
+    link.addEventListener('click', closeMenu);
   });
 
-  /* ---------- Reveal on scroll ---------- */
-  var revealItems = document.querySelectorAll('[data-reveal]');
-  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  window.addEventListener('resize', function () {
+    if (window.innerWidth > 899) closeMenu();
+  });
 
-  if (reduceMotion || !('IntersectionObserver' in window)) {
-    revealItems.forEach(function (el) {
-      el.classList.add('is-visible');
-    });
-  } else {
-    var observer = new IntersectionObserver(
+  var revealTargets = document.querySelectorAll('.use-cases, .feature-mobile, .cta, .testimonial');
+  if ('IntersectionObserver' in window && revealTargets.length) {
+    var io = new IntersectionObserver(
       function (entries) {
         entries.forEach(function (entry) {
           if (entry.isIntersecting) {
             entry.target.classList.add('is-visible');
-            observer.unobserve(entry.target);
+            io.unobserve(entry.target);
           }
         });
       },
-      { rootMargin: '0px 0px -10% 0px', threshold: 0.1 }
+      { threshold: 0.15 }
     );
-
-    revealItems.forEach(function (el) {
-      observer.observe(el);
+    revealTargets.forEach(function (el) {
+      io.observe(el);
+    });
+  } else {
+    revealTargets.forEach(function (el) {
+      el.classList.add('is-visible');
     });
   }
 
-  /* ---------- FAQ accordion ---------- */
-  document.querySelectorAll('.faq-item').forEach(function (item) {
-    var question = item.querySelector('.faq-q');
+  var stack = document.getElementById('testimonialStack');
+  var dotsWrap = document.getElementById('testimonialDots');
+  if (stack && dotsWrap) {
+    var cards = Array.prototype.slice.call(stack.querySelectorAll('.testimonial-card'));
+    var dots = Array.prototype.slice.call(dotsWrap.querySelectorAll('.testimonial-dot'));
+    var n = cards.length;
+    var current = 0;
+    var timer = null;
+    var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    question.addEventListener('click', function () {
-      var isOpen = item.classList.contains('open');
-
-      document.querySelectorAll('.faq-item.open').forEach(function (other) {
-        other.classList.remove('open');
-        other.querySelector('.faq-q').setAttribute('aria-expanded', 'false');
+    function layout() {
+      cards.forEach(function (card, i) {
+        card.setAttribute('data-depth', (i - current + n) % n);
       });
-
-      if (!isOpen) {
-        item.classList.add('open');
-        question.setAttribute('aria-expanded', 'true');
-      }
-    });
-  });
-
-  /* ---------- Carrossel de depoimentos ---------- */
-  var track = document.getElementById('quoteTrack');
-
-  if (track) {
-    var prevBtn = document.getElementById('quotePrev');
-    var nextBtn = document.getElementById('quoteNext');
-
-    function cardStep() {
-      var card = track.querySelector('.quote-card');
-      if (!card) return 360;
-      var gap = parseFloat(getComputedStyle(track).columnGap) || 24;
-      return card.getBoundingClientRect().width + gap;
-    }
-
-    function updateButtons() {
-      var maxScroll = track.scrollWidth - track.clientWidth - 2;
-      if (prevBtn) prevBtn.disabled = track.scrollLeft <= 2;
-      if (nextBtn) nextBtn.disabled = track.scrollLeft >= maxScroll;
-    }
-
-    if (prevBtn) {
-      prevBtn.addEventListener('click', function () {
-        track.scrollBy({ left: -cardStep(), behavior: 'smooth' });
+      dots.forEach(function (dot, i) {
+        dot.classList.toggle('is-active', i === current);
       });
     }
 
-    if (nextBtn) {
-      nextBtn.addEventListener('click', function () {
-        track.scrollBy({ left: cardStep(), behavior: 'smooth' });
+    function goTo(index) {
+      if (index === current) return;
+      var leaving = cards[current];
+      leaving.classList.add('is-leaving');
+      window.setTimeout(function () {
+        leaving.classList.remove('is-leaving');
+      }, 600);
+      current = index;
+      layout();
+    }
+
+    function next() {
+      goTo((current + 1) % n);
+    }
+
+    function startAutoplay() {
+      if (reduceMotion || n < 2) return;
+      window.clearInterval(timer);
+      timer = window.setInterval(next, 10000);
+    }
+
+    dots.forEach(function (dot, index) {
+      dot.addEventListener('click', function () {
+        goTo(index);
+        startAutoplay();
       });
-    }
-
-    track.addEventListener('scroll', updateButtons, { passive: true });
-    window.addEventListener('resize', updateButtons);
-    updateButtons();
-
-    /* Arrastar para rolar (mouse/touch via Pointer Events) */
-    var isDown = false;
-    var startX = 0;
-    var startLeft = 0;
-    var moved = false;
-
-    track.addEventListener('pointerdown', function (event) {
-      isDown = true;
-      moved = false;
-      startX = event.clientX;
-      startLeft = track.scrollLeft;
-      track.classList.add('dragging');
-      track.setPointerCapture(event.pointerId);
     });
 
-    track.addEventListener('pointermove', function (event) {
-      if (!isDown) return;
-      var dx = event.clientX - startX;
-      if (Math.abs(dx) > 4) moved = true;
-      track.scrollLeft = startLeft - dx;
-    });
+    layout();
+    startAutoplay();
+  }
 
-    function endDrag() {
-      if (!isDown) return;
-      isDown = false;
-      track.classList.remove('dragging');
-      updateButtons();
-    }
+  var faqList = document.getElementById('faqList');
+  if (faqList) {
+    var faqItems = Array.prototype.slice.call(faqList.querySelectorAll('.faq-item'));
 
-    track.addEventListener('pointerup', endDrag);
-    track.addEventListener('pointercancel', endDrag);
+    faqItems.forEach(function (item) {
+      var question = item.querySelector('.faq-question');
+      if (!question) return;
 
-    /* Evita que o clique acidental após arrastar dispare links */
-    track.addEventListener(
-      'click',
-      function (event) {
-        if (moved) {
-          event.preventDefault();
-          event.stopPropagation();
+      question.addEventListener('click', function () {
+        var isOpen = item.classList.contains('is-open');
+
+        faqItems.forEach(function (other) {
+          other.classList.remove('is-open');
+          var q = other.querySelector('.faq-question');
+          if (q) q.setAttribute('aria-expanded', 'false');
+        });
+
+        if (!isOpen) {
+          item.classList.add('is-open');
+          question.setAttribute('aria-expanded', 'true');
         }
-      },
-      true
-    );
+      });
+    });
+  }
+
+  var plansToggle = document.getElementById('plansToggle');
+  if (plansToggle) {
+    var periodBtns = Array.prototype.slice.call(plansToggle.querySelectorAll('.plans-toggle-btn'));
+    var planCards = Array.prototype.slice.call(document.querySelectorAll('#planos .plan-card'));
+
+    function setPeriod(period) {
+      plansToggle.setAttribute('data-active', period);
+
+      periodBtns.forEach(function (btn) {
+        var on = btn.getAttribute('data-period') === period;
+        btn.classList.toggle('is-active', on);
+        btn.setAttribute('aria-selected', String(on));
+      });
+
+      planCards.forEach(function (card) {
+        var amount = card.querySelector('.plan-amount[data-monthly]');
+        if (!amount) return;
+        amount.textContent =
+          period === 'annual' ? amount.getAttribute('data-annual') : amount.getAttribute('data-monthly');
+        var billing = card.querySelector('.plan-billing');
+        if (billing) {
+          billing.textContent = period === 'annual' ? 'cobrado anualmente' : 'cobrado mensalmente';
+        }
+      });
+    }
+
+    periodBtns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        setPeriod(btn.getAttribute('data-period'));
+      });
+    });
   }
 })();

@@ -787,7 +787,7 @@ function PaymentCheckout({
             <div className="flex gap-2">
               <div className="flex-1">
                 <Input
-                  leftIcon={<Ticket className="h-4 w-4" />}
+                  leftIcon={<Ticket className="h-4 w-4 text-primary" />}
                   placeholder="Cupom (opcional)"
                   value={couponInput}
                   onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
@@ -900,7 +900,7 @@ function PaymentCheckout({
               onClick={() => openView('products')}
               className="flex items-center gap-1.5 rounded-lg border border-line px-2 py-1.5 text-xs font-medium text-ink-secondary transition-colors hover:border-primary/40 hover:bg-primary/5"
             >
-              <ShoppingBag className="h-3.5 w-3.5 shrink-0 text-ink-tertiary" />
+              <ShoppingBag className="h-3.5 w-3.5 shrink-0 text-primary" />
               <span className="truncate">Produtos</span>
               {saleItems.length > 0 && (
                 <span className="ml-auto flex h-4 min-w-[16px] shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-white">
@@ -913,7 +913,7 @@ function PaymentCheckout({
               onClick={() => openView('services')}
               className="flex items-center gap-1.5 rounded-lg border border-line px-2 py-1.5 text-xs font-medium text-ink-secondary transition-colors hover:border-primary/40 hover:bg-primary/5"
             >
-              <Scissors className="h-3.5 w-3.5 shrink-0 text-ink-tertiary" />
+              <Scissors className="h-3.5 w-3.5 shrink-0 text-primary" />
               <span className="truncate">Serviços</span>
               {saleServiceItems.length > 0 && (
                 <span className="ml-auto flex h-4 min-w-[16px] shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-white">
@@ -926,7 +926,7 @@ function PaymentCheckout({
               onClick={() => openView('coupon')}
               className="flex items-center gap-1.5 rounded-lg border border-line px-2 py-1.5 text-xs font-medium text-ink-secondary transition-colors hover:border-primary/40 hover:bg-primary/5"
             >
-              <Ticket className="h-3.5 w-3.5 shrink-0 text-ink-tertiary" />
+              <Ticket className="h-3.5 w-3.5 shrink-0 text-primary" />
               <span className="truncate">Cupom</span>
               {(appliedCoupon || campaignCoupon || manualDiscountCents > 0) && (
                 <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-primary" />
@@ -1042,7 +1042,7 @@ function PaymentCheckout({
                         onChange={() => toggle(method)}
                         className="h-4 w-4 rounded border-line accent-primary"
                       />
-                      <Icon className="h-4 w-4 text-ink-tertiary" />
+                      <Icon className="h-4 w-4 text-primary" />
                       <span className="text-sm font-medium text-ink">{meta.label}</span>
                     </label>
                     {isOn && method === 'credit' && (
@@ -1210,7 +1210,7 @@ function ProductPicker({ catalog, loading, initial, onCancel, onSave }: ProductP
   return (
     <div className="space-y-4">
       <Input
-        leftIcon={<Search className="h-4 w-4" />}
+        leftIcon={<Search className="h-4 w-4 text-primary" />}
         placeholder="Buscar produto…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
@@ -1264,7 +1264,7 @@ function ProductPicker({ catalog, loading, initial, onCancel, onSave }: ProductP
                     <button
                       type="button"
                       onClick={() => setProductQty(product, current - 1)}
-                      className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-ink-secondary transition-colors hover:bg-background"
+                      className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-primary transition-colors hover:bg-background"
                       aria-label="Diminuir"
                     >
                       <Minus className="h-3.5 w-3.5" />
@@ -1274,7 +1274,7 @@ function ProductPicker({ catalog, loading, initial, onCancel, onSave }: ProductP
                       type="button"
                       onClick={() => setProductQty(product, current + 1)}
                       disabled={current >= product.stockQuantity}
-                      className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-ink-secondary transition-colors hover:bg-background disabled:opacity-40"
+                      className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-primary transition-colors hover:bg-background disabled:opacity-40"
                       aria-label="Aumentar"
                     >
                       <Plus className="h-3.5 w-3.5" />
@@ -1355,7 +1355,7 @@ function ServicePicker({ catalog, loading, initial, onCancel, onSave }: ServiceP
   return (
     <div className="space-y-4">
       <Input
-        leftIcon={<Search className="h-4 w-4" />}
+        leftIcon={<Search className="h-4 w-4 text-primary" />}
         placeholder="Buscar serviço…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
@@ -1400,7 +1400,7 @@ function ServicePicker({ catalog, loading, initial, onCancel, onSave }: ServiceP
                     <button
                       type="button"
                       onClick={() => setServiceQty(service, current - 1)}
-                      className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-ink-secondary transition-colors hover:bg-background"
+                      className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-primary transition-colors hover:bg-background"
                       aria-label="Diminuir"
                     >
                       <Minus className="h-3.5 w-3.5" />
@@ -1409,7 +1409,7 @@ function ServicePicker({ catalog, loading, initial, onCancel, onSave }: ServiceP
                     <button
                       type="button"
                       onClick={() => setServiceQty(service, current + 1)}
-                      className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-ink-secondary transition-colors hover:bg-background"
+                      className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-primary transition-colors hover:bg-background"
                       aria-label="Aumentar"
                     >
                       <Plus className="h-3.5 w-3.5" />

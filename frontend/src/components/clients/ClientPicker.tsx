@@ -144,7 +144,7 @@ export function ClientPicker({ value, onChange, autoFocus, disabled }: ClientPic
       <div className="flex items-center gap-2">
         <Input
           placeholder="Buscar por nome ou telefone…"
-          leftIcon={<Search className="h-4 w-4" />}
+          leftIcon={<Search className="h-4 w-4 text-primary" />}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           disabled={addingNew || disabled}
@@ -162,7 +162,7 @@ export function ClientPicker({ value, onChange, autoFocus, disabled }: ClientPic
           aria-label="Adicionar novo cliente"
           title="Novo cliente"
         >
-          <UserPlus className="h-4 w-4" />
+          <UserPlus className="h-4 w-4 text-primary" />
         </Button>
       </div>
 

@@ -22,8 +22,8 @@ interface SectionNavProps {
 export function SectionNav({ tabs, active, onChange, children }: SectionNavProps) {
   return (
     <div className="lg:flex lg:gap-8">
-      {/* Mobile: tabs horizontais */}
-      <div className="lg:hidden">
+      {/* Mobile: tabs horizontais, fixas logo abaixo do header ao rolar */}
+      <div className="sticky top-14 z-10 bg-background lg:hidden">
         <Tabs tabs={tabs} active={active} onChange={onChange} />
       </div>
 

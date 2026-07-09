@@ -178,7 +178,7 @@ export function WaitlistDialog({
             variant="outline"
             size="sm"
             className="w-full"
-            leftIcon={<Plus className="h-4 w-4" />}
+            leftIcon={<Plus className="h-4 w-4 text-primary" />}
             onClick={() => setShowAdd(true)}
           >
             Adicionar à fila
@@ -190,7 +190,7 @@ export function WaitlistDialog({
           <p className="py-6 text-center text-sm text-ink-tertiary">Carregando…</p>
         ) : entries.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-8 text-center">
-            <CalendarClock className="h-8 w-8 text-ink-tertiary" />
+            <CalendarClock className="h-8 w-8 text-primary" />
             <p className="text-sm text-ink-secondary">Ninguém na fila de espera.</p>
           </div>
         ) : (

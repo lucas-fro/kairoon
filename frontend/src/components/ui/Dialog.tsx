@@ -39,7 +39,7 @@ export function Dialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
+      className="fixed inset-0 z-50 flex items-center justify-center"
       role="dialog"
       aria-modal="true"
     >
@@ -50,8 +50,7 @@ export function Dialog({
       />
       <div
         className={cn(
-          'dialog-enter relative z-10 max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-surface p-6 shadow-floating',
-          'sm:m-4 sm:rounded-2xl',
+          'dialog-enter relative z-10 m-4 max-h-[92vh] w-full overflow-y-auto rounded-2xl bg-surface p-6 shadow-floating',
           maxWidth,
         )}
       >

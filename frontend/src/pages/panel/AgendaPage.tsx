@@ -273,7 +273,7 @@ export function AgendaPage() {
             <Button
               size="sm"
               variant="outline"
-              leftIcon={<Clock className="h-4 w-4" />}
+              leftIcon={<Clock className="h-4 w-4 text-primary" />}
               onClick={() => setWaitlistOpen(true)}
             >
               Fila de espera{waitlistCount > 0 ? ` (${waitlistCount})` : ''}
@@ -281,7 +281,7 @@ export function AgendaPage() {
             <Button
               size="sm"
               variant="outline"
-              leftIcon={<Zap className="h-4 w-4" />}
+              leftIcon={<Zap className="h-4 w-4 text-primary" />}
               onClick={() => setWalkInOpen(true)}
             >
               Atender agora
@@ -306,7 +306,7 @@ export function AgendaPage() {
             onClick={() => navigate(-1)}
             aria-label="Anterior"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-4 w-4 text-primary" />
           </Button>
           <Button
             variant="outline"
@@ -323,7 +323,7 @@ export function AgendaPage() {
             onClick={() => navigate(1)}
             aria-label="Próximo"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-4 w-4 text-primary" />
           </Button>
         </div>
 

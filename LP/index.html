@@ -3,799 +3,855 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Kairoon — Agenda, clientes e financeiro em um só lugar</title>
-  <meta name="description" content="O Kairoon centraliza agenda, clientes, financeiro e relatórios em uma plataforma simples e precisa para negócios de serviços. Comece grátis." />
-  <meta property="og:title" content="Kairoon — Toda a sua operação. Um só sistema." />
-  <meta property="og:description" content="Agenda inteligente, lembretes por WhatsApp, financeiro e relatórios para barbearias, salões e studios de beleza." />
+  <title>Kairoon — Sistema de agenda e gestão para barbearias e salões</title>
+  <meta name="description" content="A Kairoon reúne agenda, clientes, financeiro e fidelidade em um só sistema para o seu negócio de serviços crescer com controle. Teste grátis por 14 dias." />
+  <meta name="theme-color" content="#1E2F5E" />
+  <meta name="robots" content="index, follow" />
+  <meta name="author" content="Kairoon" />
+  <link rel="icon" type="image/x-icon" href="elementos/logofavicon.ico" />
+
+  <!-- Canonical (troque pelo domínio real quando publicar) -->
+  <link rel="canonical" href="https://www.kairoon.com.br/" />
+
+  <!-- Open Graph (preview em WhatsApp, Facebook, LinkedIn) -->
   <meta property="og:type" content="website" />
-  <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="%231E2F5E"/><text x="32" y="44" font-family="Arial,sans-serif" font-size="36" font-weight="700" fill="white" text-anchor="middle">K</text></svg>' />
+  <meta property="og:site_name" content="Kairoon" />
+  <meta property="og:locale" content="pt_BR" />
+  <meta property="og:url" content="https://www.kairoon.com.br/" />
+  <meta property="og:title" content="Kairoon — Sistema de agenda e gestão para barbearias e salões" />
+  <meta property="og:description" content="Agenda, clientes, financeiro e fidelidade em um só sistema. Menos improviso, mais controle. Teste grátis por 14 dias." />
+  <meta property="og:image" content="https://www.kairoon.com.br/elementos/og-image.png" />
+  <meta property="og:image:alt" content="Kairoon — gestão para negócios de serviços" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Kairoon — Sistema de agenda e gestão para barbearias e salões" />
+  <meta name="twitter:description" content="Agenda, clientes, financeiro e fidelidade em um só sistema. Teste grátis por 14 dias." />
+  <meta name="twitter:image" content="https://www.kairoon.com.br/elementos/og-image.png" />
+
+  <!-- Structured data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Kairoon",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web",
+    "url": "https://www.kairoon.com.br/",
+    "description": "Sistema de agenda, clientes, financeiro e fidelidade para barbearias, salões de beleza, clínicas de estética e estúdios.",
+    "offers": {
+      "@type": "Offer",
+      "price": "79.00",
+      "priceCurrency": "BRL"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Kairoon",
+      "logo": "https://www.kairoon.com.br/elementos/logotipo%20(1).png"
+    }
+  }
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
-  <!-- ============================== ÍCONES (Lucide, inline sprite) ============================== -->
-  <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
-    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></symbol>
-    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
-    <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
-    <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
-    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
-    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
-    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
-    <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></symbol>
-    <symbol id="i-calendar-x" viewBox="0 0 24 24"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m14 14 4 4"/><path d="m18 14-4 4"/></symbol>
-    <symbol id="i-x-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></symbol>
-    <symbol id="i-message" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></symbol>
-    <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></symbol>
-    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
-    <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></symbol>
-    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
-    <symbol id="i-hourglass" viewBox="0 0 24 24"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></symbol>
-    <symbol id="i-quote" viewBox="0 0 24 24"><path d="M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"/><path d="M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"/></symbol>
-    <symbol id="i-crown" viewBox="0 0 24 24"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.735H5.81a1 1 0 0 1-.957-.735L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></symbol>
-    <symbol id="i-smartphone" viewBox="0 0 24 24"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></symbol>
-    <symbol id="i-monitor" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></symbol>
-    <symbol id="i-dashboard" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></symbol>
-    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
-    <symbol id="i-instagram" viewBox="0 0 24 24"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></symbol>
-    <symbol id="i-building" viewBox="0 0 24 24"><rect width="16" height="20" x="4" y="2" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></symbol>
-    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></symbol>
-  </svg>
-
-  <!-- ============================== HEADER ============================== -->
-  <header class="header" id="header">
-    <div class="container header-inner">
-      <a class="brand" href="#topo" aria-label="Kairoon — início">
-        <span class="brand-mark">K</span>
-        <span class="brand-name">Kairoon</span>
+  <header class="site-header" id="siteHeader">
+    <div class="nav-container">
+      <a href="#topo" class="nav-logo" aria-label="Kairoon — página inicial">
+        <img src="elementos/logotipo%20(1).png" alt="Kairoon" width="622" height="325" />
       </a>
 
-      <nav class="nav" id="nav" aria-label="Navegação principal">
-        <a href="#recursos">Recursos</a>
-        <a href="#como-funciona">Como funciona</a>
+      <nav class="nav-links" aria-label="Navegação principal">
         <a href="#para-quem">Para quem é</a>
+        <a href="#gestao-mobile">Recursos</a>
         <a href="#planos">Planos</a>
+        <a href="#depoimentos">Depoimentos</a>
         <a href="#faq">FAQ</a>
-        <div class="nav-actions">
-          <a class="btn btn-ghost btn-sm" href="#">Entrar</a>
-          <a class="btn btn-primary btn-sm" href="#cta-final">Começar grátis</a>
-        </div>
       </nav>
 
-      <button class="nav-toggle" id="navToggle" aria-label="Abrir menu" aria-expanded="false">
-        <svg class="icon icon-menu"><use href="#i-menu"/></svg>
-        <svg class="icon icon-close"><use href="#i-x"/></svg>
+      <div class="nav-actions">
+        <a href="#" class="btn btn-primary btn-sm">Teste grátis</a>
+        <a href="#" class="btn btn-outline-secondary btn-sm">Entrar</a>
+      </div>
+
+      <button type="button" class="nav-toggle" id="navToggle" aria-label="Abrir menu" aria-expanded="false" aria-controls="mobileMenu">
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
       </button>
+    </div>
+
+    <div class="mobile-menu" id="mobileMenu">
+      <a href="#para-quem">Para quem é</a>
+      <a href="#gestao-mobile">Recursos</a>
+      <a href="#planos">Planos</a>
+      <a href="#depoimentos">Depoimentos</a>
+      <a href="#faq">FAQ</a>
+      <div class="mobile-menu-actions">
+        <a href="#" class="btn btn-primary btn-lg btn-block">Teste grátis</a>
+        <a href="#" class="btn btn-outline-secondary btn-lg btn-block">Entrar</a>
+      </div>
     </div>
   </header>
 
   <main id="topo">
+    <section class="hero" id="hero">
+      <div class="hero-decor-left" aria-hidden="true">
+        <img src="elementos/const-orion.svg" alt="" class="hero-constellation" />
+      </div>
 
-    <!-- ============================== HERO ============================== -->
-    <section class="hero">
-      <div class="hero-bg" aria-hidden="true"></div>
-      <div class="container hero-grid">
-        <div class="hero-copy" data-reveal>
-          <span class="hero-pill">
-            <svg class="icon"><use href="#i-sparkles"/></svg>
-            Plataforma de gestão para negócios de serviços
-          </span>
-          <h1>Toda a sua operação.<br /><span class="text-gradient">Um só sistema.</span></h1>
-          <p class="lead">
-            O Kairoon centraliza agenda, clientes, financeiro e relatórios em uma
-            plataforma simples e precisa. Menos improviso, mais direção.
+      <div class="hero-decor" aria-hidden="true">
+        <img src="elementos/det-azul%20escuro2.svg" alt="" class="hero-shard" />
+      </div>
+
+      <div class="hero-container">
+        <div class="hero-content">
+          <h1 class="hero-title">
+            <span class="hero-title-line">Sua agenda cheia.</span><br />
+            <span class="text-gradient">Seu negócio no controle.</span>
+          </h1>
+          <p class="hero-subtitle">
+            A Kairoon reúne agenda, clientes, financeiro e fidelidade em um só sistema
+            para você cuidar do seu negócio, não de planilhas.
           </p>
-          <div class="hero-ctas">
-            <a class="btn btn-primary btn-lg" href="#cta-final">
-              Começar grátis
-              <svg class="icon"><use href="#i-arrow-right"/></svg>
+          <div class="hero-actions">
+            <a href="#" class="btn btn-primary btn-lg">
+              Teste grátis
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14" />
+                <path d="m12 5 7 7-7 7" />
+              </svg>
             </a>
-            <a class="btn btn-outline btn-lg" href="#como-funciona">Ver como funciona</a>
           </div>
-          <p class="hero-note">Grátis para começar &middot; Sem cartão de crédito</p>
         </div>
 
-        <div class="hero-visual" data-reveal data-reveal-delay="2">
-          <div class="hero-glow" aria-hidden="true"></div>
-          <div class="phone">
-            <div class="phone-screen">
-              <div class="ph ph-fill">
-                <svg class="icon"><use href="#i-smartphone"/></svg>
-                <span>Print real do sistema — agenda semanal do Kairoon no celular, com blocos de horários coloridos por status</span>
-              </div>
+        <div class="hero-visual">
+          <div class="browser-frame">
+            <div class="browser-frame-bar">
+              <span class="browser-dot browser-dot-red"></span>
+              <span class="browser-dot browser-dot-yellow"></span>
+              <span class="browser-dot browser-dot-green"></span>
             </div>
-          </div>
-          <div class="float-chip" aria-hidden="true">
-            <span class="status-dot"></span>
-            <div>
-              <strong>Agendamento confirmado</strong>
-              <span>Corte + barba &middot; hoje, 14:30</span>
-            </div>
+            <img
+              src="elementos/preview-agenda.png"
+              alt="Tela da agenda da Kairoon mostrando a semana com horários preenchidos"
+              class="browser-frame-img"
+              width="1897"
+              height="905"
+            />
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ============================== PROBLEMA ============================== -->
-    <section class="section section-white" id="problema">
-      <div class="container problem-grid">
-        <div class="problem-copy" data-reveal>
-          <p class="eyebrow">O problema</p>
-          <h2>Empresas que crescem precisam de organização.</h2>
-          <p class="lead">
-            Enquanto o dia acontece, a gestão fica para depois.
-            E o que não é medido, não cresce.
+    <section class="use-cases" id="para-quem">
+      <div class="use-cases-decor" aria-hidden="true">
+        <img src="elementos/Vector%2024.svg" class="uc-shape uc-shape-1" alt="" />
+        <img src="elementos/det-azul-claro-contorno.svg" class="uc-shape uc-shape-2" alt="" />
+        <img src="elementos/det-azul%20escuro-conterno.svg" class="uc-shape uc-shape-3" alt="" />
+      </div>
+
+      <div class="section-header">
+        <span class="eyebrow">
+          <img src="elementos/star-d8.svg" alt="" class="eyebrow-star" />
+          Para quem é
+          <img src="elementos/star-d8.svg" alt="" class="eyebrow-star" />
+        </span>
+        <h2 class="section-title">Feito para o seu tipo de negócio.</h2>
+        <p class="section-subtitle">
+          De barbearias a estúdios de beleza, a Kairoon se adapta à rotina de quem cuida da agenda todos os dias.
+        </p>
+      </div>
+
+      <div class="carousel">
+        <div class="carousel-track">
+          <article class="uc-card">
+            <div class="uc-card-image">
+              <img src="elementos/barbearia.webp" alt="Barbearia" loading="lazy" />
+            </div>
+            <div class="uc-card-body">
+              <h3>
+                Barbearias
+                <svg class="uc-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+              </h3>
+              <p>Fila organizada, comissão de cada barbeiro calculada automaticamente e cliente fiel sempre por perto, do corte à barba.</p>
+            </div>
+          </article>
+
+          <article class="uc-card">
+            <div class="uc-card-image">
+              <img src="elementos/studio-de-estetica.webp" alt="Clínica de estética" loading="lazy" />
+            </div>
+            <div class="uc-card-body">
+              <h3>
+                Clínicas de estética
+                <svg class="uc-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+              </h3>
+              <p>Protocolos completos, retornos programados e pacotes de sessões sob controle, mesmo com a agenda cheia todos os dias.</p>
+            </div>
+          </article>
+
+          <article class="uc-card">
+            <div class="uc-card-image">
+              <img src="elementos/studio-de-tatuagem.webp" alt="Estúdio de tatuagem" loading="lazy" />
+            </div>
+            <div class="uc-card-body">
+              <h3>
+                Estúdios de tatuagem
+                <svg class="uc-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+              </h3>
+              <p>Sessões longas, sinal de reserva garantido e o portfólio de cada cliente organizado do primeiro traço à última sessão.</p>
+            </div>
+          </article>
+
+          <article class="uc-card">
+            <div class="uc-card-image">
+              <img src="elementos/studio-de-unhas.webp" alt="Estúdio de nail design" loading="lazy" />
+            </div>
+            <div class="uc-card-body">
+              <h3>
+                Estúdios de nail design
+                <svg class="uc-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+              </h3>
+              <p>Manicure, pedicure, cílios e sobrancelha com agenda cheia, lembrete automático pro cliente e zero risco de overbooking.</p>
+            </div>
+          </article>
+
+          <article class="uc-card">
+            <div class="uc-card-image">
+              <img src="elementos/salão-de-beleza.webp" alt="Salão de beleza" loading="lazy" />
+            </div>
+            <div class="uc-card-body">
+              <h3>
+                Salões de beleza
+                <svg class="uc-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+              </h3>
+              <p>Corte, coloração e tratamentos com horários sob controle, equipe organizada e clientes satisfeitos em todas as visitas.</p>
+            </div>
+          </article>
+
+          <article class="uc-card" aria-hidden="true">
+            <div class="uc-card-image">
+              <img src="elementos/barbearia.webp" alt="" loading="lazy" />
+            </div>
+            <div class="uc-card-body">
+              <h3>Barbearias</h3>
+              <p>Fila organizada, comissão de cada barbeiro calculada automaticamente e cliente fiel sempre por perto, do corte à barba.</p>
+            </div>
+          </article>
+
+          <article class="uc-card" aria-hidden="true">
+            <div class="uc-card-image">
+              <img src="elementos/studio-de-estetica.webp" alt="" loading="lazy" />
+            </div>
+            <div class="uc-card-body">
+              <h3>Clínicas de estética</h3>
+              <p>Protocolos completos, retornos programados e pacotes de sessões sob controle, mesmo com a agenda cheia todos os dias.</p>
+            </div>
+          </article>
+
+          <article class="uc-card" aria-hidden="true">
+            <div class="uc-card-image">
+              <img src="elementos/studio-de-tatuagem.webp" alt="" loading="lazy" />
+            </div>
+            <div class="uc-card-body">
+              <h3>Estúdios de tatuagem</h3>
+              <p>Sessões longas, sinal de reserva garantido e o portfólio de cada cliente organizado do primeiro traço à última sessão.</p>
+            </div>
+          </article>
+
+          <article class="uc-card" aria-hidden="true">
+            <div class="uc-card-image">
+              <img src="elementos/studio-de-unhas.webp" alt="" loading="lazy" />
+            </div>
+            <div class="uc-card-body">
+              <h3>Estúdios de nail design</h3>
+              <p>Manicure, pedicure, cílios e sobrancelha com agenda cheia, lembrete automático pro cliente e zero risco de overbooking.</p>
+            </div>
+          </article>
+
+          <article class="uc-card" aria-hidden="true">
+            <div class="uc-card-image">
+              <img src="elementos/salão-de-beleza.webp" alt="" loading="lazy" />
+            </div>
+            <div class="uc-card-body">
+              <h3>Salões de beleza</h3>
+              <p>Corte, coloração e tratamentos com horários sob controle, equipe organizada e clientes satisfeitos em todas as visitas.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="feature-mobile" id="gestao-mobile">
+      <div class="feature-mobile-decor" aria-hidden="true">
+        <img src="elementos/det-azul-claro.svg" class="fm-shape fm-shape-1" alt="" />
+        <img src="elementos/det-azul%20escuro.svg" class="fm-shape fm-shape-2" alt="" />
+        <img src="elementos/det-azul-claro-contorno.svg" class="fm-shape fm-shape-3" alt="" />
+        <img src="elementos/pontos.svg" class="fm-shape fm-shape-dots" alt="" />
+      </div>
+
+      <div class="feature-mobile-eyebrow">
+        <span class="eyebrow">
+          <img src="elementos/star-d8.svg" alt="" class="eyebrow-star" />
+          Onde você estiver
+          <img src="elementos/star-d8.svg" alt="" class="eyebrow-star" />
+        </span>
+      </div>
+
+      <div class="feature-mobile-container">
+        <div class="feature-mobile-media">
+          <img
+            src="elementos/mulher-tablet-det-crop.webp"
+            alt="Mulher sorrindo enquanto usa a Kairoon em um tablet"
+            width="690"
+            height="770"
+            loading="lazy"
+          />
+        </div>
+
+        <div class="feature-mobile-content">
+          <h2 class="section-title">Gestão na palma da sua mão.</h2>
+          <p class="feature-mobile-lead">
+            Do agendamento ao financeiro, a Kairoon vai com você pra qualquer lugar, direto do celular ou tablet.
+            Sem precisar estar atrás do balcão ou preso ao computador, você acompanha o negócio inteiro em tempo
+            real e resolve tudo com poucos toques, esteja você em casa, no carro ou no meio do atendimento.
           </p>
 
-          <ul class="pain-list">
-            <li data-reveal data-reveal-delay="1">
-              <span class="pain-icon"><svg class="icon"><use href="#i-calendar-x"/></svg></span>
-              <div><strong>Clientes esquecem horários</strong><span>Faltas e atrasos que custam caro no fim do mês.</span></div>
+          <ul class="feature-list">
+            <li>
+              <img src="elementos/star-d8.svg" alt="" class="feature-bullet-star" />
+              Agenda completa no bolso, em tempo real
             </li>
-            <li data-reveal data-reveal-delay="1">
-              <span class="pain-icon"><svg class="icon"><use href="#i-message"/></svg></span>
-              <div><strong>Agenda no WhatsApp</strong><span>Horários espalhados em conversas, prints e cadernos.</span></div>
+            <li>
+              <img src="elementos/star-d8.svg" alt="" class="feature-bullet-star" />
+              Financeiro do dia sempre à mão
             </li>
-            <li data-reveal data-reveal-delay="2">
-              <span class="pain-icon"><svg class="icon"><use href="#i-wallet"/></svg></span>
-              <div><strong>Financeiro no escuro</strong><span>Entradas e saídas sem registro, comissões no improviso.</span></div>
+            <li>
+              <img src="elementos/star-d8.svg" alt="" class="feature-bullet-star" />
+              Aviso automático a cada novo agendamento
             </li>
-            <li data-reveal data-reveal-delay="2">
-              <span class="pain-icon"><svg class="icon"><use href="#i-users"/></svg></span>
-              <div><strong>Equipe desorganizada</strong><span>Cada um com a própria agenda, ninguém com a visão do todo.</span></div>
+            <li>
+              <img src="elementos/star-d8.svg" alt="" class="feature-bullet-star" />
+              Relatórios simples pra decidir na hora
             </li>
-            <li data-reveal data-reveal-delay="3">
-              <span class="pain-icon"><svg class="icon"><use href="#i-x-circle"/></svg></span>
-              <div><strong>Cancelamentos de última hora</strong><span>Horários vagos que ninguém consegue reocupar.</span></div>
+            <li>
+              <img src="elementos/star-d8.svg" alt="" class="feature-bullet-star" />
+              Histórico completo de cada cliente, sempre por perto
             </li>
-            <li data-reveal data-reveal-delay="3">
-              <span class="pain-icon"><svg class="icon"><use href="#i-eye-off"/></svg></span>
-              <div><strong>Nenhuma visão do negócio</strong><span>Decisões tomadas por intuição, não por dados.</span></div>
+            <li>
+              <img src="elementos/star-d8.svg" alt="" class="feature-bullet-star" />
+              Cupons e pontos de fidelidade pra fechar mais horários
+            </li>
+            <li>
+              <img src="elementos/star-d8.svg" alt="" class="feature-bullet-star" />
+              Comissão de cada profissional calculada automaticamente
+            </li>
+            <li>
+              <img src="elementos/star-d8.svg" alt="" class="feature-bullet-star" />
+              Lembrete por WhatsApp pro cliente não esquecer o horário
             </li>
           </ul>
         </div>
+      </div>
+    </section>
 
-        <div class="problem-visual" data-reveal data-reveal-delay="2">
-          <div class="shot shot-bleed-right">
-            <div class="ph" style="aspect-ratio: 4 / 3.4">
-              <svg class="icon"><use href="#i-dashboard"/></svg>
-              <span>Print real — dashboard do Kairoon com agendamentos do dia, receita do mês e visão geral do negócio</span>
-            </div>
+    <section class="cta" id="comece-agora">
+      <div class="cta-container">
+        <div class="cta-eyebrow">
+          <span class="eyebrow">
+            <img src="elementos/star-d8.svg" alt="" class="eyebrow-star" />
+            Descanse tranquilo
+            <img src="elementos/star-d8.svg" alt="" class="eyebrow-star" />
+          </span>
+        </div>
+
+        <div class="cta-card">
+          <div class="cta-content">
+            <h2 class="cta-title">
+              Você desconecta.<br />
+              O negócio continua no automático.
+            </h2>
+            <p class="cta-lead">
+              Agenda, financeiro e clientes seguem em ordem, mesmo quando você não está de olho.
+            </p>
+            <a href="#" class="btn btn-light btn-lg">Teste grátis por 14 dias</a>
+          </div>
+
+          <div class="cta-media">
+            <img
+              src="elementos/barbeiro.webp"
+              alt="Barbeiro sorrindo, de braços cruzados, na barbearia"
+              loading="lazy"
+            />
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ============================== NICHOS ============================== -->
-    <section class="section" id="para-quem">
-      <div class="container">
-        <div class="section-head" data-reveal>
-          <p class="eyebrow">Para quem é</p>
-          <h2>Feito para o seu negócio.</h2>
-          <p class="lead">Se a sua empresa vive de horários marcados, o Kairoon foi desenhado para você.</p>
+    <section class="plans" id="planos">
+      <div class="plans-decor" aria-hidden="true">
+        <img src="elementos/det-azul-claro-contorno.svg" class="plans-shape plans-shape-1" alt="" />
+        <img src="elementos/det-azul%20escuro-conterno.svg" class="plans-shape plans-shape-2" alt="" />
+        <img src="elementos/Vector%2024.svg" class="plans-shape plans-shape-3" alt="" />
+        <img src="elementos/Vector%2025.svg" class="plans-shape plans-shape-4" alt="" />
+        <img src="elementos/det-azul-claro.svg" class="plans-shape plans-shape-5" alt="" />
+        <img src="elementos/det-azul%20escuro2.svg" class="plans-shape plans-shape-6" alt="" />
+      </div>
+
+      <div class="plans-header">
+        <span class="eyebrow">
+          <img src="elementos/star-d8.svg" alt="" class="eyebrow-star" />
+          Planos
+          <img src="elementos/star-d8.svg" alt="" class="eyebrow-star" />
+        </span>
+        <h2 class="section-title">Escolha o plano ideal para o seu negócio.</h2>
+        <p class="section-subtitle">
+          Comece com 14 dias grátis e evolua quando quiser. Sem fidelidade, cancele quando precisar.
+        </p>
+
+        <div class="plans-toggle" id="plansToggle" data-active="monthly" role="tablist" aria-label="Ciclo de cobrança">
+          <span class="plans-toggle-slider" aria-hidden="true"></span>
+          <button type="button" class="plans-toggle-btn is-active" data-period="monthly" role="tab" aria-selected="true">Mensal</button>
+          <button type="button" class="plans-toggle-btn" data-period="annual" role="tab" aria-selected="false">
+            Anual
+            <span class="plans-save">-20%</span>
+          </button>
         </div>
+      </div>
 
-        <div class="niche-grid">
-          <article class="niche-card" data-reveal data-reveal-delay="1">
-            <div class="ph niche-photo">
-              <svg class="icon"><use href="#i-camera"/></svg>
-              <span>Foto editorial — interior de barbearia com luz natural, madeira escura, couro e tons quentes</span>
-            </div>
-            <div class="niche-body">
-              <h3>Barbearia</h3>
-              <p>Do corte ao caixa: agenda cheia, comissões claras e cliente que volta.</p>
-              <ul class="check-list">
-                <li><svg class="icon"><use href="#i-check"/></svg>Fim das faltas com lembretes automáticos</li>
-                <li><svg class="icon"><use href="#i-check"/></svg>Comissões calculadas sem planilha</li>
-                <li><svg class="icon"><use href="#i-check"/></svg>Fila de espera para horários disputados</li>
-              </ul>
-              <a class="link-arrow" href="#cta-final">Conhecer o Kairoon <svg class="icon"><use href="#i-arrow-right"/></svg></a>
-            </div>
-          </article>
+      <div class="plans-grid">
+        <article class="plan-card">
+          <div class="plan-head">
+            <h3 class="plan-name">Básico</h3>
+            <p class="plan-desc">Para quem está começando a organizar a agenda e sair do caderno.</p>
+          </div>
+          <div class="plan-price">
+            <span class="plan-currency">R$</span>
+            <span class="plan-amount" data-monthly="99" data-annual="79">99</span>
+            <span class="plan-period">/mês</span>
+          </div>
+          <p class="plan-billing">cobrado mensalmente</p>
+          <a href="#" class="btn btn-outline-secondary btn-lg btn-block">Começar grátis</a>
+          <ul class="plan-features">
+            <li><svg class="plan-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>Agenda online e link de agendamento</li>
+            <li><svg class="plan-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>Lembretes automáticos para clientes</li>
+            <li><svg class="plan-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>Cadastro de clientes e histórico</li>
+            <li><svg class="plan-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>Até 2 profissionais</li>
+            <li><svg class="plan-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>Suporte por e-mail</li>
+          </ul>
+        </article>
 
-          <article class="niche-card" data-reveal data-reveal-delay="2">
-            <div class="ph niche-photo">
-              <svg class="icon"><use href="#i-camera"/></svg>
-              <span>Foto editorial — salão de beleza amplo e claro, espelhos iluminados, luz difusa e tons neutros</span>
-            </div>
-            <div class="niche-body">
-              <h3>Salão de beleza</h3>
-              <p>Vários profissionais, uma só agenda. Organização para operar no volume.</p>
-              <ul class="check-list">
-                <li><svg class="icon"><use href="#i-check"/></svg>Agenda por profissional, visão do todo</li>
-                <li><svg class="icon"><use href="#i-check"/></svg>Histórico completo de cada cliente</li>
-                <li><svg class="icon"><use href="#i-check"/></svg>Financeiro do salão em um só lugar</li>
-              </ul>
-              <a class="link-arrow" href="#cta-final">Conhecer o Kairoon <svg class="icon"><use href="#i-arrow-right"/></svg></a>
-            </div>
-          </article>
+        <article class="plan-card plan-card-featured">
+          <span class="plan-badge">Mais popular</span>
+          <div class="plan-head">
+            <h3 class="plan-name">Essencial</h3>
+            <p class="plan-desc">Para negócios em crescimento que querem controle total da operação.</p>
+          </div>
+          <div class="plan-price">
+            <span class="plan-currency">R$</span>
+            <span class="plan-amount" data-monthly="249" data-annual="199">249</span>
+            <span class="plan-period">/mês</span>
+          </div>
+          <p class="plan-billing">cobrado mensalmente</p>
+          <a href="#" class="btn btn-primary btn-lg btn-block">Começar grátis</a>
+          <ul class="plan-features">
+            <li><svg class="plan-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>Tudo do plano Básico</li>
+            <li><svg class="plan-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>Controle financeiro completo</li>
+            <li><svg class="plan-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>Comissões calculadas automaticamente</li>
+            <li><svg class="plan-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>Profissionais ilimitados</li>
+            <li><svg class="plan-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>Relatórios e fidelidade</li>
+            <li><svg class="plan-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>Suporte prioritário</li>
+          </ul>
+        </article>
 
-          <article class="niche-card" data-reveal data-reveal-delay="3">
-            <div class="ph niche-photo">
-              <svg class="icon"><use href="#i-camera"/></svg>
-              <span>Foto editorial — studio de beleza intimista, luz suave de janela, tons claros e detalhes minimalistas</span>
-            </div>
-            <div class="niche-body">
-              <h3>Studio de beleza</h3>
-              <p>Atendimento personalizado merece uma gestão à altura.</p>
-              <ul class="check-list">
-                <li><svg class="icon"><use href="#i-check"/></svg>Página online com a sua identidade</li>
-                <li><svg class="icon"><use href="#i-check"/></svg>Histórico e preferências de cada cliente</li>
-                <li><svg class="icon"><use href="#i-check"/></svg>Agendamento sem troca de mensagens</li>
-              </ul>
-              <a class="link-arrow" href="#cta-final">Conhecer o Kairoon <svg class="icon"><use href="#i-arrow-right"/></svg></a>
-            </div>
-          </article>
-        </div>
+        <article class="plan-card">
+          <div class="plan-head">
+            <h3 class="plan-name">Profissional</h3>
+            <p class="plan-desc">Para operações maiores e redes que precisam de mais poder e suporte.</p>
+          </div>
+          <div class="plan-price">
+            <span class="plan-from">a partir de</span>
+            <span class="plan-currency">R$</span>
+            <span class="plan-amount">349</span>
+            <span class="plan-period">/mês</span>
+          </div>
+          <p class="plan-billing">valor sob consulta</p>
+          <a href="#" class="btn btn-outline-secondary btn-lg btn-block">Falar com a gente</a>
+          <ul class="plan-features">
+            <li><svg class="plan-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>Tudo do plano Essencial</li>
+            <li><svg class="plan-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>Múltiplas unidades em um só painel</li>
+            <li><svg class="plan-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>Relatórios avançados e exportação</li>
+            <li><svg class="plan-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>Gerente de conta dedicado</li>
+            <li><svg class="plan-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>Onboarding assistido</li>
+          </ul>
+        </article>
       </div>
     </section>
 
-    <!-- ============================== COMO FUNCIONA ============================== -->
-    <section class="section section-white" id="como-funciona">
-      <div class="container">
-        <div class="section-head" data-reveal>
-          <p class="eyebrow">Como funciona</p>
-          <h2>Do zero ao primeiro agendamento em minutos.</h2>
-        </div>
-
-        <div class="steps-grid">
-          <div class="step" data-reveal data-reveal-delay="1">
-            <div class="step-head">
-              <span class="step-num">1</span>
-              <span class="step-line" aria-hidden="true"></span>
-            </div>
-            <h3>Cadastre seu negócio</h3>
-            <p>Crie sua conta, defina os horários de funcionamento e pronto: seu espaço no Kairoon está no ar.</p>
-            <div class="shot">
-              <div class="ph" style="aspect-ratio: 4 / 3">
-                <svg class="icon"><use href="#i-monitor"/></svg>
-                <span>Print real — tela de criação de conta e configuração inicial do negócio</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="step" data-reveal data-reveal-delay="2">
-            <div class="step-head">
-              <span class="step-num">2</span>
-              <span class="step-line" aria-hidden="true"></span>
-            </div>
-            <h3>Configure profissionais e serviços</h3>
-            <p>Adicione a equipe, os serviços, durações e preços. Tudo simples, sem manual de instruções.</p>
-            <div class="shot">
-              <div class="ph" style="aspect-ratio: 4 / 3">
-                <svg class="icon"><use href="#i-monitor"/></svg>
-                <span>Print real — configurações do Kairoon com cadastro de serviços e equipe</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="step" data-reveal data-reveal-delay="3">
-            <div class="step-head">
-              <span class="step-num">3</span>
-            </div>
-            <h3>Comece a receber agendamentos</h3>
-            <p>Compartilhe seu link e deixe os clientes agendarem sozinhos, a qualquer hora do dia.</p>
-            <div class="shot">
-              <div class="ph" style="aspect-ratio: 4 / 3">
-                <svg class="icon"><use href="#i-smartphone"/></svg>
-                <span>Print real — página pública de agendamento vista pelo cliente no celular</span>
-              </div>
-            </div>
-          </div>
-        </div>
+    <section class="testimonial" id="depoimentos">
+      <div class="testimonial-decor" aria-hidden="true">
+        <img src="elementos/det-azul-claro-contorno.svg" class="ts-shape ts-shape-1" alt="" />
+        <img src="elementos/Vector%2025.svg" class="ts-shape ts-shape-2" alt="" />
       </div>
-    </section>
 
-    <!-- ============================== RECURSOS ============================== -->
-    <section class="section" id="recursos">
-      <div class="container">
-        <div class="section-head" data-reveal>
-          <p class="eyebrow">Recursos</p>
-          <h2>Tudo o que a operação precisa.<br />Nada do que atrapalha.</h2>
-        </div>
-
-        <!-- Agenda inteligente -->
-        <div class="feature-row">
-          <div class="feature-media" data-reveal>
-            <div class="media-accent">
-              <div class="shot">
-                <div class="ph" style="aspect-ratio: 16 / 10.5">
-                  <svg class="icon"><use href="#i-monitor"/></svg>
-                  <span>Print real — agenda semanal do Kairoon com blocos por status: confirmado, concluído e cancelado</span>
-                </div>
-              </div>
-              <div class="float-chip float-chip-inline" aria-hidden="true">
-                <span class="status-dot"></span>
-                <div><strong>Corte + barba</strong><span>Confirmado &middot; 14:30</span></div>
-              </div>
-            </div>
-          </div>
-          <div class="feature-copy" data-reveal data-reveal-delay="1">
-            <h3>Agenda inteligente</h3>
-            <p>
-              A semana inteira em uma tela. Status por cor, bloqueios de horário e
-              reagendamento em segundos — a agenda deixa de ser um problema e vira
-              o centro de comando do negócio.
-            </p>
-            <ul class="check-list">
-              <li><svg class="icon"><use href="#i-check"/></svg>Visão por dia, semana e profissional</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Status claros: confirmado, concluído, cancelado</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Bloqueios para pausas e compromissos</li>
-            </ul>
-          </div>
-        </div>
-
-        <!-- WhatsApp automático -->
-        <div class="feature-row feature-row-reverse">
-          <div class="feature-media" data-reveal>
-            <div class="shot shot-tall">
-              <div class="ph" style="aspect-ratio: 4 / 4.2">
-                <svg class="icon"><use href="#i-message"/></svg>
-                <span>Print real — lembrete automático de agendamento enviado pelo WhatsApp ao cliente</span>
-              </div>
-            </div>
-          </div>
-          <div class="feature-copy" data-reveal data-reveal-delay="1">
-            <h3>WhatsApp automático</h3>
-            <p>
-              Lembretes enviados na hora certa, sem você precisar cobrar ninguém.
-              Menos faltas, mais horários cumpridos — e o seu WhatsApp livre para
-              o que importa.
-            </p>
-            <ul class="check-list">
-              <li><svg class="icon"><use href="#i-check"/></svg>Lembrete automático antes de cada horário</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Confirmação sem esforço para o cliente</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Redução direta de faltas e atrasos</li>
-            </ul>
-          </div>
-        </div>
-
-        <!-- Financeiro -->
-        <div class="feature-row">
-          <div class="feature-media" data-reveal>
-            <div class="media-accent media-accent-right">
-              <div class="shot">
-                <div class="ph" style="aspect-ratio: 16 / 10.5">
-                  <svg class="icon"><use href="#i-wallet"/></svg>
-                  <span>Print real — tela de financeiro do Kairoon com entradas, saídas e resumo do período</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="feature-copy" data-reveal data-reveal-delay="1">
-            <h3>Financeiro sem planilha</h3>
-            <p>
-              Entradas, saídas e comissões registradas onde o trabalho acontece.
-              O caixa fecha junto com a agenda — não semanas depois.
-            </p>
-            <ul class="check-list">
-              <li><svg class="icon"><use href="#i-check"/></svg>Receita ligada a cada atendimento</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Despesas e comissões organizadas</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Resumo do mês sempre em dia</li>
-            </ul>
-          </div>
-        </div>
-
-        <!-- Relatórios -->
-        <div class="feature-row feature-row-reverse">
-          <div class="feature-media" data-reveal>
-            <div class="shot">
-              <div class="ph" style="aspect-ratio: 16 / 10.5">
-                <svg class="icon"><use href="#i-chart"/></svg>
-                <span>Print real — relatórios do Kairoon com gráficos de receita, serviços mais vendidos e horários de pico</span>
-              </div>
-            </div>
-          </div>
-          <div class="feature-copy" data-reveal data-reveal-delay="1">
-            <h3>Relatórios que orientam</h3>
-            <p>
-              Serviços mais vendidos, horários de pico, receita por profissional.
-              O negócio inteiro em números claros, para decidir com precisão —
-              não por intuição.
-            </p>
-            <ul class="check-list">
-              <li><svg class="icon"><use href="#i-check"/></svg>Visão de receita por período</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Desempenho por serviço e profissional</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Tendências para planejar o próximo mês</li>
-            </ul>
-          </div>
-        </div>
-
-        <!-- Página online -->
-        <div class="feature-row">
-          <div class="feature-media" data-reveal>
-            <div class="media-accent">
-              <div class="shot">
-                <div class="ph" style="aspect-ratio: 16 / 10.5">
-                  <svg class="icon"><use href="#i-smartphone"/></svg>
-                  <span>Print real — página online do estabelecimento com serviços, horários e botão de agendar</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="feature-copy" data-reveal data-reveal-delay="1">
-            <h3>Sua página online</h3>
-            <p>
-              Um endereço próprio na internet, com seus serviços, seus horários e
-              a sua marca. O cliente agenda sozinho — até de madrugada.
-            </p>
-            <ul class="check-list">
-              <li><svg class="icon"><use href="#i-check"/></svg>Link único para compartilhar onde quiser</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Agendamento em poucos toques, sem app</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Personalização com a identidade do negócio</li>
-            </ul>
-          </div>
-        </div>
-
-        <!-- Grid complementar -->
-        <div class="more-grid">
-          <div class="more-card" data-reveal data-reveal-delay="1">
-            <span class="more-icon"><svg class="icon"><use href="#i-users"/></svg></span>
-            <h4>Cadastro de clientes</h4>
-            <p>Contatos, preferências e observações organizados em um só lugar.</p>
-            <div class="ph ph-mini">
-              <span>Print real — lista de clientes</span>
-            </div>
-          </div>
-          <div class="more-card" data-reveal data-reveal-delay="2">
-            <span class="more-icon"><svg class="icon"><use href="#i-history"/></svg></span>
-            <h4>Histórico completo</h4>
-            <p>Cada atendimento registrado, do primeiro ao último.</p>
-            <div class="ph ph-mini">
-              <span>Print real — histórico do cliente</span>
-            </div>
-          </div>
-          <div class="more-card" data-reveal data-reveal-delay="3">
-            <span class="more-icon"><svg class="icon"><use href="#i-hourglass"/></svg></span>
-            <h4>Fila de espera</h4>
-            <p>Horário vagou? O próximo da fila fica sabendo na hora.</p>
-            <div class="ph ph-mini">
-              <span>Print real — fila de espera</span>
-            </div>
-          </div>
-        </div>
+      <div class="testimonial-eyebrow">
+        <span class="eyebrow eyebrow-light">
+          <img src="elementos/star-d8.svg" alt="" class="eyebrow-star" />
+          Quem usa, aprova
+          <img src="elementos/star-d8.svg" alt="" class="eyebrow-star" />
+        </span>
       </div>
-    </section>
 
-    <!-- ============================== DASHBOARD ============================== -->
-    <section class="section-dark" id="dashboard">
-      <div class="container">
-        <div class="section-head section-head-dark" data-reveal>
-          <p class="eyebrow eyebrow-dark">Dashboard</p>
-          <h2>Um painel que dá gosto de abrir.</h2>
-          <p class="lead">
-            Agendamentos do dia, receita do mês e o pulso do negócio —
-            na primeira tela, sem procurar.
+      <div class="testimonial-container">
+        <div class="testimonial-info">
+          <h2 class="testimonial-title">Quem cresce com organização, cresce com a Kairoon.</h2>
+
+          <p class="testimonial-lead">
+            Histórias reais de quem trocou a bagunça pela organização e viu o negócio decolar.
           </p>
         </div>
 
-        <div class="browser browser-overlap" data-reveal data-reveal-delay="2">
-          <div class="browser-bar">
-            <span class="browser-dot"></span>
-            <span class="browser-dot"></span>
-            <span class="browser-dot"></span>
-            <span class="browser-url">app.kairoon.com.br</span>
+        <div class="testimonial-carousel">
+          <div class="testimonial-stack" id="testimonialStack">
+            <article class="testimonial-card" data-index="0" data-depth="0">
+              <span class="testimonial-mark" aria-hidden="true">&ldquo;</span>
+              <div class="testimonial-stars" aria-hidden="true">
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+              </div>
+              <blockquote class="testimonial-quote">
+                Sinceramente, a Kairoon mudou por completo a forma como eu enxergo o meu estúdio. Antes eu
+                vivia no sufoco, anotando horário em caderno e sem saber direito quanto tinha entrado no fim
+                do dia. Hoje eu abro o celular e vejo exatamente o que entrou, o que saiu e quem vai chegar
+                amanhã. Já são quase três anos usando e, de verdade, cada mês fica mais fácil de crescer com
+                tranquilidade. Não me imagino mais trabalhando sem.
+              </blockquote>
+              <div class="testimonial-author">
+                <span class="testimonial-avatar">CD</span>
+                <div>
+                  <strong>Camila Duarte</strong>
+                  <span>Estúdio CD Beauty</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="testimonial-card" data-index="1" data-depth="1">
+              <span class="testimonial-mark" aria-hidden="true">&ldquo;</span>
+              <div class="testimonial-stars" aria-hidden="true">
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+              </div>
+              <blockquote class="testimonial-quote">
+                Cara, antes eu perdia cliente por esquecimento de horário quase toda semana, e isso me
+                deixava revoltado. Comecei a usar a Kairoon e o lembrete automático resolveu o problema
+                sozinho, sem eu precisar mexer em nada. Hoje minha agenda vive cheia e eu não fico mais
+                preso no telefone confirmando horário com todo mundo. Sobra tempo pra eu focar no corte e no
+                atendimento, que é o que traz o cliente de volta.
+              </blockquote>
+              <div class="testimonial-author">
+                <span class="testimonial-avatar">RN</span>
+                <div>
+                  <strong>Rafael Nogueira</strong>
+                  <span>Barbearia Nogueira</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="testimonial-card" data-index="2" data-depth="2">
+              <span class="testimonial-mark" aria-hidden="true">&ldquo;</span>
+              <div class="testimonial-stars" aria-hidden="true">
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+              </div>
+              <blockquote class="testimonial-quote">
+                Eu comecei sozinha, num quartinho na minha casa, atendendo umas poucas clientes. Hoje já são
+                três meninas trabalhando comigo, e foi a Kairoon que me deu segurança pra dar esse passo. Ela
+                organiza tanto a minha agenda quanto a comissão de cada uma, então nunca mais tive confusão
+                nem briga no fim do mês. Saber que a parte da gestão está toda redonda me deixou muito mais
+                tranquila pra crescer.
+              </blockquote>
+              <div class="testimonial-author">
+                <span class="testimonial-avatar">JP</span>
+                <div>
+                  <strong>Juliana Prado</strong>
+                  <span>Estúdio JP Nails</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="testimonial-card" data-index="3" data-depth="3">
+              <span class="testimonial-mark" aria-hidden="true">&ldquo;</span>
+              <div class="testimonial-stars" aria-hidden="true">
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+              </div>
+              <blockquote class="testimonial-quote">
+                Trabalhar com tatuagem é complicado por causa da sessão longa e do sinal de reserva, e eu
+                vivia perdendo esse controle no meio de mil conversas de WhatsApp. Com a Kairoon, cada projeto
+                fica registrado certinho: o cliente, o valor combinado e o sinal que já foi pago, tudo num
+                lugar só. Acabou aquela dor de cabeça de não lembrar quem tinha pago o quê. Hoje eu chego pra
+                tatuar já sabendo como está cada agendamento.
+              </blockquote>
+              <div class="testimonial-author">
+                <span class="testimonial-avatar">TB</span>
+                <div>
+                  <strong>Thiago Bastos</strong>
+                  <span>Bastos Tattoo Studio</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="testimonial-card" data-index="4" data-depth="4">
+              <span class="testimonial-mark" aria-hidden="true">&ldquo;</span>
+              <div class="testimonial-stars" aria-hidden="true">
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+              </div>
+              <blockquote class="testimonial-quote">
+                Vou ser bem honesta: eu não fazia a menor ideia de quanto o meu espaço realmente lucrava por
+                mês. Eu achava que sabia, mas era tudo no achismo. Depois que comecei a usar a Kairoon, o
+                financeiro ficou tão claro que hoje eu tomo cada decisão com o número na mão. Consigo ver o
+                que dá lucro, o que não compensa e onde vale a pena investir. Isso me trouxe uma paz e uma
+                confiança que eu não tinha antes.
+              </blockquote>
+              <div class="testimonial-author">
+                <span class="testimonial-avatar">FL</span>
+                <div>
+                  <strong>Fernanda Lopes</strong>
+                  <span>Espaço Bem-Estar Fernanda</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="testimonial-card" data-index="5" data-depth="5">
+              <span class="testimonial-mark" aria-hidden="true">&ldquo;</span>
+              <div class="testimonial-stars" aria-hidden="true">
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+                <img src="elementos/star-d8.svg" alt="" />
+              </div>
+              <blockquote class="testimonial-quote">
+                Com quatro barbeiros na equipe, calcular a comissão de cada um no fim do mês era um parto: eu
+                perdia horas na planilha e ainda dava erro. Hoje a Kairoon faz essa conta sozinha, automática,
+                e eu confio de olhos fechados no resultado. Todo esse tempo que eu gastava quebrando a cabeça
+                agora eu uso pra pensar em como trazer mais cliente e fazer a barbearia crescer. Pra quem tem
+                equipe, isso vale ouro.
+              </blockquote>
+              <div class="testimonial-author">
+                <span class="testimonial-avatar">DM</span>
+                <div>
+                  <strong>Diego Martins</strong>
+                  <span>Barbearia Martins</span>
+                </div>
+              </div>
+            </article>
           </div>
-          <div class="ph" style="aspect-ratio: 16 / 9; border-radius: 0">
-            <svg class="icon"><use href="#i-dashboard"/></svg>
-            <span>Print real em alta resolução — dashboard completo do Kairoon: métricas do dia, gráfico de receita e agenda</span>
+
+          <div class="testimonial-dots" id="testimonialDots">
+            <button type="button" class="testimonial-dot is-active" data-index="0" aria-label="Depoimento 1"></button>
+            <button type="button" class="testimonial-dot" data-index="1" aria-label="Depoimento 2"></button>
+            <button type="button" class="testimonial-dot" data-index="2" aria-label="Depoimento 3"></button>
+            <button type="button" class="testimonial-dot" data-index="3" aria-label="Depoimento 4"></button>
+            <button type="button" class="testimonial-dot" data-index="4" aria-label="Depoimento 5"></button>
+            <button type="button" class="testimonial-dot" data-index="5" aria-label="Depoimento 6"></button>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ============================== DEPOIMENTOS ============================== -->
-    <section class="section section-white section-after-overlap" id="depoimentos">
-      <div class="container">
-        <div class="quotes-head" data-reveal>
-          <div class="section-head section-head-flush">
-            <p class="eyebrow">Depoimentos</p>
-            <h2>Quem usa, não volta para o caderno.</h2>
-          </div>
-          <div class="carousel-nav">
-            <button class="carousel-btn" id="quotePrev" data-dir="prev" aria-label="Depoimento anterior">
-              <svg class="icon"><use href="#i-chevron-left"/></svg>
-            </button>
-            <button class="carousel-btn" id="quoteNext" data-dir="next" aria-label="Próximo depoimento">
-              <svg class="icon"><use href="#i-chevron-right"/></svg>
-            </button>
-          </div>
-        </div>
-
-        <div class="quote-track" id="quoteTrack" tabindex="0" role="region" aria-label="Depoimentos de clientes, role para o lado">
-          <figure class="quote-card">
-            <figcaption class="quote-author">
-              <span class="ph ph-avatar" title="Foto natural — barbeiro no ambiente de trabalho, luz de janela"><svg class="icon"><use href="#i-camera"/></svg></span>
-              <div><strong>Rafael Martins</strong><span>Barbeiro &middot; Barbearia Norte</span></div>
-            </figcaption>
-            <svg class="icon quote-mark"><use href="#i-quote"/></svg>
-            <blockquote>Eu achava que agenda no WhatsApp funcionava. Para o cliente, sim; para mim, era caos. Com o Kairoon a semana fechou no lugar e as faltas caíram pela metade.</blockquote>
-          </figure>
-
-          <figure class="quote-card">
-            <figcaption class="quote-author">
-              <span class="ph ph-avatar" title="Foto natural — cabeleireira sorrindo no salão, tons claros"><svg class="icon"><use href="#i-camera"/></svg></span>
-              <div><strong>Juliana Costa</strong><span>Cabeleireira &middot; Studio J</span></div>
-            </figcaption>
-            <svg class="icon quote-mark"><use href="#i-quote"/></svg>
-            <blockquote>O que mudou não foi só a agenda. Foi abrir o sistema e saber exatamente quanto entrou, quem atendeu e o que fazer amanhã. Isso é tranquilidade.</blockquote>
-          </figure>
-
-          <figure class="quote-card">
-            <figcaption class="quote-author">
-              <span class="ph ph-avatar" title="Foto natural — designer de sobrancelhas em studio intimista, luz difusa"><svg class="icon"><use href="#i-camera"/></svg></span>
-              <div><strong>Camila Duarte</strong><span>Designer de sobrancelhas</span></div>
-            </figcaption>
-            <svg class="icon quote-mark"><use href="#i-quote"/></svg>
-            <blockquote>Minha página no Kairoon virou meu cartão de visita. A cliente escolhe o horário e agenda sozinha. Eu só recebo a confirmação.</blockquote>
-          </figure>
-
-          <figure class="quote-card">
-            <figcaption class="quote-author">
-              <span class="ph ph-avatar" title="Foto natural — dono de barbearia entre as cadeiras, luz natural"><svg class="icon"><use href="#i-camera"/></svg></span>
-              <div><strong>Diego Almeida</strong><span>Dono de barbearia &middot; Studio DA</span></div>
-            </figcaption>
-            <svg class="icon quote-mark"><use href="#i-quote"/></svg>
-            <blockquote>Somos quatro barbeiros e antes cada um tinha a própria agenda. Hoje é tudo numa tela só. Consegui enxergar o negócio pela primeira vez.</blockquote>
-          </figure>
-
-          <figure class="quote-card">
-            <figcaption class="quote-author">
-              <span class="ph ph-avatar" title="Foto natural — nail designer na bancada de trabalho, tons suaves"><svg class="icon"><use href="#i-camera"/></svg></span>
-              <div><strong>Marina Lopes</strong><span>Nail designer</span></div>
-            </figcaption>
-            <svg class="icon quote-mark"><use href="#i-quote"/></svg>
-            <blockquote>Os lembretes por WhatsApp acabaram com os furos de horário. Minha cadeira não fica mais parada esperando quem não vem.</blockquote>
-          </figure>
-
-          <figure class="quote-card">
-            <figcaption class="quote-author">
-              <span class="ph ph-avatar" title="Foto natural — barbeiro jovem sorrindo, ambiente claro"><svg class="icon"><use href="#i-camera"/></svg></span>
-              <div><strong>Thiago Fernandes</strong><span>Barbeiro</span></div>
-            </figcaption>
-            <svg class="icon quote-mark"><use href="#i-quote"/></svg>
-            <blockquote>Configurei serviços, preços e horários numa tarde. No dia seguinte já tinha agendamento entrando sozinho pela minha página.</blockquote>
-          </figure>
-
-          <figure class="quote-card">
-            <figcaption class="quote-author">
-              <span class="ph ph-avatar" title="Foto natural — esteticista em studio de estética, luz difusa e tons claros"><svg class="icon"><use href="#i-camera"/></svg></span>
-              <div><strong>Patrícia Nogueira</strong><span>Esteticista &middot; Studio Pele</span></div>
-            </figcaption>
-            <svg class="icon quote-mark"><use href="#i-quote"/></svg>
-            <blockquote>O financeiro sempre foi meu ponto fraco. Agora fecho o mês em minutos e sei exatamente onde estou ganhando.</blockquote>
-          </figure>
-
-          <figure class="quote-card">
-            <figcaption class="quote-author">
-              <span class="ph ph-avatar" title="Foto natural — barbeiro experiente, retrato ambiente na barbearia"><svg class="icon"><use href="#i-camera"/></svg></span>
-              <div><strong>André Ramos</strong><span>Barbeiro</span></div>
-            </figcaption>
-            <svg class="icon quote-mark"><use href="#i-quote"/></svg>
-            <blockquote>Testei outros sistemas e desisti no meio. O Kairoon é o primeiro que eu realmente uso todo dia — porque é simples de verdade.</blockquote>
-          </figure>
-        </div>
+    <section class="faq" id="faq">
+      <div class="faq-decor" aria-hidden="true">
+        <img src="elementos/det-azul-claro.svg" class="faq-shape faq-det faq-det-1" alt="" />
+        <img src="elementos/det-azul-claro-contorno.svg" class="faq-shape faq-det faq-det-2" alt="" />
+        <img src="elementos/det-azul%20escuro.svg" class="faq-shape faq-det faq-det-3" alt="" />
+        <img src="elementos/det-azul%20escuro2.svg" class="faq-shape faq-det faq-det-4" alt="" />
+        <img src="elementos/det-azul%20escuro-conterno.svg" class="faq-shape faq-det faq-det-5" alt="" />
       </div>
-    </section>
 
-    <!-- ============================== PLANOS ============================== -->
-    <section class="section" id="planos">
-      <div class="container">
-        <div class="section-head section-head-center" data-reveal>
-          <p class="eyebrow">Planos</p>
-          <h2>Comece grátis. Evolua quando fizer sentido.</h2>
-          <p class="lead">Do primeiro cliente à rede de unidades — um plano para cada momento do seu negócio.</p>
-        </div>
-
-        <div class="plans-grid">
-          <article class="plan-card" data-reveal data-reveal-delay="1">
-            <h3>Grátis</h3>
-            <p class="plan-desc">Para colocar a operação em ordem.</p>
-            <p class="plan-price">R$ 0<span>/mês</span></p>
-            <a class="btn btn-outline btn-block" href="#cta-final">Criar conta grátis</a>
-            <ul class="check-list">
-              <li><svg class="icon"><use href="#i-check"/></svg>1 profissional</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Agendamentos ilimitados</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Link público de agendamento</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Cadastro e histórico de clientes</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Relatórios essenciais</li>
-            </ul>
-          </article>
-
-          <article class="plan-card plan-card-pro" data-reveal data-reveal-delay="2">
-            <span class="plan-badge">
-              <svg class="icon"><use href="#i-crown"/></svg>
-              Recomendado
-            </span>
-            <h3>Pro</h3>
-            <p class="plan-desc">Para equipes que querem crescer com direção.</p>
-            <p class="plan-price">R$ 49<span>/mês</span></p>
-            <a class="btn btn-white btn-block" href="#cta-final">Assinar Pro</a>
-            <ul class="check-list check-list-light">
-              <li><svg class="icon"><use href="#i-check"/></svg>Tudo do plano Grátis</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Múltiplos profissionais</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Lembretes automáticos por WhatsApp</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Sinal de agendamento via Pix</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Página personalizada com a sua marca</li>
-            </ul>
-          </article>
-
-          <article class="plan-card" data-reveal data-reveal-delay="3">
-            <h3>Max</h3>
-            <p class="plan-desc">Para quem opera no volume e no detalhe.</p>
-            <p class="plan-price">R$ 99<span>/mês</span></p>
-            <a class="btn btn-outline btn-block" href="#cta-final">Assinar Max</a>
-            <ul class="check-list">
-              <li><svg class="icon"><use href="#i-check"/></svg>Tudo do plano Pro</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Relatórios avançados</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Controle de estoque</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Fila de espera inteligente</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Comissões automáticas</li>
-            </ul>
-          </article>
-
-          <article class="plan-card" data-reveal data-reveal-delay="4">
-            <span class="plan-tag"><svg class="icon"><use href="#i-building"/></svg></span>
-            <h3>Enterprise</h3>
-            <p class="plan-desc">Para redes e operações com várias unidades.</p>
-            <p class="plan-price plan-price-text">Personalizado</p>
-            <a class="btn btn-outline btn-block" href="mailto:contato@kairoon.com.br">Falar com vendas</a>
-            <ul class="check-list">
-              <li><svg class="icon"><use href="#i-check"/></svg>Tudo do plano Max</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Múltiplas unidades</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Permissões por equipe</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Suporte prioritário</li>
-              <li><svg class="icon"><use href="#i-check"/></svg>Gerente de conta dedicado</li>
-            </ul>
-          </article>
-        </div>
-
-        <p class="plans-note" data-reveal data-reveal-delay="4">
-          Sem cartão de crédito no plano Grátis. Sem fidelidade. Cancele quando quiser.
+      <div class="faq-header">
+        <span class="eyebrow">
+          <img src="elementos/star-d8.svg" alt="" class="eyebrow-star" />
+          Perguntas frequentes
+          <img src="elementos/star-d8.svg" alt="" class="eyebrow-star" />
+        </span>
+        <h2 class="section-title">Ainda com dúvida? A gente responde.</h2>
+        <p class="section-subtitle">
+          As perguntas que mais recebemos de quem está começando com a Kairoon.
         </p>
       </div>
-    </section>
 
-    <!-- ============================== FAQ ============================== -->
-    <section class="section section-white" id="faq">
-      <div class="container container-narrow">
-        <div class="section-head" data-reveal>
-          <p class="eyebrow">Perguntas frequentes</p>
-          <h2>Tudo o que você precisa saber.</h2>
-        </div>
-
-        <div class="faq-list" data-reveal data-reveal-delay="1">
-          <div class="faq-item">
-            <button class="faq-q" aria-expanded="false">
-              O Kairoon é grátis mesmo?
-              <svg class="icon"><use href="#i-chevron-down"/></svg>
-            </button>
-            <div class="faq-a"><div>
-              Sim. O plano Grátis inclui 1 profissional, agendamentos ilimitados,
-              link público de agendamento e relatórios essenciais — sem cartão de
-              crédito e sem prazo. Se precisar de mais, os planos Pro, Max e
-              Enterprise crescem junto com o seu negócio.
-            </div></div>
-          </div>
-
-          <div class="faq-item">
-            <button class="faq-q" aria-expanded="false">
-              Preciso instalar alguma coisa?
-              <svg class="icon"><use href="#i-chevron-down"/></svg>
-            </button>
-            <div class="faq-a"><div>
-              Não. O Kairoon funciona direto no navegador, no computador e no
-              celular. Você acessa a operação de onde estiver.
-            </div></div>
-          </div>
-
-          <div class="faq-item">
-            <button class="faq-q" aria-expanded="false">
-              Meus clientes precisam baixar aplicativo?
-              <svg class="icon"><use href="#i-chevron-down"/></svg>
-            </button>
-            <div class="faq-a"><div>
-              Não. Eles recebem o seu link, escolhem serviço, profissional e
-              horário — e pronto. Sem cadastro complicado, sem app.
-            </div></div>
-          </div>
-
-          <div class="faq-item">
-            <button class="faq-q" aria-expanded="false">
-              Como funcionam os lembretes por WhatsApp?
-              <svg class="icon"><use href="#i-chevron-down"/></svg>
-            </button>
-            <div class="faq-a"><div>
-              A partir do plano Pro, o Kairoon envia lembretes automáticos antes de
-              cada horário. As faltas caem sem que você precise cobrar ninguém.
-            </div></div>
-          </div>
-
-          <div class="faq-item">
-            <button class="faq-q" aria-expanded="false">
-              Consigo migrar minha agenda atual?
-              <svg class="icon"><use href="#i-chevron-down"/></svg>
-            </button>
-            <div class="faq-a"><div>
-              Sim. Você cadastra seus clientes e próximos horários em poucos
-              minutos. E, se precisar de ajuda, nosso suporte acompanha a migração.
-            </div></div>
-          </div>
-
-          <div class="faq-item">
-            <button class="faq-q" aria-expanded="false">
-              Meus dados estão seguros?
-              <svg class="icon"><use href="#i-chevron-down"/></svg>
-            </button>
-            <div class="faq-a"><div>
-              Sim. Seus dados trafegam criptografados e são armazenados com
-              segurança. Eles pertencem a você — e só a você.
-            </div></div>
+      <div class="faq-list" id="faqList">
+        <div class="faq-item">
+          <button type="button" class="faq-question" aria-expanded="false" aria-controls="faq-a-1" id="faq-q-1">
+            <span>Preciso instalar algum programa para usar?</span>
+            <svg class="faq-chevron" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+          </button>
+          <div class="faq-answer" id="faq-a-1" role="region" aria-labelledby="faq-q-1">
+            <div class="faq-answer-inner">
+              <p class="faq-answer-lead">Não. A Kairoon funciona 100% pelo navegador.</p>
+              <p class="faq-answer-detail">Basta abrir o site e entrar com a sua conta. Não precisa baixar, instalar nem atualizar nada. Como tudo fica na nuvem, você acessa do computador da recepção, do seu celular ou de qualquer aparelho com internet, e os dados estão sempre sincronizados.</p>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
 
-    <!-- ============================== CTA FINAL ============================== -->
-    <section class="section" id="cta-final">
-      <div class="container">
-        <div class="cta-panel" data-reveal>
-          <div class="cta-glow" aria-hidden="true"></div>
-          <h2>Transforme tempo<br />em crescimento.</h2>
-          <p>Crie sua conta grátis e organize sua operação ainda hoje.</p>
-          <a class="btn btn-white btn-lg" href="#">
-            Começar grátis
-            <svg class="icon"><use href="#i-arrow-right"/></svg>
-          </a>
-          <span class="cta-note">Leva menos de 5 minutos</span>
+        <div class="faq-item">
+          <button type="button" class="faq-question" aria-expanded="false" aria-controls="faq-a-2" id="faq-q-2">
+            <span>Meus clientes precisam baixar um aplicativo para agendar?</span>
+            <svg class="faq-chevron" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+          </button>
+          <div class="faq-answer" id="faq-a-2" role="region" aria-labelledby="faq-q-2">
+            <div class="faq-answer-inner">
+              <p class="faq-answer-lead">Não, eles agendam por um link, sem baixar nada.</p>
+              <p class="faq-answer-detail">Você compartilha o seu link de agendamento no Instagram, no WhatsApp ou onde preferir. O cliente escolhe o serviço, o profissional e o horário disponível em poucos toques, direto pelo navegador do celular dele.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button type="button" class="faq-question" aria-expanded="false" aria-controls="faq-a-3" id="faq-q-3">
+            <span>O sistema envia lembretes para os clientes?</span>
+            <svg class="faq-chevron" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+          </button>
+          <div class="faq-answer" id="faq-a-3" role="region" aria-labelledby="faq-q-3">
+            <div class="faq-answer-inner">
+              <p class="faq-answer-lead">Sim, os lembretes são enviados automaticamente.</p>
+              <p class="faq-answer-detail">Antes de cada horário o cliente recebe um aviso lembrando do compromisso, o que reduz muito as faltas e os atrasos. Você não precisa mandar mensagem manual para ninguém, porque a Kairoon cuida disso por você.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button type="button" class="faq-question" aria-expanded="false" aria-controls="faq-a-4" id="faq-q-4">
+            <span>Tem período de teste grátis?</span>
+            <svg class="faq-chevron" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+          </button>
+          <div class="faq-answer" id="faq-a-4" role="region" aria-labelledby="faq-q-4">
+            <div class="faq-answer-inner">
+              <p class="faq-answer-lead">Sim, você testa grátis por 14 dias.</p>
+              <p class="faq-answer-detail">Nesse período você usa a plataforma completa, sem precisar cadastrar cartão de crédito. É tempo de sobra para colocar a sua agenda no ar e sentir na prática a diferença antes de decidir continuar.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button type="button" class="faq-question" aria-expanded="false" aria-controls="faq-a-5" id="faq-q-5">
+            <span>A Kairoon serve para o meu tipo de negócio?</span>
+            <svg class="faq-chevron" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+          </button>
+          <div class="faq-answer" id="faq-a-5" role="region" aria-labelledby="faq-q-5">
+            <div class="faq-answer-inner">
+              <p class="faq-answer-lead">Se você trabalha com hora marcada, provavelmente sim.</p>
+              <p class="faq-answer-detail">Barbearias, salões de beleza, clínicas de estética, estúdios de tatuagem e de nail design já usam a Kairoon no dia a dia. A plataforma se adapta à rotina de quem vive de agenda e atendimento, seja você sozinho ou com uma equipe inteira.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button type="button" class="faq-question" aria-expanded="false" aria-controls="faq-a-6" id="faq-q-6">
+            <span>Vou ter suporte se precisar de ajuda?</span>
+            <svg class="faq-chevron" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+          </button>
+          <div class="faq-answer" id="faq-a-6" role="region" aria-labelledby="faq-q-6">
+            <div class="faq-answer-inner">
+              <p class="faq-answer-lead">Sim, você conta com o nosso time sempre que precisar.</p>
+              <p class="faq-answer-detail">Desde a configuração inicial até as dúvidas do dia a dia, o suporte da Kairoon está por perto para te ajudar a aproveitar ao máximo a plataforma. Assim você nunca fica travado ou perdido na hora de organizar o seu negócio.</p>
+            </div>
+          </div>
         </div>
       </div>
     </section>
-
   </main>
 
-  <!-- ============================== FOOTER ============================== -->
-  <footer class="footer">
-    <div class="container">
-      <div class="footer-grid">
+  <footer class="footer" id="rodape">
+    <div class="footer-decor" aria-hidden="true">
+      <img src="elementos/det-azul-claro-contorno.svg" class="footer-shape footer-shape-1" alt="" />
+      <img src="elementos/det-azul%20escuro2.svg" class="footer-shape footer-shape-2" alt="" />
+    </div>
+
+    <div class="footer-container">
+      <div class="footer-top">
         <div class="footer-brand">
-          <a class="brand" href="#topo">
-            <span class="brand-mark">K</span>
-            <span class="brand-name">Kairoon</span>
+          <a href="#topo" class="footer-logo" aria-label="Kairoon — início">
+            <img src="elementos/logotipo-lisa.svg" alt="Kairoon" />
           </a>
-          <p>O encontro entre tempo, precisão e direção.</p>
+          <p class="footer-tagline">
+            Agenda, clientes e financeiro num só lugar. A gestão do seu negócio, finalmente organizada.
+          </p>
+
+          <div class="footer-socials">
+            <a href="#" class="footer-social" aria-label="Instagram da Kairoon">
+              <img src="elementos/instagram.svg" alt="" />
+            </a>
+            <a href="#" class="footer-social" aria-label="TikTok da Kairoon">
+              <img src="elementos/Platform=TikTok,%20Color=Negative.svg" alt="" />
+            </a>
+            <a href="#" class="footer-social" aria-label="YouTube da Kairoon">
+              <img src="elementos/Platform=YouTube,%20Color=Negative.svg" alt="" />
+            </a>
+            <a href="#" class="footer-social" aria-label="WhatsApp da Kairoon">
+              <img src="elementos/whatsapp.svg" alt="" />
+            </a>
+            <a href="mailto:contato@kairoon.com.br" class="footer-social" aria-label="E-mail da Kairoon">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M2 6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v.35l-10 5.55L2 6.35V6Z" />
+                <path d="M22 8.64 12.48 13.9a1 1 0 0 1-.96 0L2 8.64V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8.64Z" />
+              </svg>
+            </a>
+          </div>
         </div>
 
-        <nav class="footer-col" aria-label="Produto">
-          <h5>Produto</h5>
-          <a href="#recursos">Recursos</a>
-          <a href="#como-funciona">Como funciona</a>
-          <a href="#planos">Planos</a>
-          <a href="#faq">FAQ</a>
-        </nav>
-
-        <nav class="footer-col" aria-label="Empresa">
-          <h5>Empresa</h5>
-          <a href="#para-quem">Para quem é</a>
-          <a href="#depoimentos">Depoimentos</a>
-          <a href="mailto:contato@kairoon.com.br">Contato</a>
-        </nav>
-
-        <nav class="footer-col" aria-label="Legal">
-          <h5>Legal</h5>
-          <a href="#">Política de privacidade</a>
-          <a href="#">Termos de uso</a>
+        <nav class="footer-cols" aria-label="Rodapé">
+          <div class="footer-col">
+            <h4>Produto</h4>
+            <a href="#para-quem">Para quem é</a>
+            <a href="#gestao-mobile">Recursos</a>
+            <a href="#planos">Planos</a>
+            <a href="#faq">FAQ</a>
+          </div>
+          <div class="footer-col">
+            <h4>Empresa</h4>
+            <a href="#">Sobre nós</a>
+            <a href="#depoimentos">Depoimentos</a>
+            <a href="mailto:contato@kairoon.com.br">Contato</a>
+          </div>
+          <div class="footer-col">
+            <h4>Comece agora</h4>
+            <a href="#">Teste grátis</a>
+            <a href="#">Entrar</a>
+            <a href="#">Falar com a gente</a>
+          </div>
         </nav>
       </div>
 
       <div class="footer-bottom">
-        <span>&copy; 2026 Kairoon. Todos os direitos reservados.</span>
-        <div class="footer-social">
-          <a href="#" aria-label="Instagram"><svg class="icon"><use href="#i-instagram"/></svg></a>
-          <a href="#" aria-label="WhatsApp"><svg class="icon"><use href="#i-message"/></svg></a>
+        <p class="footer-copy">© 2026 Kairoon. Todos os direitos reservados.</p>
+        <div class="footer-legal">
+          <a href="#">Política de Privacidade</a>
+          <span class="footer-legal-sep" aria-hidden="true">•</span>
+          <a href="#">Termos de Uso</a>
+          <span class="footer-legal-sep" aria-hidden="true">•</span>
+          <a href="#">Cookies</a>
         </div>
       </div>
     </div>

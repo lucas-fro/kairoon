@@ -7,10 +7,12 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: string
   hint?: string
   leftIcon?: ReactNode
+  /** Ícone/ação à direita (interativo, ex.: botão de mostrar/ocultar senha). */
+  rightIcon?: ReactNode
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { label, error, hint, leftIcon, className, id, ...props },
+  { label, error, hint, leftIcon, rightIcon, className, id, ...props },
   ref,
 ) {
   const generatedId = useId()
@@ -37,6 +39,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
             'transition-shadow duration-150 focus:outline-none focus:ring-[3px]',
             'disabled:cursor-not-allowed disabled:bg-background disabled:text-ink-disabled',
             leftIcon ? 'pl-10' : null,
+            rightIcon ? 'pr-10' : null,
             error
               ? 'border-error focus:border-error focus:ring-error-light'
               : 'border-line focus:border-secondary focus:ring-secondary-light',
@@ -44,6 +47,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           )}
           {...props}
         />
+        {rightIcon && (
+          <span className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center">
+            {rightIcon}
+          </span>
+        )}
       </div>
       {error && <p className="mt-1.5 text-xs text-error-dark">{error}</p>}
       {!error && hint && <p className="mt-1.5 text-xs text-ink-tertiary">{hint}</p>}
