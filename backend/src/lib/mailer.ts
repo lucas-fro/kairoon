@@ -97,17 +97,16 @@ function layout(bodyHtml: string): string {
 
 export async function sendWelcomeEmail(to: string, name: string, establishmentName: string) {
   const html = layout(`
-    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${BRAND.navy};">Bem-vindo(a), ${firstName(name)}! 🎉</h1>
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${BRAND.navy};">Bem-vindo(a), ${firstName(name)}!</h1>
     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:${BRAND.inkSoft};">
       Sua conta da <strong style="color:${BRAND.ink};">${establishmentName}</strong> foi criada com sucesso.
       Agora é só configurar seus serviços, horários e começar a receber agendamentos.
     </p>
-    <a href="${APP_URL}/login" style="display:inline-block;background:${BRAND.navy};color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 24px;border-radius:8px;">
-      Acessar o painel
-    </a>
-    <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#94A3B8;">
-      Precisa de ajuda para começar? É só responder este e-mail.
-    </p>
+    <div style="text-align:center;">
+      <a href="${APP_URL}/login" style="display:inline-block;background:${BRAND.navy};color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 24px;border-radius:8px;">
+        Acessar o painel
+      </a>
+    </div>
   `)
   await sendEmail({
     to,
