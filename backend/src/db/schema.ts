@@ -556,10 +556,10 @@ export const loyaltyPrograms = pgTable(
     minTicketCents: integer('min_ticket_cents').notNull().default(0),
     rewardType: loyaltyRewardTypeEnum('reward_type').notNull().default('free_service'),
     rewardValue: integer('reward_value').notNull().default(0),
-    // null = qualquer serviço (free_service)
-    rewardServiceId: uuid('reward_service_id').references(() => services.id, {
-      onDelete: 'set null',
-    }),
+    // Serviços elegíveis do 'free_service' (um ou mais). null/vazio = qualquer
+    // serviço. Sem FK (igual a coupons.appliesToServiceIds): ids órfãos de um
+    // serviço removido simplesmente deixam de casar.
+    rewardServiceIds: jsonb('reward_service_ids').$type<string[]>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('loyalty_programs_establishment_idx').on(t.establishmentId)],
@@ -579,9 +579,8 @@ export const loyaltyRedemptions = pgTable('loyalty_redemptions', {
   couponId: uuid('coupon_id').references(() => coupons.id, { onDelete: 'set null' }),
   rewardType: loyaltyRewardTypeEnum('reward_type').notNull(),
   rewardValue: integer('reward_value').notNull(),
-  rewardServiceId: uuid('reward_service_id').references(() => services.id, {
-    onDelete: 'set null',
-  }),
+  // Snapshot dos serviços elegíveis no momento do resgate (free_service)
+  rewardServiceIds: jsonb('reward_service_ids').$type<string[]>(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -641,9 +640,9 @@ export const pointsRewards = pgTable(
     costPoints: integer('cost_points').notNull(),
     rewardType: couponDiscountTypeEnum('reward_type').notNull(),
     rewardValue: integer('reward_value').notNull().default(0),
-    rewardServiceId: uuid('reward_service_id').references(() => services.id, {
-      onDelete: 'set null',
-    }),
+    // Serviços elegíveis do 'free_service' (um ou mais). null/vazio = qualquer
+    // serviço. Sem FK (igual a coupons.appliesToServiceIds).
+    rewardServiceIds: jsonb('reward_service_ids').$type<string[]>(),
     active: boolean('active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -841,10 +840,6 @@ export const loyaltyProgramsRelations = relations(loyaltyPrograms, ({ one }) => 
     fields: [loyaltyPrograms.establishmentId],
     references: [establishments.id],
   }),
-  rewardService: one(services, {
-    fields: [loyaltyPrograms.rewardServiceId],
-    references: [services.id],
-  }),
 }))
 
 export const loyaltyStampsRelations = relations(loyaltyStamps, ({ one }) => ({
@@ -884,10 +879,6 @@ export const pointsRewardsRelations = relations(pointsRewards, ({ one, many }) =
   establishment: one(establishments, {
     fields: [pointsRewards.establishmentId],
     references: [establishments.id],
-  }),
-  rewardService: one(services, {
-    fields: [pointsRewards.rewardServiceId],
-    references: [services.id],
   }),
   entries: many(pointsEntries),
 }))

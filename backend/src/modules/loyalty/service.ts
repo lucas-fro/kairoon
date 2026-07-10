@@ -35,17 +35,27 @@ export async function getProgram(establishmentId: string) {
   return program ?? null
 }
 
+/** Valida que todos os serviços da recompensa pertencem ao estabelecimento. */
+async function assertRewardServicesBelong(establishmentId: string, serviceIds: string[]) {
+  if (serviceIds.length === 0) return
+  const rows = await db
+    .select({ id: services.id })
+    .from(services)
+    .where(and(eq(services.establishmentId, establishmentId), inArray(services.id, serviceIds)))
+  if (rows.length !== new Set(serviceIds).size) {
+    throw new AppError('Selecione serviços válidos para a recompensa', 404)
+  }
+}
+
 export async function upsertProgram(establishmentId: string, input: UpsertLoyaltyProgramInput) {
   if (MARKETING_REQUIRES_PRO) await assertPaidPlan(establishmentId)
 
-  const rewardServiceId = input.rewardType === 'free_service' ? (input.rewardServiceId ?? null) : null
-  if (rewardServiceId) {
-    const service = await db.query.services.findFirst({
-      where: and(eq(services.id, rewardServiceId), eq(services.establishmentId, establishmentId)),
-      columns: { id: true },
-    })
-    if (!service) throw new AppError('Serviço da recompensa não encontrado', 404)
-  }
+  // free_service pode valer para um ou mais serviços; vazio = qualquer serviço.
+  const rewardServiceIds =
+    input.rewardType === 'free_service' && input.rewardServiceIds && input.rewardServiceIds.length > 0
+      ? input.rewardServiceIds
+      : null
+  if (rewardServiceIds) await assertRewardServicesBelong(establishmentId, rewardServiceIds)
 
   const values = {
     establishmentId,
@@ -54,7 +64,7 @@ export async function upsertProgram(establishmentId: string, input: UpsertLoyalt
     minTicketCents: input.minTicketCents,
     rewardType: input.rewardType,
     rewardValue: input.rewardType === 'free_service' ? 0 : input.rewardValue,
-    rewardServiceId,
+    rewardServiceIds,
   }
   const [program] = await db
     .insert(loyaltyPrograms)
@@ -119,8 +129,8 @@ export async function redeemLoyalty(establishmentId: string, input: RedeemLoyalt
       discountType: program.rewardType,
       discountValue: program.rewardValue,
       appliesToServiceIds:
-        program.rewardType === 'free_service' && program.rewardServiceId
-          ? [program.rewardServiceId]
+        program.rewardType === 'free_service' && program.rewardServiceIds?.length
+          ? program.rewardServiceIds
           : null,
     })
 
@@ -133,7 +143,7 @@ export async function redeemLoyalty(establishmentId: string, input: RedeemLoyalt
         couponId: coupon.id,
         rewardType: program.rewardType,
         rewardValue: program.rewardValue,
-        rewardServiceId: program.rewardServiceId,
+        rewardServiceIds: program.rewardServiceIds ?? null,
       })
       .returning()
 
@@ -186,6 +196,13 @@ export async function syncLoyaltyStamp(
   })
   if (!program?.active) return
   if (params.finalCents < program.minTicketCents) return
+
+  // Cartão cheio: para de carimbar ao atingir o limite e nunca passa dele. Só
+  // volta a acumular depois que o cliente resgata (o resgate consome os
+  // carimbos e zera os disponíveis). Serializado pelo lockClientLoyalty do
+  // chamador, então a contagem não corre com outro fechamento do mesmo cliente.
+  const available = await countAvailableStamps(tx, params.establishmentId, params.clientId)
+  if (available >= program.stampsRequired) return
 
   await tx.insert(loyaltyStamps).values({
     establishmentId: params.establishmentId,

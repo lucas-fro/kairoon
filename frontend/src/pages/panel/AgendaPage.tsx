@@ -44,13 +44,6 @@ const VIEW_OPTIONS: { key: ViewMode; label: string }[] = [
   { key: 'month', label: 'Mês' },
 ]
 
-const LEGEND = [
-  { label: 'Confirmado', dotClass: 'bg-success' },
-  { label: 'Pendente', dotClass: 'bg-warning' },
-  { label: 'Concluído', dotClass: 'bg-primary' },
-  { label: 'Cancelado', dotClass: 'bg-error/60' },
-]
-
 function formatDayShort(dateStr: string): string {
   const day = Number(dateStr.slice(8, 10))
   const month = MONTH_LABELS[Number(dateStr.slice(5, 7)) - 1].slice(0, 3).toLowerCase()
@@ -402,21 +395,6 @@ export function AgendaPage() {
           />
         )}
       </div>
-
-      {/* Legenda de cores (abaixo da agenda, compacta) */}
-      {view !== 'month' && (
-        <div className="mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
-          {LEGEND.map((item) => (
-            <span
-              key={item.label}
-              className="flex items-center gap-1.5 text-[11px] text-ink-tertiary"
-            >
-              <span className={cn('h-2 w-2 rounded-full', item.dotClass)} />
-              {item.label}
-            </span>
-          ))}
-        </div>
-      )}
 
       <NewAppointmentDialog
         open={newDialog !== null}

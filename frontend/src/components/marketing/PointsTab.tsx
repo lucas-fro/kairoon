@@ -24,11 +24,11 @@ import { Dialog } from '../ui/Dialog'
 import { DialogActions } from '../ui/DialogActions'
 import { EmptyState } from '../ui/EmptyState'
 import { Input } from '../ui/Input'
-import { SelectMenu } from '../ui/SelectMenu'
 import { SkeletonList } from '../ui/Skeleton'
 import { Switch } from '../ui/Switch'
 import { Table, TBody, Td, Th, THead, Tr } from '../ui/Table'
 import { useToast } from '../ui/Toast'
+import { ServiceChecklist } from './ServiceChecklist'
 
 const REWARD_TYPES: { key: CouponDiscountType; label: string }[] = [
   { key: 'percent', label: '%' },
@@ -81,8 +81,8 @@ export function PointsTab() {
   const [costPoints, setCostPoints] = useState('')
   const [rewardType, setRewardType] = useState<CouponDiscountType>('percent')
   const [rewardValue, setRewardValue] = useState('')
-  // '' = qualquer serviço (só para tipo 'Grátis')
-  const [rewardServiceId, setRewardServiceId] = useState('')
+  // vazio = qualquer serviço (só para tipo 'Grátis')
+  const [rewardServiceIds, setRewardServiceIds] = useState<string[]>([])
   const [formErrors, setFormErrors] = useState<{ name?: string; points?: string; value?: string }>(
     {},
   )
@@ -91,15 +91,22 @@ export function PointsTab() {
   const rewards = rewardsQuery.data ?? []
   const services = servicesQuery.data ?? []
   const serviceById = new Map(services.map((s) => [s.id, s]))
-  // Mantém o serviço da recompensa em edição mesmo se ele estiver inativo
-  const serviceOptions = services.filter((s) => s.active || s.id === rewardServiceId)
+  // Mantém serviços já selecionados na lista mesmo se estiverem inativos
+  const serviceOptions = services.filter((s) => s.active || rewardServiceIds.includes(s.id))
+  const selectedServiceNames = rewardServiceIds
+    .map((rid) => serviceById.get(rid)?.name)
+    .filter((name): name is string => Boolean(name))
+
+  function toggleRewardService(rid: string) {
+    setRewardServiceIds((prev) => (prev.includes(rid) ? prev.filter((x) => x !== rid) : [...prev, rid]))
+  }
 
   function resetForm() {
     setName('')
     setCostPoints('')
     setRewardType('percent')
     setRewardValue('')
-    setRewardServiceId('')
+    setRewardServiceIds([])
     setFormErrors({})
   }
 
@@ -118,7 +125,7 @@ export function PointsTab() {
     else if (reward.rewardType === 'fixed') {
       setRewardValue((reward.rewardValue / 100).toFixed(2).replace('.', ','))
     } else setRewardValue('')
-    setRewardServiceId(reward.rewardType === 'free_service' ? (reward.rewardServiceId ?? '') : '')
+    setRewardServiceIds(reward.rewardType === 'free_service' ? (reward.rewardServiceIds ?? []) : [])
     setFormErrors({})
     setDialogOpen(true)
   }
@@ -151,7 +158,7 @@ export function PointsTab() {
         costPoints: reward.costPoints,
         rewardType: reward.rewardType,
         rewardValue: reward.rewardValue,
-        rewardServiceId: reward.rewardServiceId,
+        rewardServiceIds: reward.rewardServiceIds,
         active: !reward.active,
       }),
     onSuccess: (updated) => {
@@ -198,12 +205,12 @@ export function PointsTab() {
     }
     if (rewardType === 'percent') {
       payload.rewardValue = percentValue
-      payload.rewardServiceId = null
+      payload.rewardServiceIds = null
     } else if (rewardType === 'fixed') {
       payload.rewardValue = fixedCents
-      payload.rewardServiceId = null
+      payload.rewardServiceIds = null
     } else {
-      payload.rewardServiceId = rewardServiceId === '' ? null : rewardServiceId
+      payload.rewardServiceIds = rewardServiceIds.length > 0 ? rewardServiceIds : null
     }
     if (editing) {
       payload.active = editing.active
@@ -223,14 +230,17 @@ export function PointsTab() {
       return `${pct}% de desconto`
     }
     if (rewardType === 'fixed') return `${formatBRL(parseBRLToCents(rewardValue))} de desconto`
-    const service = rewardServiceId ? serviceById.get(rewardServiceId) : undefined
-    return service ? `${service.name} grátis` : 'um serviço grátis (qualquer serviço)'
+    if (selectedServiceNames.length === 0) return 'um serviço grátis (qualquer serviço)'
+    if (selectedServiceNames.length === 1) return `${selectedServiceNames[0]} grátis`
+    return `1 grátis entre: ${selectedServiceNames.join(', ')}`
   })()
 
   function prizeSubtext(reward: PointsReward): string | null {
     if (reward.rewardType !== 'free_service') return null
-    if (!reward.rewardServiceId) return 'Qualquer serviço'
-    return serviceById.get(reward.rewardServiceId)?.name ?? 'Serviço removido'
+    const ids = reward.rewardServiceIds ?? []
+    if (ids.length === 0) return 'Qualquer serviço'
+    const names = ids.map((rid) => serviceById.get(rid)?.name).filter(Boolean)
+    return names.length > 0 ? names.join(', ') : 'Serviço removido'
   }
 
   return (
@@ -447,8 +457,8 @@ export function PointsTab() {
 
           <div>
             <span className="mb-2 block text-[13px] font-medium text-ink-secondary">Prêmio</span>
-            <div className="flex gap-2">
-              <div className="inline-flex shrink-0 rounded-lg border border-line p-0.5">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="flex w-full gap-1 rounded-lg border border-line p-0.5 sm:inline-flex sm:w-auto sm:shrink-0">
                 {REWARD_TYPES.map(({ key, label }) => (
                   <button
                     key={key}
@@ -459,7 +469,7 @@ export function PointsTab() {
                       setFormErrors((prev) => ({ ...prev, value: undefined }))
                     }}
                     className={cn(
-                      'h-9 rounded-md px-3 text-[13px] font-medium transition-colors',
+                      'flex flex-1 items-center justify-center rounded-md px-2 py-2 text-center text-xs font-medium leading-tight transition-colors sm:h-9 sm:flex-none sm:px-3 sm:py-0 sm:text-[13px]',
                       rewardType === key
                         ? 'bg-primary text-white'
                         : 'text-ink-secondary hover:text-ink',
@@ -511,18 +521,19 @@ export function PointsTab() {
           </div>
 
           {rewardType === 'free_service' && (
-            <SelectMenu
-              label="Serviço grátis"
-              value={rewardServiceId}
-              onChange={setRewardServiceId}
-              options={[
-                { value: '', label: 'Qualquer serviço' },
-                ...serviceOptions.map((service) => ({
-                  value: service.id,
-                  label: `${service.name} · ${formatBRL(service.priceCents)}`,
-                })),
-              ]}
-            />
+            <div>
+              <span className="mb-1.5 block text-[13px] font-medium text-ink-secondary">
+                Serviços que podem sair grátis
+              </span>
+              <ServiceChecklist
+                services={serviceOptions}
+                selected={rewardServiceIds}
+                onToggle={toggleRewardService}
+              />
+              <p className="mt-1.5 text-xs text-ink-tertiary">
+                Selecione um ou mais. Nenhum selecionado = qualquer serviço.
+              </p>
+            </div>
           )}
 
           {/* Prévia do nível de resgate */}

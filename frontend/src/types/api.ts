@@ -302,7 +302,8 @@ export interface LoyaltyProgram {
   minTicketCents: number
   rewardType: LoyaltyRewardType
   rewardValue: number
-  rewardServiceId: string | null
+  /** Serviços elegíveis do 'free_service' (um ou mais). null/vazio = qualquer serviço */
+  rewardServiceIds: string[] | null
   createdAt: string
 }
 
@@ -328,7 +329,8 @@ export interface PointsReward {
   costPoints: number
   rewardType: CouponDiscountType
   rewardValue: number
-  rewardServiceId: string | null
+  /** Serviços elegíveis do 'free_service' (um ou mais). null/vazio = qualquer serviço */
+  rewardServiceIds: string[] | null
   active: boolean
   createdAt: string
 }

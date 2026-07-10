@@ -13,7 +13,8 @@ const rewardBaseSchema = z.object({
   costPoints: z.number().int().min(1, 'Informe o custo em pontos'),
   rewardType: pointsRewardTypeSchema,
   rewardValue: z.number().int().min(0, 'Valor inválido').default(0),
-  rewardServiceId: z.string().uuid('Serviço inválido').nullable().optional(),
+  // Um ou mais serviços elegíveis do 'free_service'. Vazio/ausente = qualquer serviço.
+  rewardServiceIds: z.array(z.string().uuid('Serviço inválido')).nullable().optional(),
   active: z.boolean().default(true),
 })
 

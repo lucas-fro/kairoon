@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import { db } from '../../db'
 import { clients, pointsEntries, pointsPrograms, pointsRewards, services } from '../../db/schema'
 import { AppError } from '../../lib/errors'
@@ -32,16 +32,24 @@ async function getPointsBalance(
   return Number(row?.value ?? 0)
 }
 
-async function assertRewardServiceBelongs(
-  establishmentId: string,
-  rewardServiceId: string | null,
-) {
-  if (!rewardServiceId) return
-  const service = await db.query.services.findFirst({
-    where: and(eq(services.id, rewardServiceId), eq(services.establishmentId, establishmentId)),
-    columns: { id: true },
-  })
-  if (!service) throw new AppError('Serviço da recompensa não encontrado', 404)
+async function assertRewardServicesBelong(establishmentId: string, serviceIds: string[]) {
+  if (serviceIds.length === 0) return
+  const rows = await db
+    .select({ id: services.id })
+    .from(services)
+    .where(and(eq(services.establishmentId, establishmentId), inArray(services.id, serviceIds)))
+  if (rows.length !== new Set(serviceIds).size) {
+    throw new AppError('Selecione serviços válidos para a recompensa', 404)
+  }
+}
+
+/** Normaliza os serviços elegíveis: só para free_service e sem vazio → null. */
+function normalizeRewardServiceIds(
+  rewardType: 'percent' | 'fixed' | 'free_service',
+  ids: string[] | null | undefined,
+): string[] | null {
+  if (rewardType !== 'free_service' || !ids || ids.length === 0) return null
+  return ids
 }
 
 export async function getProgram(establishmentId: string) {
@@ -77,8 +85,8 @@ export async function listRewards(establishmentId: string) {
 export async function createReward(establishmentId: string, input: CreatePointsRewardInput) {
   if (MARKETING_REQUIRES_PRO) await assertPaidPlan(establishmentId)
   const isFreeService = input.rewardType === 'free_service'
-  const rewardServiceId = isFreeService ? (input.rewardServiceId ?? null) : null
-  await assertRewardServiceBelongs(establishmentId, rewardServiceId)
+  const rewardServiceIds = normalizeRewardServiceIds(input.rewardType, input.rewardServiceIds)
+  if (rewardServiceIds) await assertRewardServicesBelong(establishmentId, rewardServiceIds)
   const [reward] = await db
     .insert(pointsRewards)
     .values({
@@ -87,7 +95,7 @@ export async function createReward(establishmentId: string, input: CreatePointsR
       costPoints: input.costPoints,
       rewardType: input.rewardType,
       rewardValue: isFreeService ? 0 : input.rewardValue,
-      rewardServiceId,
+      rewardServiceIds,
       active: input.active,
     })
     .returning()
@@ -106,8 +114,8 @@ export async function updateReward(
   if (!existing) throw new AppError('Recompensa não encontrada', 404)
 
   const isFreeService = input.rewardType === 'free_service'
-  const rewardServiceId = isFreeService ? (input.rewardServiceId ?? null) : null
-  await assertRewardServiceBelongs(establishmentId, rewardServiceId)
+  const rewardServiceIds = normalizeRewardServiceIds(input.rewardType, input.rewardServiceIds)
+  if (rewardServiceIds) await assertRewardServicesBelong(establishmentId, rewardServiceIds)
 
   const [updated] = await db
     .update(pointsRewards)
@@ -116,7 +124,7 @@ export async function updateReward(
       costPoints: input.costPoints,
       rewardType: input.rewardType,
       rewardValue: isFreeService ? 0 : input.rewardValue,
-      rewardServiceId,
+      rewardServiceIds,
       active: input.active,
     })
     .where(and(eq(pointsRewards.id, id), eq(pointsRewards.establishmentId, establishmentId)))
@@ -186,8 +194,8 @@ export async function redeemPoints(establishmentId: string, input: RedeemPointsI
       discountType: reward.rewardType,
       discountValue: reward.rewardValue,
       appliesToServiceIds:
-        reward.rewardType === 'free_service' && reward.rewardServiceId
-          ? [reward.rewardServiceId]
+        reward.rewardType === 'free_service' && reward.rewardServiceIds?.length
+          ? reward.rewardServiceIds
           : null,
     })
 

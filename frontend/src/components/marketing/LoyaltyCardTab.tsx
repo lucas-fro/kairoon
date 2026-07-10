@@ -11,15 +11,15 @@ import type { LoyaltyRewardType } from '../../types/api'
 import { Button } from '../ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import { Input } from '../ui/Input'
-import { SelectMenu } from '../ui/SelectMenu'
 import { SkeletonList } from '../ui/Skeleton'
 import { Switch } from '../ui/Switch'
 import { useToast } from '../ui/Toast'
+import { ServiceChecklist } from './ServiceChecklist'
 
 const REWARD_OPTIONS: { key: LoyaltyRewardType; label: string }[] = [
-  { key: 'free_service', label: 'Serviço grátis' },
   { key: 'percent', label: '%' },
   { key: 'fixed', label: 'R$' },
+  { key: 'free_service', label: 'Grátis' },
 ]
 
 export function LoyaltyCardTab() {
@@ -33,10 +33,10 @@ export function LoyaltyCardTab() {
   const [stamps, setStamps] = useState('10')
   // '' equivale a R$ 0,00 (qualquer valor carimba)
   const [minTicket, setMinTicket] = useState('')
-  const [rewardType, setRewardType] = useState<LoyaltyRewardType>('free_service')
+  const [rewardType, setRewardType] = useState<LoyaltyRewardType>('percent')
   const [rewardValue, setRewardValue] = useState('')
-  // '' = qualquer serviço (rewardServiceId null)
-  const [rewardServiceId, setRewardServiceId] = useState('')
+  // vazio = qualquer serviço (rewardServiceIds null)
+  const [rewardServiceIds, setRewardServiceIds] = useState<string[]>([])
   const [formErrors, setFormErrors] = useState<{ stamps?: string; reward?: string }>({})
 
   // Sincroniza o formulário quando o programa carrega (null = nunca configurado → defaults)
@@ -59,26 +59,30 @@ export function LoyaltyCardTab() {
             ? (program.rewardValue / 100).toFixed(2).replace('.', ',')
             : '',
       )
-      setRewardServiceId(program.rewardServiceId ?? '')
+      setRewardServiceIds(program.rewardServiceIds ?? [])
     } else {
       setActive(false)
       setStamps('10')
       setMinTicket('')
-      setRewardType('free_service')
+      setRewardType('percent')
       setRewardValue('')
-      setRewardServiceId('')
+      setRewardServiceIds([])
     }
     setFormErrors({})
   }, [query.data])
 
   const services = servicesQuery.data ?? []
   const activeServices = services.filter((s) => s.active)
-  const rewardService = services.find((s) => s.id === rewardServiceId)
-  // Mantém o serviço salvo na lista mesmo que tenha sido desativado depois
-  const serviceOptions =
-    rewardService && !activeServices.some((s) => s.id === rewardService.id)
-      ? [...activeServices, rewardService]
-      : activeServices
+  // Mantém serviços já selecionados na lista mesmo que tenham sido desativados
+  const inactiveSelected = services.filter((s) => !s.active && rewardServiceIds.includes(s.id))
+  const serviceOptions = [...activeServices, ...inactiveSelected]
+  const selectedServiceNames = rewardServiceIds
+    .map((rid) => services.find((s) => s.id === rid)?.name)
+    .filter((name): name is string => Boolean(name))
+
+  function toggleRewardService(rid: string) {
+    setRewardServiceIds((prev) => (prev.includes(rid) ? prev.filter((x) => x !== rid) : [...prev, rid]))
+  }
 
   const saveMutation = useMutation({
     mutationFn: saveLoyaltyProgram,
@@ -95,9 +99,9 @@ export function LoyaltyCardTab() {
 
   function describeReward(): string {
     if (rewardType === 'free_service') {
-      return rewardService
-        ? `1 ${rewardService.name} grátis`
-        : 'um serviço grátis (qualquer serviço)'
+      if (selectedServiceNames.length === 0) return 'um serviço grátis (qualquer serviço)'
+      if (selectedServiceNames.length === 1) return `1 ${selectedServiceNames[0]} grátis`
+      return `1 serviço grátis entre: ${selectedServiceNames.join(', ')}`
     }
     if (rewardType === 'percent') {
       const pct = Number(onlyDigits(rewardValue)) || 0
@@ -137,7 +141,8 @@ export function LoyaltyCardTab() {
       minTicketCents,
       rewardType,
       rewardValue: value,
-      rewardServiceId: rewardType === 'free_service' ? rewardServiceId || null : null,
+      rewardServiceIds:
+        rewardType === 'free_service' && rewardServiceIds.length > 0 ? rewardServiceIds : null,
     }
     saveMutation.mutate(payload)
   }
@@ -210,7 +215,7 @@ export function LoyaltyCardTab() {
                     Recompensa ao completar o cartão
                   </span>
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                    <div className="inline-flex shrink-0 rounded-lg border border-line p-0.5">
+                    <div className="flex w-full gap-1 rounded-lg border border-line p-0.5 sm:inline-flex sm:w-auto sm:shrink-0">
                       {REWARD_OPTIONS.map(({ key, label }) => (
                         <button
                           key={key}
@@ -221,7 +226,7 @@ export function LoyaltyCardTab() {
                             setFormErrors((prev) => ({ ...prev, reward: undefined }))
                           }}
                           className={cn(
-                            'inline-flex h-9 items-center justify-center rounded-md px-4 text-[13px] font-medium transition-colors',
+                            'flex flex-1 items-center justify-center rounded-md px-2 py-2 text-center text-xs font-medium leading-tight transition-colors sm:h-9 sm:flex-none sm:px-4 sm:py-0 sm:text-[13px]',
                             rewardType === key
                               ? 'bg-primary text-white'
                               : 'text-ink-secondary hover:text-ink',
@@ -232,21 +237,8 @@ export function LoyaltyCardTab() {
                       ))}
                     </div>
 
-                    <div className="min-w-0 flex-1">
-                      {rewardType === 'free_service' ? (
-                        <SelectMenu
-                          ariaLabel="Serviço da recompensa"
-                          value={rewardServiceId}
-                          onChange={setRewardServiceId}
-                          options={[
-                            { value: '', label: 'Qualquer serviço' },
-                            ...serviceOptions.map((s) => ({
-                              value: s.id,
-                              label: `${s.name} · ${formatBRL(s.priceCents)}`,
-                            })),
-                          ]}
-                        />
-                      ) : (
+                    {rewardType !== 'free_service' && (
+                      <div className="min-w-0 flex-1">
                         <div className="relative">
                           {rewardType === 'fixed' && (
                             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-tertiary">
@@ -286,9 +278,25 @@ export function LoyaltyCardTab() {
                             </span>
                           )}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
+
+                  {rewardType === 'free_service' && (
+                    <div className="mt-3">
+                      <p className="mb-1.5 text-[13px] font-medium text-ink-secondary">
+                        Serviços que podem sair grátis
+                      </p>
+                      <ServiceChecklist
+                        services={serviceOptions}
+                        selected={rewardServiceIds}
+                        onToggle={toggleRewardService}
+                      />
+                      <p className="mt-1.5 text-xs text-ink-tertiary">
+                        Selecione um ou mais. Nenhum selecionado = qualquer serviço.
+                      </p>
+                    </div>
+                  )}
                   {formErrors.reward && (
                     <p className="mt-1.5 text-xs text-error-dark">{formErrors.reward}</p>
                   )}

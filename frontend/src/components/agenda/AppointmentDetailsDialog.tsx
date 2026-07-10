@@ -250,9 +250,12 @@ export function AppointmentDetailsDialog({
               </div>
               <div className="flex items-center gap-3">
                 <CalendarClock className="h-4 w-4 shrink-0 text-ink-tertiary" />
-                <p className="text-ink-secondary">
-                  {formatDate(appointment.date)} · {appointment.startTime} – {appointment.endTime}
-                </p>
+                <div>
+                  <p className="text-ink-secondary">{formatDate(appointment.date)}</p>
+                  <p className="text-xs text-ink-tertiary">
+                    {appointment.startTime} – {appointment.endTime}
+                  </p>
+                </div>
               </div>
               <div className="flex items-center gap-3">
                 <Clock className="h-4 w-4 shrink-0 text-ink-tertiary" />
@@ -806,29 +809,67 @@ function PaymentCheckout({
           )}
           {couponError && <p className="text-xs font-medium text-error-dark">{couponError}</p>}
 
-          {/* Recompensas cunhadas disponíveis do cliente — aplicar em um toque */}
+          {/* Recompensas cunhadas disponíveis do cliente — aplicar em um toque.
+              Cupom restrito a serviços que não incluem o serviço deste
+              atendimento fica desabilitado, indicando para qual serviço vale. */}
           {!appliedCoupon &&
             (clientCouponsQuery.data ?? [])
               .filter((coupon) => coupon.code)
-              .map((coupon) => (
-                <button
-                  key={coupon.id}
-                  type="button"
-                  onClick={() => applyCouponCode(coupon.code!)}
-                  className="flex w-full items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-left text-xs transition-colors hover:border-primary/40 hover:bg-primary/5"
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <Gift className="h-3.5 w-3.5 shrink-0 text-primary" />
-                    <span className="shrink-0 font-mono font-medium text-ink">{coupon.code}</span>
-                    {coupon.name && (
-                      <span className="truncate text-ink-tertiary">{coupon.name}</span>
+              .map((coupon) => {
+                const restrictedIds = coupon.appliesToServiceIds ?? []
+                const eligible =
+                  restrictedIds.length === 0 || restrictedIds.includes(appointment.service.id)
+                const eligibleNames = restrictedIds
+                  .map((serviceId) => serviceCatalogById.get(serviceId)?.name)
+                  .filter((name): name is string => Boolean(name))
+                  .join(', ')
+                return (
+                  <button
+                    key={coupon.id}
+                    type="button"
+                    disabled={!eligible}
+                    onClick={eligible ? () => applyCouponCode(coupon.code!) : undefined}
+                    className={cn(
+                      'flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-xs transition-colors',
+                      eligible
+                        ? 'border-line hover:border-primary/40 hover:bg-primary/5'
+                        : 'cursor-not-allowed border-line bg-background opacity-70',
                     )}
-                  </span>
-                  <span className="shrink-0 font-medium text-primary">
-                    {describeCouponDiscount(coupon.discountType, coupon.discountValue)}
-                  </span>
-                </button>
-              ))}
+                  >
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <Gift
+                          className={cn(
+                            'h-3.5 w-3.5 shrink-0',
+                            eligible ? 'text-primary' : 'text-ink-tertiary',
+                          )}
+                        />
+                        <span className="shrink-0 font-mono font-medium text-ink">
+                          {coupon.code}
+                        </span>
+                        {coupon.name && (
+                          <span className="truncate text-ink-tertiary">{coupon.name}</span>
+                        )}
+                      </span>
+                      {!eligible && (
+                        <span className="pl-[22px] text-[11px] font-medium text-warning-dark">
+                          {eligibleNames
+                            ? `Válido só para: ${eligibleNames}`
+                            : 'Não vale para este serviço'}
+                        </span>
+                      )}
+                    </span>
+                    <span
+                      className={cn(
+                        'shrink-0 font-medium',
+                        eligible ? 'text-primary' : 'text-ink-tertiary',
+                      )}
+                    >
+                      {describeCouponDiscount(coupon.discountType, coupon.discountValue)}
+                    </span>
+                  </button>
+                )
+              })}
 
           {campaignCoupon && (
             <div className="flex items-center justify-between gap-2 rounded-lg bg-secondary-light/60 px-3 py-2 text-xs">

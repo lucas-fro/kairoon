@@ -18,7 +18,7 @@ export interface PointsRewardPayload {
   costPoints: number
   rewardType: CouponDiscountType
   rewardValue?: number
-  rewardServiceId?: string | null
+  rewardServiceIds?: string[] | null
   active?: boolean
 }
 

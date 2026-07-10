@@ -7,7 +7,7 @@ export interface LoyaltyProgramPayload {
   minTicketCents: number
   rewardType: LoyaltyRewardType
   rewardValue?: number
-  rewardServiceId?: string | null
+  rewardServiceIds?: string[] | null
 }
 
 export function getLoyaltyProgram() {
