@@ -25,7 +25,7 @@ A identidade visual segue o **Kairoon Design System** documentado em [frontend/D
 
 | Camada | Tecnologias |
 | --- | --- |
-| Backend | Node.js 20+, TypeScript (ESM, rodado via `tsx`), Fastify 5, Zod, Drizzle ORM, PostgreSQL, JWT (`@fastify/jwt`, expira em 7 dias), bcryptjs, `@fastify/cors`, `@fastify/rate-limit` |
+| Backend | Node.js 20+, TypeScript (ESM, rodado via `tsx`), Fastify 5, Zod, Drizzle ORM, PostgreSQL, JWT (`@fastify/jwt`, expira em 7 dias), bcryptjs, `@fastify/cors`, `@fastify/rate-limit`, Resend (e-mail transacional) |
 | Frontend | React 18, TypeScript, Vite, Tailwind CSS, TanStack Query, React Router, lucide-react, Recharts |
 | Tempo real | Server-Sent Events (SSE) para avisar o painel de reservas do link público |
 
@@ -41,6 +41,8 @@ Pré-requisitos: Node 20+, PostgreSQL em `localhost:5432`. As credenciais e o no
 | `JWT_SECRET` | — (obrigatório, ≥ 20 chars) | sem default de propósito: a app não sobe sem ele |
 | `PORT` | `3333` | porta do backend |
 | `CORS_ORIGIN` | `http://localhost:5173` | origens permitidas (separadas por vírgula) |
+| `RESEND_API_KEY` | — (opcional) | chave da Resend p/ e-mail transacional; sem ela os envios viram no-op logado (útil em dev) |
+| `RESEND_FROM` | `Kairoon <onboarding@resend.dev>` | remetente dos e-mails (use domínio verificado em produção) |
 
 ```bash
 # Backend (porta 3333)
@@ -73,6 +75,7 @@ npm run dev
 | `npm run db:generate` | gera uma nova migration a partir do `schema.ts` |
 | `npm run db:migrate` | aplica as migrations pendentes |
 | `npm run db:seed` | popula a empresa/usuário de teste |
+| `npm run db:seed:demo` | popula um estabelecimento demo com ~3 meses de operação (agenda, caixa, fidelidade, pontos); **limpa o banco antes** |
 
 ---
 
@@ -117,7 +120,7 @@ frontend/
 Navegação do painel (sidebar): **Principal** (Dashboard, Agenda) · **Gestão** (Clientes, Fidelidade, Estoque, Financeiro, Relatórios) · **Sistema** (Configurações).
 
 ### Agenda & Agendamentos
-- Visão de agenda por dia com colunas por profissional e legenda.
+- Visão de agenda (dia/semana/mês) com colunas por profissional, cores por status do atendimento.
 - Criação de agendamento pelo painel (walk-in, aceita horário passado) com criação/reuso automático de cliente por telefone.
 - Estados do atendimento: `pending` → `confirmed` → `completed`, além de `cancelled`. Remarcar, cancelar, reabrir e restaurar.
 - Cálculo de disponibilidade respeitando jornada do profissional, almoço, horário de funcionamento e bloqueios de agenda.
@@ -138,6 +141,8 @@ Página dedicada com abas — o **cupom é o instrumento universal de desconto**
 - **Campanhas:** descontos automáticos por condição (ex.: primeira visita) aplicados sozinhos no fechamento; quando várias casam, vale a de maior desconto (código digitado/desconto manual têm prioridade).
 - **Cartão fidelidade:** a cada atendimento concluído acima de um ticket mínimo o cliente ganha 1 carimbo; ao juntar X carimbos resgata a recompensa (serviço grátis / `%` / valor fixo), que vira um cupom pessoal.
 - **Pontos:** o dono define pontos por atendimento e/ou por valor gasto; um catálogo de níveis (X pontos = recompensa) permite resgatar um cupom pessoal.
+
+No tipo **serviço grátis** (fidelidade e pontos), a recompensa pode valer para qualquer serviço ou ser restrita a um ou mais serviços elegíveis (`reward_service_ids`).
 
 ### Financeiro
 - Livro-caixa (entradas/saídas) com filtros por período e tipo; entradas de atendimento aparecem vinculadas.
@@ -165,6 +170,7 @@ Abas: **Estabelecimento** (dados, CNPJ, endereço via ViaCEP, formas de pagament
 
 ### Autenticação & Planos
 - Cadastro do dono cria conta + estabelecimento + primeiro profissional; login retorna JWT (7 dias).
+- Redefinição de senha por código enviado no e-mail (Resend), disparada pelo próprio usuário logado na aba **Conta**.
 - Plano Free: 1 estabelecimento e 1 funcionário, aplicado por regra de negócio (`403` na API + tela de upgrade na UI).
 
 ---
@@ -182,6 +188,8 @@ Base local: `http://localhost:3333`. Autenticação por **JWT Bearer** (`Authori
 - `GET /auth/slug-available?slug=` — disponibilidade de slug no cadastro; rate-limit 30/min (público)
 - `GET /auth/me` — perfil do usuário atual (auth)
 - `PUT /auth/me` — atualiza o perfil (auth)
+- `POST /auth/password-reset/request` — envia um código de redefinição por e-mail; rate-limit 3/5min (auth)
+- `POST /auth/password-reset/confirm` — confirma o código e define a nova senha; rate-limit 6/5min (auth)
 
 ### Estabelecimento — `/establishment` (auth)
 - `GET /establishment` · `PUT /establishment` — obtém/atualiza o estabelecimento
@@ -273,7 +281,7 @@ PostgreSQL via Drizzle ORM. Convenções gerais: PK `uuid` com `defaultRandom()`
 
 | Tabela | Papel |
 | --- | --- |
-| `users` | conta do dono (login): nome, email único, hash da senha, dados pessoais |
+| `users` | conta do dono (login): nome, email único, hash da senha, dados pessoais, campos de redefinição de senha (hash do código + validade) |
 | `establishments` | raiz do tenant: nome, `slug` único, branding, `plan`, formas de pagamento (jsonb), `autoConfirm`, endereço/CNPJ |
 | `working_hours` | horário de funcionamento por dia da semana (0–6), único por (estabelecimento, dia) |
 | `services` | serviços: duração, `priceCents`, ativo; **pacotes** (`isPackage` + `packageServiceIds` + desconto) |
@@ -289,11 +297,11 @@ PostgreSQL via Drizzle ORM. Convenções gerais: PK `uuid` com `defaultRandom()`
 | `commission_entries` | comissão apurada por atendimento (snapshot da regra + valor), 1 por agendamento |
 | `coupons` | definição de cupom/campanha: tipo/valor do desconto, escopo, validade, limites, `autoApply`, `source`, `clientId` (pessoal) |
 | `coupon_redemptions` | ledger de uso do cupom (1 por agendamento; estorno = delete por `appointmentId`) |
-| `loyalty_programs` | config do cartão fidelidade (carimbos necessários, ticket mínimo, recompensa) — 1 por estabelecimento |
+| `loyalty_programs` | config do cartão fidelidade (carimbos necessários, ticket mínimo, recompensa; `reward_service_ids` p/ o serviço grátis) — 1 por estabelecimento |
 | `loyalty_stamps` | ledger de carimbos (1 por atendimento; `redemptionId` = consumido) |
 | `loyalty_redemptions` | concessão da recompensa do cartão (snapshot + cupom cunhado) |
 | `points_programs` | config do programa de pontos (por serviço + por valor gasto) — 1 por estabelecimento |
-| `points_rewards` | catálogo de níveis (X pontos = recompensa) |
+| `points_rewards` | catálogo de níveis (X pontos = recompensa; `reward_service_ids` p/ o serviço grátis) |
 | `points_entries` | ledger de pontos (`earn`/`redeem`); saldo = `sum(points)` por cliente |
 
 **Padrão de acúmulo/estorno:** `commission_entries`, `coupon_redemptions`, `loyalty_stamps` e `points_entries` são ledgers chaveados por `appointmentId` (índice único). Concluir um atendimento insere as linhas; reabrir/cancelar as remove (delete por `appointmentId`) — tudo dentro da transação do fechamento. Fidelidade e pontos acumulam sobre o valor **realmente pago** (`finalCents`), não sobre o preço bruto.
@@ -308,7 +316,11 @@ Fluxo Drizzle Kit (config em `backend/drizzle.config.ts`, dialeto `postgresql`, 
 2. `npm run db:generate` — diffa o schema contra os snapshots e emite um novo `.sql` em `backend/drizzle/` (statements separados por `--> statement-breakpoint`), atualizando `drizzle/meta/`.
 3. `npm run db:migrate` — aplica as migrations pendentes.
 
-As migrations são **geradas** (não escritas à mão) e versionadas em `backend/drizzle/` (`0000` … em diante), com snapshots em `drizzle/meta/*.json` e a ordem em `drizzle/meta/_journal.json`. A migration mais recente adicionou a coluna `sale_services` (serviços extras vendidos no fechamento).
+As migrations são **geradas** (não escritas à mão) e versionadas em `backend/drizzle/` (`0000` … em diante), com snapshots em `drizzle/meta/*.json` e a ordem em `drizzle/meta/_journal.json`. As migrations mais recentes adicionaram a redefinição de senha (colunas em `users`) e trocaram a recompensa de serviço único (`reward_service_id`) pela lista de serviços elegíveis (`reward_service_ids`, jsonb) na fidelidade e nos pontos.
+
+> ⚠️ **Ordem dos timestamps.** O drizzle-orm decide o que aplicar comparando **apenas** o `when` (timestamp) da migration com o mais recente já registrado no banco — não por hash/tag individual. Ao renumerar ou reordenar migrations (ex.: para resolver colisão de numeração entre branches), garanta que os `when` fiquem em ordem crescente; uma migration com `when` menor que o topo já aplicado é **pulada silenciosamente**, sem erro.
+
+Deploy: o `backend/docker-entrypoint.sh` roda `db:create` + `db:migrate` (com retry) no start do container, antes de subir a API.
 
 ---
 
