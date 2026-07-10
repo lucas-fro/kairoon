@@ -5,22 +5,37 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   LabelList,
   Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
 import { ApiError } from '../../api/client'
-import { getOccupancyReport, getRevenueReport, getTopServices } from '../../api/reports'
+import {
+  getAppointmentsByStatusReport,
+  getBusyHoursReport,
+  getNewClientsReport,
+  getOccupancyReport,
+  getPaymentMethodsReport,
+  getRevenueByEmployeeReport,
+  getRevenueReport,
+  getTopClientsReport,
+  getTopServices,
+} from '../../api/reports'
 import { Button } from '../../components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Input } from '../../components/ui/Input'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Skeleton } from '../../components/ui/Skeleton'
-import { CHART_COLORS } from '../../lib/chartColors'
+import { CHART_COLORS, METHOD_COLORS, STATUS_COLORS } from '../../lib/chartColors'
 import {
   MONTH_LABELS,
   WEEKDAY_LABELS,
@@ -30,7 +45,12 @@ import {
   todayStr,
 } from '../../lib/dates'
 import { cn, formatBRL, formatDate } from '../../lib/format'
-import type { TopService } from '../../types/api'
+import type {
+  AppointmentsByStatusPoint,
+  BusyHourCell,
+  PaymentMethod,
+  TopService,
+} from '../../types/api'
 
 type GroupBy = 'day' | 'month'
 
@@ -48,10 +68,31 @@ interface OccupancyBarDatum {
   availableMinutes: number
 }
 
+/** Item genérico de barra horizontal com valor em reais (métodos, clientes, recursos) */
+interface RevenueRow {
+  key: string
+  label: string
+  valueCents: number
+}
+
 const PRESETS = [
   { label: '7 dias', days: 7 },
   { label: '30 dias', days: 30 },
   { label: '90 dias', days: 90 },
+] as const
+
+const METHOD_LABELS: Record<PaymentMethod, string> = {
+  cash: 'Dinheiro',
+  pix: 'Pix',
+  debit: 'Débito',
+  credit: 'Crédito',
+}
+
+const STATUS_META = [
+  { key: 'completed', label: 'Concluídos', color: STATUS_COLORS.completed },
+  { key: 'confirmed', label: 'Confirmados', color: STATUS_COLORS.confirmed },
+  { key: 'pending', label: 'Pendentes', color: STATUS_COLORS.pending },
+  { key: 'cancelled', label: 'Cancelados', color: STATUS_COLORS.cancelled },
 ] as const
 
 /** Estilo padrão dos ticks: texto de eixo sempre em cinza, 12px */
@@ -92,6 +133,10 @@ function buildMonthSequence(from: string, to: string): string[] {
     guard += 1
   }
   return months
+}
+
+function buildPeriodSequence(from: string, to: string, groupBy: GroupBy): string[] {
+  return groupBy === 'month' ? buildMonthSequence(from, to) : buildDaySequence(from, to)
 }
 
 /** Tick compacto do eixo Y de dinheiro: R$ 1.200 em vez de R$ 1.200,00 */
@@ -183,6 +228,12 @@ function TopServicesTooltip({ active, payload }: ChartTooltipProps) {
   )
 }
 
+function RevenueRowTooltip({ active, payload }: ChartTooltipProps) {
+  if (!active || !payload || payload.length === 0) return null
+  const item = payload[0].payload as RevenueRow
+  return <TooltipShell title={item.label} rows={[{ text: formatBRL(item.valueCents) }]} />
+}
+
 function OccupancyTooltip({ active, payload }: ChartTooltipProps) {
   if (!active || !payload || payload.length === 0) return null
   const item = payload[0].payload as OccupancyBarDatum
@@ -197,6 +248,31 @@ function OccupancyTooltip({ active, payload }: ChartTooltipProps) {
           )} disponíveis`,
         },
       ]}
+    />
+  )
+}
+
+function NewClientsTooltip({ active, payload, groupBy }: ChartTooltipProps & { groupBy: GroupBy }) {
+  if (!active || !payload || payload.length === 0) return null
+  const datum = payload[0].payload as { period: string; count: number }
+  return (
+    <TooltipShell
+      title={formatPeriodLong(datum.period, groupBy)}
+      rows={[{ text: `${datum.count} ${datum.count === 1 ? 'novo cliente' : 'novos clientes'}` }]}
+    />
+  )
+}
+
+function StatusTooltip({ active, payload, groupBy }: ChartTooltipProps & { groupBy: GroupBy }) {
+  if (!active || !payload || payload.length === 0) return null
+  const datum = payload[0].payload as AppointmentsByStatusPoint
+  return (
+    <TooltipShell
+      title={formatPeriodLong(datum.period, groupBy)}
+      rows={STATUS_META.map((meta) => ({
+        dot: meta.color,
+        text: `${meta.label}: ${datum[meta.key]}`,
+      }))}
     />
   )
 }
@@ -244,6 +320,158 @@ function ChartError({ error, onRetry }: { error: unknown; onRetry: () => void })
   )
 }
 
+/** Barra horizontal genérica com valores em reais (serviços, clientes, colaboradores). Preenche a altura do pai (flex-1 min-h-0). */
+function RevenueBarChart({ data }: { data: RevenueRow[] }) {
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart layout="vertical" data={data} margin={{ top: 8, right: 76, left: 0, bottom: 0 }}>
+        <XAxis
+          type="number"
+          axisLine={false}
+          tickLine={false}
+          tick={AXIS_TICK}
+          tickFormatter={(value: number) => formatCompactBRL(value)}
+        />
+        <YAxis
+          type="category"
+          dataKey="label"
+          width={132}
+          interval={0}
+          axisLine={false}
+          tickLine={false}
+          tick={AXIS_TICK}
+          tickFormatter={(value: string) => truncate(value, 16)}
+        />
+        <Tooltip
+          cursor={{ fill: CHART_COLORS.grid, fillOpacity: 0.4 }}
+          content={<RevenueRowTooltip />}
+        />
+        <Bar
+          dataKey="valueCents"
+          name="Receita"
+          fill={CHART_COLORS.series}
+          maxBarSize={28}
+          radius={[0, 4, 4, 0]}
+        >
+          <LabelList
+            dataKey="valueCents"
+            position="right"
+            fill={CHART_COLORS.axisText}
+            fontSize={12}
+            formatter={(value: number) => formatCompactBRL(value)}
+          />
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
+
+/** Donut de métodos de pagamento com legenda de valores ao lado. Preenche a altura do pai. */
+function PaymentMethodsChart({ data }: { data: RevenueRow[] }) {
+  return (
+    <div className="flex h-full items-center gap-6">
+      <div className="h-full w-full max-w-[180px] shrink-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              dataKey="valueCents"
+              nameKey="label"
+              innerRadius="60%"
+              outerRadius="90%"
+              paddingAngle={3}
+              stroke="none"
+            >
+              {data.map((row) => (
+                <Cell key={row.key} fill={METHOD_COLORS[row.key as PaymentMethod]} />
+              ))}
+            </Pie>
+            <Tooltip content={<RevenueRowTooltip />} />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+        {data.map((row) => (
+          <div key={row.key} className="flex items-center gap-2 text-[13px]">
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: METHOD_COLORS[row.key as PaymentMethod] }}
+              aria-hidden="true"
+            />
+            <span className="truncate text-ink-secondary">{row.label}</span>
+            <span className="ml-auto shrink-0 font-medium text-ink">
+              {formatCompactBRL(row.valueCents)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------- Horários mais movimentados ------------------------ */
+
+/** Total de agendamentos por hora do dia (soma de todos os dias da semana no período) */
+function buildHourlySeries(cells: BusyHourCell[]): { hour: number; count: number }[] {
+  let minHour = 23
+  let maxHour = 0
+  const totals = new Map<number, number>()
+  for (const cell of cells) {
+    minHour = Math.min(minHour, cell.hour)
+    maxHour = Math.max(maxHour, cell.hour)
+    totals.set(cell.hour, (totals.get(cell.hour) ?? 0) + cell.count)
+  }
+  if (minHour > maxHour) {
+    minHour = 8
+    maxHour = 20
+  }
+  const series: { hour: number; count: number }[] = []
+  for (let hour = minHour; hour <= maxHour; hour += 1) {
+    series.push({ hour, count: totals.get(hour) ?? 0 })
+  }
+  return series
+}
+
+function BusyHoursTooltip({ active, payload }: ChartTooltipProps) {
+  if (!active || !payload || payload.length === 0) return null
+  const item = payload[0].payload as { hour: number; count: number }
+  return (
+    <TooltipShell
+      title={`${String(item.hour).padStart(2, '0')}h`}
+      rows={[{ text: `${item.count} ${item.count === 1 ? 'agendamento' : 'agendamentos'}` }]}
+    />
+  )
+}
+
+function BusyHoursChart({ cells }: { cells: BusyHourCell[] }) {
+  const series = useMemo(() => buildHourlySeries(cells), [cells])
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart data={series} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+        <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
+        <XAxis
+          dataKey="hour"
+          axisLine={false}
+          tickLine={false}
+          tick={AXIS_TICK}
+          tickFormatter={(value: number) => `${String(value).padStart(2, '0')}h`}
+        />
+        <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={AXIS_TICK} width={36} />
+        <Tooltip cursor={{ stroke: CHART_COLORS.grid, strokeWidth: 1 }} content={<BusyHoursTooltip />} />
+        <Line
+          type="monotone"
+          dataKey="count"
+          name="Agendamentos"
+          stroke={CHART_COLORS.series}
+          strokeWidth={2}
+          dot={false}
+          activeDot={{ r: 4 }}
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  )
+}
+
 /* --------------------------------- Página -------------------------------- */
 
 export function ReportsPage() {
@@ -274,9 +502,51 @@ export function ReportsPage() {
     enabled: rangeValid,
   })
 
+  const topServicesRevenueQuery = useQuery({
+    queryKey: ['reports', 'top-services', 'revenue', { from, to }],
+    queryFn: () => getTopServices({ from, to, sort: 'revenue' }),
+    enabled: rangeValid,
+  })
+
   const occupancyQuery = useQuery({
     queryKey: ['reports', 'occupancy', { from, to }],
     queryFn: () => getOccupancyReport({ from, to }),
+    enabled: rangeValid,
+  })
+
+  const paymentMethodsQuery = useQuery({
+    queryKey: ['reports', 'payment-methods', { from, to }],
+    queryFn: () => getPaymentMethodsReport({ from, to }),
+    enabled: rangeValid,
+  })
+
+  const topClientsQuery = useQuery({
+    queryKey: ['reports', 'top-clients', { from, to }],
+    queryFn: () => getTopClientsReport({ from, to }),
+    enabled: rangeValid,
+  })
+
+  const revenueByEmployeeQuery = useQuery({
+    queryKey: ['reports', 'revenue-by-employee', { from, to }],
+    queryFn: () => getRevenueByEmployeeReport({ from, to }),
+    enabled: rangeValid,
+  })
+
+  const newClientsQuery = useQuery({
+    queryKey: ['reports', 'new-clients', { from, to, groupBy }],
+    queryFn: () => getNewClientsReport({ from, to, groupBy }),
+    enabled: rangeValid,
+  })
+
+  const statusQuery = useQuery({
+    queryKey: ['reports', 'appointments-by-status', { from, to, groupBy }],
+    queryFn: () => getAppointmentsByStatusReport({ from, to, groupBy }),
+    enabled: rangeValid,
+  })
+
+  const busyHoursQuery = useQuery({
+    queryKey: ['reports', 'busy-hours', { from, to }],
+    queryFn: () => getBusyHoursReport({ from, to }),
     enabled: rangeValid,
   })
 
@@ -285,7 +555,7 @@ export function ReportsPage() {
     if (!rangeValid || !revenueQuery.data) return []
     const keyOf = (period: string) => (groupBy === 'month' ? period.slice(0, 7) : period.slice(0, 10))
     const byPeriod = new Map(revenueQuery.data.map((point) => [keyOf(point.period), point]))
-    const periods = groupBy === 'month' ? buildMonthSequence(from, to) : buildDaySequence(from, to)
+    const periods = buildPeriodSequence(from, to, groupBy)
     return periods.map((period) => ({
       period,
       incomeCents: byPeriod.get(period)?.incomeCents ?? 0,
@@ -310,6 +580,92 @@ export function ReportsPage() {
   const topServicesEmpty =
     topServicesQuery.data !== undefined &&
     (topServices.length === 0 || topServices.every((service) => service.count === 0))
+
+  /** Métodos de pagamento como linhas de barra em reais */
+  const paymentMethodRows = useMemo<RevenueRow[]>(() => {
+    return (paymentMethodsQuery.data ?? [])
+      .filter((item) => item.amountCents > 0)
+      .map((item) => ({
+        key: item.method,
+        label: METHOD_LABELS[item.method],
+        valueCents: item.amountCents,
+      }))
+  }, [paymentMethodsQuery.data])
+  const paymentMethodsTotal = paymentMethodRows.reduce((sum, row) => sum + row.valueCents, 0)
+  const paymentMethodsEmpty =
+    paymentMethodsQuery.data !== undefined && paymentMethodRows.length === 0
+
+  const topServicesRevenueRows = useMemo<RevenueRow[]>(() => {
+    return (topServicesRevenueQuery.data ?? [])
+      .filter((item) => item.revenueCents > 0)
+      .map((item) => ({ key: item.serviceId, label: item.name, valueCents: item.revenueCents }))
+  }, [topServicesRevenueQuery.data])
+  const topServicesRevenueEmpty =
+    topServicesRevenueQuery.data !== undefined && topServicesRevenueRows.length === 0
+
+  const topClientRows = useMemo<RevenueRow[]>(() => {
+    return (topClientsQuery.data ?? [])
+      .filter((item) => item.revenueCents > 0)
+      .map((item) => ({ key: item.clientId, label: item.name, valueCents: item.revenueCents }))
+  }, [topClientsQuery.data])
+  const topClientsEmpty = topClientsQuery.data !== undefined && topClientRows.length === 0
+
+  const employeeRevenueRows = useMemo<RevenueRow[]>(() => {
+    return (revenueByEmployeeQuery.data ?? [])
+      .filter((item) => item.revenueCents > 0)
+      .map((item) => ({ key: item.employeeId, label: item.name, valueCents: item.revenueCents }))
+  }, [revenueByEmployeeQuery.data])
+  const employeeRevenueEmpty =
+    revenueByEmployeeQuery.data !== undefined && employeeRevenueRows.length === 0
+
+  // Altura compartilhada entre os 2 gráficos de cada linha da grade, calculada
+  // pelo maior número de itens dos dois, para as barras nunca ficarem
+  // espremidas nem os cards da mesma linha ficarem com alturas diferentes.
+  const rankingHeight = (...counts: number[]) => Math.max(240, Math.max(...counts) * 44)
+  const servicesRowHeight = rankingHeight(topServices.length, topServicesRevenueRows.length)
+  const peopleRowHeight = rankingHeight(topClientRows.length, employeeRevenueRows.length)
+
+  /** Novos clientes por período, com buracos preenchidos com zero */
+  const filledNewClients = useMemo(() => {
+    if (!rangeValid || !newClientsQuery.data) return []
+    const byPeriod = new Map(newClientsQuery.data.map((point) => [point.period, point.count]))
+    return buildPeriodSequence(from, to, groupBy).map((period) => ({
+      period,
+      count: byPeriod.get(period) ?? 0,
+    }))
+  }, [rangeValid, newClientsQuery.data, from, to, groupBy])
+  const newClientsTotal = (newClientsQuery.data ?? []).reduce((sum, point) => sum + point.count, 0)
+  const newClientsEmpty = newClientsQuery.data !== undefined && newClientsTotal === 0
+
+  /** Agendamentos por status por período, com buracos preenchidos com zero */
+  const filledStatus = useMemo<AppointmentsByStatusPoint[]>(() => {
+    if (!rangeValid || !statusQuery.data) return []
+    const byPeriod = new Map(statusQuery.data.map((point) => [point.period, point]))
+    return buildPeriodSequence(from, to, groupBy).map((period) => {
+      const point = byPeriod.get(period)
+      return {
+        period,
+        confirmed: point?.confirmed ?? 0,
+        pending: point?.pending ?? 0,
+        completed: point?.completed ?? 0,
+        cancelled: point?.cancelled ?? 0,
+      }
+    })
+  }, [rangeValid, statusQuery.data, from, to, groupBy])
+
+  const statusTotals = useMemo(() => {
+    const source = statusQuery.data ?? []
+    const cancelled = source.reduce((sum, point) => sum + point.cancelled, 0)
+    const total = source.reduce(
+      (sum, point) => sum + point.confirmed + point.pending + point.completed + point.cancelled,
+      0,
+    )
+    return { cancelled, total, cancelRate: total > 0 ? Math.round((cancelled / total) * 100) : 0 }
+  }, [statusQuery.data])
+  const statusEmpty = statusQuery.data !== undefined && statusTotals.total === 0
+
+  const busyHours = busyHoursQuery.data ?? []
+  const busyHoursEmpty = busyHoursQuery.data !== undefined && busyHours.length === 0
 
   /** Semana ordenada seg→dom, preenchendo dias ausentes com zero */
   const occupancyData = useMemo<OccupancyBarDatum[]>(() => {
@@ -337,11 +693,33 @@ export function ReportsPage() {
     </span>
   )
 
+  /** Fluxo padrão de estado de um card: skeleton → erro → vazio → conteúdo */
+  function renderChart(options: {
+    query: { isPending: boolean; isError: boolean; error: unknown; refetch: () => void }
+    empty: boolean
+    emptyDescription: string
+    height?: number
+    children: React.ReactNode
+  }) {
+    if (options.query.isPending) return <ChartSkeleton height={options.height} />
+    if (options.query.isError)
+      return <ChartError error={options.query.error} onRetry={() => options.query.refetch()} />
+    if (options.empty)
+      return (
+        <EmptyState
+          icon={BarChart3}
+          title="Sem dados no período"
+          description={options.emptyDescription}
+        />
+      )
+    return <>{options.children}</>
+  }
+
   return (
     <div>
       <PageHeader
         title="Relatórios"
-        description="Acompanhe faturamento, serviços mais procurados e ocupação da agenda"
+        description="Acompanhe faturamento, clientes, serviços e ocupação da agenda"
       />
 
       {/* Toolbar de período: presets + intervalo customizado */}
@@ -397,197 +775,420 @@ export function ReportsPage() {
               <CardTitle>Faturamento no período</CardTitle>
             </CardHeader>
             <CardContent>
-              {revenueQuery.isPending ? (
-                <ChartSkeleton height={300} />
-              ) : revenueQuery.isError ? (
-                <ChartError error={revenueQuery.error} onRetry={() => revenueQuery.refetch()} />
-              ) : revenueEmpty ? (
-                <EmptyState
-                  icon={BarChart3}
-                  title="Sem dados no período"
-                  description="Nenhuma entrada ou saída registrada no intervalo selecionado."
-                />
-              ) : (
-                <>
-                  <p className="mb-4 text-[13px] text-ink-secondary">
-                    Total de entradas:{' '}
-                    <span className="font-semibold text-ink">{formatBRL(totals.incomeCents)}</span>
-                    <span className="mx-1.5 text-ink-disabled">·</span>
-                    Saídas:{' '}
-                    <span className="font-semibold text-ink">{formatBRL(totals.expenseCents)}</span>
-                  </p>
-                  <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={filledRevenue} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
-                        <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
-                        <XAxis
-                          dataKey="period"
-                          axisLine={false}
-                          tickLine={false}
-                          tick={AXIS_TICK}
-                          minTickGap={16}
-                          tickFormatter={(value: string) => formatPeriodTick(value, groupBy)}
-                        />
-                        <YAxis
-                          axisLine={false}
-                          tickLine={false}
-                          tick={AXIS_TICK}
-                          width={84}
-                          tickFormatter={(value: number) => formatCompactBRL(value)}
-                        />
-                        <Tooltip
-                          cursor={{ fill: CHART_COLORS.grid, fillOpacity: 0.4 }}
-                          content={<RevenueTooltip groupBy={groupBy} />}
-                        />
-                        <Legend
-                          iconType="circle"
-                          iconSize={8}
-                          verticalAlign="bottom"
-                          formatter={renderLegendText}
-                        />
-                        <Bar
-                          dataKey="incomeCents"
-                          name="Entradas"
-                          fill={CHART_COLORS.income}
-                          maxBarSize={24}
-                          radius={[4, 4, 0, 0]}
-                        />
-                        <Bar
-                          dataKey="expenseCents"
-                          name="Saídas"
-                          fill={CHART_COLORS.expense}
-                          maxBarSize={24}
-                          radius={[4, 4, 0, 0]}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </>
-              )}
+              {renderChart({
+                query: revenueQuery,
+                empty: revenueEmpty,
+                emptyDescription: 'Nenhuma entrada ou saída registrada no intervalo selecionado.',
+                height: 300,
+                children: (
+                  <>
+                    <p className="mb-4 text-[13px] text-ink-secondary">
+                      Total de entradas:{' '}
+                      <span className="font-semibold text-ink">{formatBRL(totals.incomeCents)}</span>
+                      <span className="mx-1.5 text-ink-disabled">·</span>
+                      Saídas:{' '}
+                      <span className="font-semibold text-ink">
+                        {formatBRL(totals.expenseCents)}
+                      </span>
+                    </p>
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={filledRevenue}
+                          margin={{ top: 8, right: 8, left: 8, bottom: 0 }}
+                        >
+                          <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
+                          <XAxis
+                            dataKey="period"
+                            axisLine={false}
+                            tickLine={false}
+                            tick={AXIS_TICK}
+                            minTickGap={16}
+                            tickFormatter={(value: string) => formatPeriodTick(value, groupBy)}
+                          />
+                          <YAxis
+                            axisLine={false}
+                            tickLine={false}
+                            tick={AXIS_TICK}
+                            width={84}
+                            tickFormatter={(value: number) => formatCompactBRL(value)}
+                          />
+                          <Tooltip
+                            cursor={{ fill: CHART_COLORS.grid, fillOpacity: 0.4 }}
+                            content={<RevenueTooltip groupBy={groupBy} />}
+                          />
+                          <Legend
+                            iconType="circle"
+                            iconSize={8}
+                            verticalAlign="bottom"
+                            formatter={renderLegendText}
+                          />
+                          <Bar
+                            dataKey="incomeCents"
+                            name="Entradas"
+                            fill={CHART_COLORS.income}
+                            maxBarSize={24}
+                            radius={[4, 4, 0, 0]}
+                          />
+                          <Bar
+                            dataKey="expenseCents"
+                            name="Saídas"
+                            fill={CHART_COLORS.expense}
+                            maxBarSize={24}
+                            radius={[4, 4, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </>
+                ),
+              })}
             </CardContent>
           </Card>
 
-          {/* 2. Serviços mais agendados */}
+          {/* 2. Recebido por método */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recebido por método</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {renderChart({
+                query: paymentMethodsQuery,
+                empty: paymentMethodsEmpty,
+                emptyDescription: 'Nenhum pagamento confirmado no intervalo selecionado.',
+                children: (
+                  <>
+                    <p className="mb-4 text-[13px] text-ink-secondary">
+                      Total recebido:{' '}
+                      <span className="font-semibold text-ink">
+                        {formatBRL(paymentMethodsTotal)}
+                      </span>
+                    </p>
+                    <div className="h-[280px]">
+                      <PaymentMethodsChart data={paymentMethodRows} />
+                    </div>
+                  </>
+                ),
+              })}
+            </CardContent>
+          </Card>
+
+          {/* 3. Novos clientes por período */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Novos clientes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {renderChart({
+                query: newClientsQuery,
+                empty: newClientsEmpty,
+                emptyDescription: 'Nenhum cliente cadastrado no intervalo selecionado.',
+                children: (
+                  <>
+                    <p className="mb-4 text-[13px] text-ink-secondary">
+                      Total no período:{' '}
+                      <span className="font-semibold text-ink">{newClientsTotal}</span>
+                    </p>
+                    <div className="h-[280px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart
+                          data={filledNewClients}
+                          margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                        >
+                          <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
+                          <XAxis
+                            dataKey="period"
+                            axisLine={false}
+                            tickLine={false}
+                            tick={AXIS_TICK}
+                            minTickGap={16}
+                            tickFormatter={(value: string) => formatPeriodTick(value, groupBy)}
+                          />
+                          <YAxis
+                            allowDecimals={false}
+                            axisLine={false}
+                            tickLine={false}
+                            tick={AXIS_TICK}
+                            width={36}
+                          />
+                          <Tooltip
+                            cursor={{ stroke: CHART_COLORS.grid, strokeWidth: 1 }}
+                            content={<NewClientsTooltip groupBy={groupBy} />}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="count"
+                            name="Novos clientes"
+                            stroke={CHART_COLORS.series}
+                            strokeWidth={2}
+                            dot={false}
+                            activeDot={{ r: 4 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </>
+                ),
+              })}
+            </CardContent>
+          </Card>
+
+          {/* 4. Serviços mais agendados */}
           <Card>
             <CardHeader>
               <CardTitle>Serviços mais agendados</CardTitle>
             </CardHeader>
             <CardContent>
-              {topServicesQuery.isPending ? (
-                <ChartSkeleton height={280} />
-              ) : topServicesQuery.isError ? (
-                <ChartError
-                  error={topServicesQuery.error}
-                  onRetry={() => topServicesQuery.refetch()}
-                />
-              ) : topServicesEmpty ? (
-                <EmptyState
-                  icon={BarChart3}
-                  title="Sem dados no período"
-                  description="Nenhum serviço agendado no intervalo selecionado."
-                />
-              ) : (
-                <div style={{ height: Math.max(220, topServices.length * 48) }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      layout="vertical"
-                      data={topServices}
-                      margin={{ top: 8, right: 36, left: 0, bottom: 0 }}
-                    >
-                      <XAxis
-                        type="number"
-                        allowDecimals={false}
-                        axisLine={false}
-                        tickLine={false}
-                        tick={AXIS_TICK}
-                      />
-                      <YAxis
-                        type="category"
-                        dataKey="name"
-                        width={140}
-                        interval={0}
-                        axisLine={false}
-                        tickLine={false}
-                        tick={AXIS_TICK}
-                        tickFormatter={(value: string) => truncate(value, 18)}
-                      />
-                      <Tooltip
-                        cursor={{ fill: CHART_COLORS.grid, fillOpacity: 0.4 }}
-                        content={<TopServicesTooltip />}
-                      />
-                      <Bar
-                        dataKey="count"
-                        name="Agendamentos"
-                        fill={CHART_COLORS.series}
-                        barSize={22}
-                        radius={[0, 4, 4, 0]}
+              {renderChart({
+                query: topServicesQuery,
+                empty: topServicesEmpty,
+                emptyDescription: 'Nenhum serviço agendado no intervalo selecionado.',
+                children: (
+                  <div style={{ height: servicesRowHeight }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        layout="vertical"
+                        data={topServices}
+                        margin={{ top: 8, right: 36, left: 0, bottom: 0 }}
                       >
-                        <LabelList
-                          dataKey="count"
-                          position="right"
-                          fill={CHART_COLORS.axisText}
-                          fontSize={12}
+                        <XAxis
+                          type="number"
+                          allowDecimals={false}
+                          axisLine={false}
+                          tickLine={false}
+                          tick={AXIS_TICK}
                         />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
+                        <YAxis
+                          type="category"
+                          dataKey="name"
+                          width={140}
+                          interval={0}
+                          axisLine={false}
+                          tickLine={false}
+                          tick={AXIS_TICK}
+                          tickFormatter={(value: string) => truncate(value, 18)}
+                        />
+                        <Tooltip
+                          cursor={{ fill: CHART_COLORS.grid, fillOpacity: 0.4 }}
+                          content={<TopServicesTooltip />}
+                        />
+                        <Bar
+                          dataKey="count"
+                          name="Agendamentos"
+                          fill={CHART_COLORS.series}
+                          maxBarSize={26}
+                          radius={[0, 4, 4, 0]}
+                        >
+                          <LabelList
+                            dataKey="count"
+                            position="right"
+                            fill={CHART_COLORS.axisText}
+                            fontSize={12}
+                          />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ),
+              })}
             </CardContent>
           </Card>
 
-          {/* 3. Ocupação por dia da semana */}
+          {/* 5. Serviços que mais faturam */}
           <Card>
+            <CardHeader>
+              <CardTitle>Serviços que mais faturam</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {renderChart({
+                query: topServicesRevenueQuery,
+                empty: topServicesRevenueEmpty,
+                emptyDescription: 'Nenhuma receita de serviço no intervalo selecionado.',
+                children: (
+                  <div style={{ height: servicesRowHeight }}>
+                    <RevenueBarChart data={topServicesRevenueRows} />
+                  </div>
+                ),
+              })}
+            </CardContent>
+          </Card>
+
+          {/* 6. Clientes que mais gastam */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Clientes que mais gastam</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {renderChart({
+                query: topClientsQuery,
+                empty: topClientsEmpty,
+                emptyDescription: 'Nenhum faturamento por cliente no intervalo selecionado.',
+                children: (
+                  <div style={{ height: peopleRowHeight }}>
+                    <RevenueBarChart data={topClientRows} />
+                  </div>
+                ),
+              })}
+            </CardContent>
+          </Card>
+
+          {/* 7. Faturamento por colaborador */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Faturamento por colaborador</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {renderChart({
+                query: revenueByEmployeeQuery,
+                empty: employeeRevenueEmpty,
+                emptyDescription: 'Nenhuma receita por colaborador no intervalo selecionado.',
+                children: (
+                  <div style={{ height: peopleRowHeight }}>
+                    <RevenueBarChart data={employeeRevenueRows} />
+                  </div>
+                ),
+              })}
+            </CardContent>
+          </Card>
+
+          {/* 8. Agendamentos por status */}
+          <Card className="xl:col-span-2">
+            <CardHeader>
+              <CardTitle>Agendamentos por status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {renderChart({
+                query: statusQuery,
+                empty: statusEmpty,
+                emptyDescription: 'Nenhum agendamento no intervalo selecionado.',
+                height: 300,
+                children: (
+                  <>
+                    <p className="mb-4 text-[13px] text-ink-secondary">
+                      Total de agendamentos:{' '}
+                      <span className="font-semibold text-ink">{statusTotals.total}</span>
+                      <span className="mx-1.5 text-ink-disabled">·</span>
+                      Taxa de cancelamento:{' '}
+                      <span className="font-semibold text-ink">{statusTotals.cancelRate}%</span>
+                    </p>
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={filledStatus}
+                          margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                        >
+                          <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
+                          <XAxis
+                            dataKey="period"
+                            axisLine={false}
+                            tickLine={false}
+                            tick={AXIS_TICK}
+                            minTickGap={16}
+                            tickFormatter={(value: string) => formatPeriodTick(value, groupBy)}
+                          />
+                          <YAxis
+                            allowDecimals={false}
+                            axisLine={false}
+                            tickLine={false}
+                            tick={AXIS_TICK}
+                            width={36}
+                          />
+                          <Tooltip
+                            cursor={{ fill: CHART_COLORS.grid, fillOpacity: 0.4 }}
+                            content={<StatusTooltip groupBy={groupBy} />}
+                          />
+                          <Legend
+                            iconType="circle"
+                            iconSize={8}
+                            verticalAlign="bottom"
+                            formatter={renderLegendText}
+                          />
+                          {STATUS_META.map((meta) => (
+                            <Bar
+                              key={meta.key}
+                              dataKey={meta.key}
+                              name={meta.label}
+                              stackId="status"
+                              fill={meta.color}
+                              maxBarSize={28}
+                            />
+                          ))}
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </>
+                ),
+              })}
+            </CardContent>
+          </Card>
+
+          {/* 9. Horários mais movimentados */}
+          <Card className="xl:col-span-2">
+            <CardHeader>
+              <CardTitle>Horários mais movimentados</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {renderChart({
+                query: busyHoursQuery,
+                empty: busyHoursEmpty,
+                emptyDescription: 'Nenhum agendamento no intervalo selecionado.',
+                height: 280,
+                children: (
+                  <div className="h-[280px]">
+                    <BusyHoursChart cells={busyHours} />
+                  </div>
+                ),
+              })}
+            </CardContent>
+          </Card>
+
+          {/* 10. Ocupação por dia da semana */}
+          <Card className="xl:col-span-2">
             <CardHeader>
               <CardTitle>Ocupação por dia da semana</CardTitle>
             </CardHeader>
             <CardContent>
-              {occupancyQuery.isPending ? (
-                <ChartSkeleton height={280} />
-              ) : occupancyQuery.isError ? (
-                <ChartError error={occupancyQuery.error} onRetry={() => occupancyQuery.refetch()} />
-              ) : occupancyEmpty ? (
-                <EmptyState
-                  icon={BarChart3}
-                  title="Sem dados no período"
-                  description="Nenhum horário disponível ou agendado no intervalo selecionado."
-                />
-              ) : (
-                <div className="h-[280px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={occupancyData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                      <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
-                      <XAxis
-                        dataKey="label"
-                        interval={0}
-                        axisLine={false}
-                        tickLine={false}
-                        tick={AXIS_TICK}
-                      />
-                      <YAxis
-                        domain={[0, 100]}
-                        ticks={[0, 25, 50, 75, 100]}
-                        axisLine={false}
-                        tickLine={false}
-                        tick={AXIS_TICK}
-                        width={44}
-                        tickFormatter={(value: number) => `${value}%`}
-                      />
-                      <Tooltip
-                        cursor={{ fill: CHART_COLORS.grid, fillOpacity: 0.4 }}
-                        content={<OccupancyTooltip />}
-                      />
-                      <Bar
-                        dataKey="percent"
-                        name="Ocupação"
-                        fill={CHART_COLORS.series}
-                        barSize={22}
-                        radius={[4, 4, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
+              {renderChart({
+                query: occupancyQuery,
+                empty: occupancyEmpty,
+                emptyDescription: 'Nenhum horário disponível ou agendado no intervalo selecionado.',
+                children: (
+                  <div className="h-[280px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={occupancyData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                        <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
+                        <XAxis
+                          dataKey="label"
+                          interval={0}
+                          axisLine={false}
+                          tickLine={false}
+                          tick={AXIS_TICK}
+                        />
+                        <YAxis
+                          domain={[0, 100]}
+                          ticks={[0, 25, 50, 75, 100]}
+                          axisLine={false}
+                          tickLine={false}
+                          tick={AXIS_TICK}
+                          width={44}
+                          tickFormatter={(value: number) => `${value}%`}
+                        />
+                        <Tooltip
+                          cursor={{ fill: CHART_COLORS.grid, fillOpacity: 0.4 }}
+                          content={<OccupancyTooltip />}
+                        />
+                        <Bar
+                          dataKey="percent"
+                          name="Ocupação"
+                          fill={CHART_COLORS.series}
+                          barSize={22}
+                          radius={[4, 4, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ),
+              })}
             </CardContent>
           </Card>
         </div>

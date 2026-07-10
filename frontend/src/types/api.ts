@@ -502,6 +502,42 @@ export interface OccupancyItem {
   rate: number
 }
 
+export interface PaymentMethodItem {
+  method: PaymentMethod
+  amountCents: number
+}
+
+export interface TopClient {
+  clientId: string
+  name: string
+  revenueCents: number
+}
+
+export interface EmployeeRevenue {
+  employeeId: string
+  name: string
+  revenueCents: number
+}
+
+export interface NewClientsPoint {
+  period: string
+  count: number
+}
+
+export interface AppointmentsByStatusPoint {
+  period: string
+  confirmed: number
+  pending: number
+  completed: number
+  cancelled: number
+}
+
+export interface BusyHourCell {
+  dayOfWeek: number
+  hour: number
+  count: number
+}
+
 export interface PlanInfo {
   plan: string
   limits: { employees: number; establishments: number }

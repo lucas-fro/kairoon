@@ -17,7 +17,7 @@ import { useAuth } from '../../contexts/AuthContext'
 const TABS: TabItem[] = [
   { key: 'estabelecimento', label: 'Estabelecimento', icon: Store },
   { key: 'servicos', label: 'Serviços', icon: Scissors },
-  { key: 'funcionarios', label: 'Funcionários', icon: Users },
+  { key: 'funcionarios', label: 'Colaboradores', icon: Users },
   { key: 'funcionamento', label: 'Expediente', icon: Clock },
   { key: 'aparencia', label: 'Aparência', icon: Palette },
   { key: 'plano', label: 'Plano', icon: Crown },

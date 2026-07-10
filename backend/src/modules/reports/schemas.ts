@@ -9,9 +9,23 @@ export const dateRangeQuerySchema = z.object({
   to: dateStringSchema('Data final inválida (use YYYY-MM-DD)').optional(),
 })
 
+const groupByField = z.enum(['day', 'month']).default('day')
+
 export const revenueQuerySchema = dateRangeQuerySchema.extend({
-  groupBy: z.enum(['day', 'month']).default('day'),
+  groupBy: groupByField,
+})
+
+// Relatórios agrupados por período (novos clientes, agendamentos por status).
+export const groupedQuerySchema = dateRangeQuerySchema.extend({
+  groupBy: groupByField,
+})
+
+// Serviços: ranking por volume de agendamentos ou por receita.
+export const topServicesQuerySchema = dateRangeQuerySchema.extend({
+  sort: z.enum(['count', 'revenue']).default('count'),
 })
 
 export type DateRangeQuery = z.infer<typeof dateRangeQuerySchema>
 export type RevenueQuery = z.infer<typeof revenueQuerySchema>
+export type GroupedQuery = z.infer<typeof groupedQuerySchema>
+export type TopServicesQuery = z.infer<typeof topServicesQuerySchema>

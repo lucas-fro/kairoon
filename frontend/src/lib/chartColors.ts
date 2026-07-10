@@ -17,3 +17,23 @@ export const CHART_COLORS = {
   /** Texto de eixos, ticks e rótulos (token ink-tertiary) */
   axisText: '#94A3B8',
 } as const
+
+/**
+ * Cores por status de agendamento (gráfico empilhado). Reaproveitam a família
+ * da marca: azul = concluído, verde = confirmado, cinza = pendente, âmbar =
+ * cancelado (mesmo âmbar das saídas, seguro para CVD contra o azul).
+ */
+export const STATUS_COLORS = {
+  completed: '#3B7DE0',
+  confirmed: '#0F8A6D',
+  pending: '#94A3B8',
+  cancelled: '#D97706',
+} as const
+
+/** Cores por método de pagamento (donut de "Recebido por método"). */
+export const METHOD_COLORS = {
+  cash: '#0F8A6D',
+  pix: '#3B7DE0',
+  debit: '#8B5CF6',
+  credit: '#D97706',
+} as const

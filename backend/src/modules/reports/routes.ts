@@ -1,5 +1,10 @@
 import type { FastifyInstance } from 'fastify'
-import { dateRangeQuerySchema, revenueQuerySchema } from './schemas'
+import {
+  dateRangeQuerySchema,
+  groupedQuerySchema,
+  revenueQuerySchema,
+  topServicesQuerySchema,
+} from './schemas'
 import * as reportsService from './service'
 
 export async function reportsRoutes(app: FastifyInstance) {
@@ -11,12 +16,42 @@ export async function reportsRoutes(app: FastifyInstance) {
   })
 
   app.get('/top-services', async (request) => {
-    const query = dateRangeQuerySchema.parse(request.query)
+    const query = topServicesQuerySchema.parse(request.query)
     return reportsService.getTopServicesReport(request.user.establishmentId, query)
   })
 
   app.get('/occupancy', async (request) => {
     const query = dateRangeQuerySchema.parse(request.query)
     return reportsService.getOccupancyReport(request.user.establishmentId, query)
+  })
+
+  app.get('/payment-methods', async (request) => {
+    const query = dateRangeQuerySchema.parse(request.query)
+    return reportsService.getPaymentMethodsReport(request.user.establishmentId, query)
+  })
+
+  app.get('/top-clients', async (request) => {
+    const query = dateRangeQuerySchema.parse(request.query)
+    return reportsService.getTopClientsReport(request.user.establishmentId, query)
+  })
+
+  app.get('/revenue-by-employee', async (request) => {
+    const query = dateRangeQuerySchema.parse(request.query)
+    return reportsService.getRevenueByEmployeeReport(request.user.establishmentId, query)
+  })
+
+  app.get('/new-clients', async (request) => {
+    const query = groupedQuerySchema.parse(request.query)
+    return reportsService.getNewClientsReport(request.user.establishmentId, query)
+  })
+
+  app.get('/appointments-by-status', async (request) => {
+    const query = groupedQuerySchema.parse(request.query)
+    return reportsService.getAppointmentsByStatusReport(request.user.establishmentId, query)
+  })
+
+  app.get('/busy-hours', async (request) => {
+    const query = dateRangeQuerySchema.parse(request.query)
+    return reportsService.getBusyHoursReport(request.user.establishmentId, query)
   })
 }

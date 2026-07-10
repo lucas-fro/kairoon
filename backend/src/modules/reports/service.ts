@@ -1,9 +1,16 @@
 import { and, asc, desc, eq, gte, lte, ne, sql } from 'drizzle-orm'
 import { db } from '../../db'
-import { appointments, employees, services, transactions, workingHours } from '../../db/schema'
+import {
+  appointments,
+  clients,
+  employees,
+  services,
+  transactions,
+  workingHours,
+} from '../../db/schema'
 import { addDays, getDayOfWeek, timeToMinutes, todayStr } from '../../lib/datetime'
 import { AppError } from '../../lib/errors'
-import type { DateRangeQuery, RevenueQuery } from './schemas'
+import type { DateRangeQuery, GroupedQuery, RevenueQuery, TopServicesQuery } from './schemas'
 
 const MAX_RANGE_DAYS = 400
 
@@ -57,17 +64,19 @@ export async function getRevenueReport(establishmentId: string, query: RevenueQu
   }))
 }
 
-export async function getTopServicesReport(establishmentId: string, query: DateRangeQuery) {
+export async function getTopServicesReport(establishmentId: string, query: TopServicesQuery) {
   const { from, to } = resolveDateRange(query)
 
   const countExpr = sql<string>`count(*)`
+  const revenueExpr = sql<string>`coalesce(sum(${services.priceCents}), 0)`
+  const orderExpr = query.sort === 'revenue' ? revenueExpr : countExpr
 
   const rows = await db
     .select({
       serviceId: services.id,
       name: services.name,
       count: countExpr,
-      revenueCents: sql<string>`coalesce(sum(${services.priceCents}), 0)`,
+      revenueCents: revenueExpr,
     })
     .from(appointments)
     .innerJoin(services, eq(appointments.serviceId, services.id))
@@ -80,7 +89,7 @@ export async function getTopServicesReport(establishmentId: string, query: DateR
       ),
     )
     .groupBy(services.id, services.name)
-    .orderBy(desc(countExpr))
+    .orderBy(desc(orderExpr))
     .limit(10)
 
   return rows.map((row) => ({
@@ -89,6 +98,216 @@ export async function getTopServicesReport(establishmentId: string, query: DateR
     count: Number(row.count),
     revenueCents: Number(row.revenueCents),
   }))
+}
+
+/**
+ * Total recebido por método de pagamento (dinheiro, pix, débito, crédito).
+ * Fonte: o snapshot `payments` dos atendimentos concluídos no período — é o
+ * único lugar com o dinheiro discriminado por método.
+ */
+export async function getPaymentMethodsReport(establishmentId: string, query: DateRangeQuery) {
+  const { from, to } = resolveDateRange(query)
+
+  const rows = await db
+    .select({ payments: appointments.payments })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.establishmentId, establishmentId),
+        gte(appointments.date, from),
+        lte(appointments.date, to),
+        eq(appointments.status, 'completed'),
+      ),
+    )
+
+  const totals: Record<'cash' | 'pix' | 'debit' | 'credit', number> = {
+    cash: 0,
+    pix: 0,
+    debit: 0,
+    credit: 0,
+  }
+  for (const row of rows) {
+    for (const payment of row.payments ?? []) {
+      totals[payment.method] += payment.amountCents
+    }
+  }
+
+  return (['cash', 'pix', 'debit', 'credit'] as const).map((method) => ({
+    method,
+    amountCents: totals[method],
+  }))
+}
+
+/**
+ * Clientes que mais gastam: faturamento líquido acumulado por cliente. Usa as
+ * receitas do caixa (transactions type=income) atreladas a atendimentos, de
+ * modo que estornos (reabertura apaga a receita) já entram descontados.
+ */
+export async function getTopClientsReport(establishmentId: string, query: DateRangeQuery) {
+  const { from, to } = resolveDateRange(query)
+
+  const revenueExpr = sql<string>`coalesce(sum(${transactions.amountCents}), 0)`
+
+  const rows = await db
+    .select({
+      clientId: clients.id,
+      name: clients.name,
+      revenueCents: revenueExpr,
+    })
+    .from(transactions)
+    .innerJoin(appointments, eq(transactions.appointmentId, appointments.id))
+    .innerJoin(clients, eq(appointments.clientId, clients.id))
+    .where(
+      and(
+        eq(transactions.establishmentId, establishmentId),
+        eq(transactions.type, 'income'),
+        gte(transactions.date, from),
+        lte(transactions.date, to),
+      ),
+    )
+    .groupBy(clients.id, clients.name)
+    .orderBy(desc(revenueExpr))
+    .limit(10)
+
+  return rows.map((row) => ({
+    clientId: row.clientId,
+    name: row.name,
+    revenueCents: Number(row.revenueCents),
+  }))
+}
+
+/** Faturamento por recurso: receita bruta (sem comissão) gerada por profissional. */
+export async function getRevenueByEmployeeReport(establishmentId: string, query: DateRangeQuery) {
+  const { from, to } = resolveDateRange(query)
+
+  const revenueExpr = sql<string>`coalesce(sum(${transactions.amountCents}), 0)`
+
+  const rows = await db
+    .select({
+      employeeId: employees.id,
+      name: employees.name,
+      revenueCents: revenueExpr,
+    })
+    .from(transactions)
+    .innerJoin(appointments, eq(transactions.appointmentId, appointments.id))
+    .innerJoin(employees, eq(appointments.employeeId, employees.id))
+    .where(
+      and(
+        eq(transactions.establishmentId, establishmentId),
+        eq(transactions.type, 'income'),
+        gte(transactions.date, from),
+        lte(transactions.date, to),
+      ),
+    )
+    .groupBy(employees.id, employees.name)
+    .orderBy(desc(revenueExpr))
+    .limit(10)
+
+  return rows.map((row) => ({
+    employeeId: row.employeeId,
+    name: row.name,
+    revenueCents: Number(row.revenueCents),
+  }))
+}
+
+/** Novos clientes cadastrados por período (dia ou mês). */
+export async function getNewClientsReport(establishmentId: string, query: GroupedQuery) {
+  const { from, to } = resolveDateRange(query)
+
+  const periodExpr =
+    query.groupBy === 'month'
+      ? sql<string>`to_char(${clients.createdAt}, 'YYYY-MM')`
+      : sql<string>`(${clients.createdAt}::date)::text`
+
+  const rows = await db
+    .select({
+      period: periodExpr,
+      count: sql<string>`count(*)`,
+    })
+    .from(clients)
+    .where(
+      and(
+        eq(clients.establishmentId, establishmentId),
+        sql`${clients.createdAt}::date >= ${from}`,
+        sql`${clients.createdAt}::date <= ${to}`,
+      ),
+    )
+    .groupBy(periodExpr)
+    .orderBy(asc(periodExpr))
+
+  return rows.map((row) => ({ period: row.period, count: Number(row.count) }))
+}
+
+/** Volume de agendamentos por período e status (pivotado por status). */
+export async function getAppointmentsByStatusReport(establishmentId: string, query: GroupedQuery) {
+  const { from, to } = resolveDateRange(query)
+
+  const periodExpr =
+    query.groupBy === 'month'
+      ? sql<string>`to_char(${appointments.date}, 'YYYY-MM')`
+      : sql<string>`${appointments.date}`
+
+  const rows = await db
+    .select({
+      period: periodExpr,
+      status: appointments.status,
+      count: sql<string>`count(*)`,
+    })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.establishmentId, establishmentId),
+        gte(appointments.date, from),
+        lte(appointments.date, to),
+      ),
+    )
+    .groupBy(periodExpr, appointments.status)
+    .orderBy(asc(periodExpr))
+
+  const byPeriod = new Map<
+    string,
+    { period: string; confirmed: number; pending: number; completed: number; cancelled: number }
+  >()
+  for (const row of rows) {
+    const bucket =
+      byPeriod.get(row.period) ??
+      { period: row.period, confirmed: 0, pending: 0, completed: 0, cancelled: 0 }
+    bucket[row.status] = Number(row.count)
+    byPeriod.set(row.period, bucket)
+  }
+
+  return Array.from(byPeriod.values()).sort((a, b) => a.period.localeCompare(b.period))
+}
+
+/** Horários mais movimentados: contagem de agendamentos por dia da semana e hora. */
+export async function getBusyHoursReport(establishmentId: string, query: DateRangeQuery) {
+  const { from, to } = resolveDateRange(query)
+
+  const rows = await db
+    .select({ date: appointments.date, startTime: appointments.startTime })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.establishmentId, establishmentId),
+        gte(appointments.date, from),
+        lte(appointments.date, to),
+        ne(appointments.status, 'cancelled'),
+      ),
+    )
+
+  // Matriz [dia da semana 0..6][hora 0..23] agregada em TypeScript.
+  const cells = new Map<string, { dayOfWeek: number; hour: number; count: number }>()
+  for (const row of rows) {
+    const dayOfWeek = getDayOfWeek(row.date)
+    const hour = Number(row.startTime.slice(0, 2))
+    if (Number.isNaN(hour)) continue
+    const key = `${dayOfWeek}-${hour}`
+    const cell = cells.get(key) ?? { dayOfWeek, hour, count: 0 }
+    cell.count += 1
+    cells.set(key, cell)
+  }
+
+  return Array.from(cells.values())
 }
 
 export async function getOccupancyReport(establishmentId: string, query: DateRangeQuery) {
