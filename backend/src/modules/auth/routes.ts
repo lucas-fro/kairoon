@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify'
 import {
-  confirmPasswordResetSchema,
+  forgotPasswordRequestSchema,
+  forgotPasswordResetSchema,
+  forgotPasswordVerifySchema,
   loginSchema,
   registerSchema,
   slugAvailabilitySchema,
@@ -43,22 +45,32 @@ export async function authRoutes(app: FastifyInstance) {
     return authService.updateProfile(request.user.sub, input)
   })
 
-  // Redefinição de senha por código no e-mail (usuário logado, na aba Conta).
-  // Rate limit protege contra spam de e-mail e força bruta do código.
+  // Recuperação de senha pública, por código no e-mail (3 passos). Rate limit por
+  // IP protege contra spam de e-mail e força bruta do código de 6 dígitos.
   app.post(
-    '/password-reset/request',
-    { preHandler: [app.authenticate], config: { rateLimit: { max: 3, timeWindow: '5 minutes' } } },
+    '/forgot-password/request',
+    { config: { rateLimit: { max: 5, timeWindow: '15 minutes' } } },
     async (request) => {
-      return authService.requestPasswordReset(request.user.sub)
+      const { email } = forgotPasswordRequestSchema.parse(request.body)
+      return authService.requestPasswordResetByEmail(email)
     },
   )
 
   app.post(
-    '/password-reset/confirm',
-    { preHandler: [app.authenticate], config: { rateLimit: { max: 6, timeWindow: '5 minutes' } } },
+    '/forgot-password/verify',
+    { config: { rateLimit: { max: 20, timeWindow: '5 minutes' } } },
     async (request) => {
-      const { code, newPassword } = confirmPasswordResetSchema.parse(request.body)
-      return authService.confirmPasswordReset(request.user.sub, code, newPassword)
+      const { email, code } = forgotPasswordVerifySchema.parse(request.body)
+      return authService.verifyPasswordResetCode(email, code)
+    },
+  )
+
+  app.post(
+    '/forgot-password/reset',
+    { config: { rateLimit: { max: 10, timeWindow: '15 minutes' } } },
+    async (request) => {
+      const { email, code, newPassword } = forgotPasswordResetSchema.parse(request.body)
+      return authService.resetPasswordByEmail(email, code, newPassword)
     },
   )
 }

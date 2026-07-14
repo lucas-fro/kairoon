@@ -55,12 +55,29 @@ export function getMe() {
   return api<{ user: User; establishment: Establishment }>('/auth/me')
 }
 
-/** Envia um código de redefinição de senha para o e-mail do usuário logado. */
-export function requestPasswordReset() {
-  return api<{ email: string }>('/auth/password-reset/request', { method: 'POST' })
+/** Passo 1: envia um código de redefinição para o e-mail da conta (resposta genérica). */
+export function requestPasswordReset(email: string) {
+  return api<{ ok: true }>('/auth/forgot-password/request', {
+    method: 'POST',
+    body: { email },
+    auth: false,
+  })
 }
 
-/** Confere o código e troca a senha. */
-export function confirmPasswordReset(data: { code: string; newPassword: string }) {
-  return api<{ ok: true }>('/auth/password-reset/confirm', { method: 'POST', body: data })
+/** Passo 2: valida o código (sem consumir), antes de mostrar os campos de senha. */
+export function verifyPasswordResetCode(email: string, code: string) {
+  return api<{ valid: true }>('/auth/forgot-password/verify', {
+    method: 'POST',
+    body: { email, code },
+    auth: false,
+  })
+}
+
+/** Passo 3: confere o código e troca a senha. */
+export function resetPassword(email: string, code: string, newPassword: string) {
+  return api<{ ok: true }>('/auth/forgot-password/reset', {
+    method: 'POST',
+    body: { email, code, newPassword },
+    auth: false,
+  })
 }

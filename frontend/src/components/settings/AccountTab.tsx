@@ -22,7 +22,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { Input } from '../ui/Input'
 import { useToast } from '../ui/Toast'
-import { PasswordResetDialog } from './PasswordResetDialog'
 
 const EMAIL_REGEX = /^\S+@\S+\.\S+$/
 
@@ -31,7 +30,6 @@ export function AccountTab() {
   const navigate = useNavigate()
   const toast = useToast()
   const [confirmOpen, setConfirmOpen] = useState(false)
-  const [resetOpen, setResetOpen] = useState(false)
 
   const [name, setName] = useState(user?.name ?? '')
   const [email, setEmail] = useState(user?.email ?? '')
@@ -161,7 +159,7 @@ export function AccountTab() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => setResetOpen(true)}
+              onClick={() => navigate('/recuperar-senha', { state: { email: user?.email } })}
               className="shrink-0"
             >
               Redefinir senha
@@ -169,12 +167,6 @@ export function AccountTab() {
           </div>
         </CardContent>
       </Card>
-
-      <PasswordResetDialog
-        open={resetOpen}
-        onClose={() => setResetOpen(false)}
-        email={user?.email ?? ''}
-      />
 
       <Card className="border border-error/30">
         <CardContent>

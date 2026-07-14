@@ -152,58 +152,69 @@ export async function getProfile(userId: string) {
 }
 
 /**
- * Gera um código de 6 dígitos, guarda o hash + validade (5 min) no usuário e
- * envia por e-mail. Sobrescreve qualquer código anterior. Devolve o e-mail de
- * destino (o próprio do usuário logado) para a UI exibir.
+ * Passo 1 (público): gera um código de 6 dígitos para o e-mail informado, guarda
+ * o hash + validade (5 min) e envia por e-mail. A resposta é sempre genérica
+ * (ok) — não revela se o e-mail existe (evita enumeração de contas). O envio é
+ * fire-and-forget para não vazar existência por erro/tempo de resposta.
  */
-export async function requestPasswordReset(userId: string) {
-  const user = await db.query.users.findFirst({ where: eq(users.id, userId) })
-  if (!user) throw new AppError('Usuário não encontrado', 404)
+export async function requestPasswordResetByEmail(email: string) {
+  const normalized = email.toLowerCase().trim()
+  const user = await db.query.users.findFirst({ where: eq(users.email, normalized) })
 
-  const code = String(randomInt(0, 1_000_000)).padStart(6, '0')
-  const passwordResetCodeHash = await bcrypt.hash(code, 10)
-  const passwordResetExpiresAt = new Date(Date.now() + RESET_CODE_TTL_MS)
+  if (user) {
+    const code = String(randomInt(0, 1_000_000)).padStart(6, '0')
+    const passwordResetCodeHash = await bcrypt.hash(code, 10)
+    const passwordResetExpiresAt = new Date(Date.now() + RESET_CODE_TTL_MS)
 
-  await db
-    .update(users)
-    .set({ passwordResetCodeHash, passwordResetExpiresAt })
-    .where(eq(users.id, userId))
+    await db
+      .update(users)
+      .set({ passwordResetCodeHash, passwordResetExpiresAt })
+      .where(eq(users.id, user.id))
 
-  // Awaited: se o envio falhar (Resend configurado mas com erro), o erro sobe e
-  // a UI avisa. Sem RESEND_API_KEY, o mailer loga o código e não lança (dev).
-  await sendPasswordResetEmail(user.email, user.name, code)
+    void sendPasswordResetEmail(user.email, user.name, code).catch((err) =>
+      console.error('[auth] falha ao enviar código de redefinição:', err),
+    )
+  } else {
+    // Roda um bcrypt "à toa" quando a conta não existe, para o tempo de resposta
+    // não denunciar a existência do e-mail (a diferença dominante é o hash).
+    await bcrypt.hash('uniform-timing-placeholder', 10)
+  }
 
-  return { email: user.email }
+  return { ok: true as const }
 }
 
 /**
- * Confere o código (válido e não expirado) e troca a senha. Consome o código
- * (limpa os campos) em qualquer desfecho terminal — sucesso ou expiração.
+ * Localiza o usuário pelo e-mail e confere o código (válido e não expirado) sem
+ * consumi-lo. Retorna null em qualquer falha — o chamador devolve sempre a mesma
+ * mensagem, sem distinguir e-mail inexistente de código errado.
  */
-export async function confirmPasswordReset(userId: string, code: string, newPassword: string) {
-  const user = await db.query.users.findFirst({ where: eq(users.id, userId) })
-  if (!user) throw new AppError('Usuário não encontrado', 404)
-
-  if (!user.passwordResetCodeHash || !user.passwordResetExpiresAt) {
-    throw new AppError('Solicite um novo código de redefinição', 400)
-  }
-
-  if (user.passwordResetExpiresAt.getTime() < Date.now()) {
-    await db
-      .update(users)
-      .set({ passwordResetCodeHash: null, passwordResetExpiresAt: null })
-      .where(eq(users.id, userId))
-    throw new AppError('O código expirou. Solicite um novo.', 400)
-  }
-
+async function findUserForResetCode(email: string, code: string) {
+  const user = await db.query.users.findFirst({
+    where: eq(users.email, email.toLowerCase().trim()),
+  })
+  if (!user || !user.passwordResetCodeHash || !user.passwordResetExpiresAt) return null
+  if (user.passwordResetExpiresAt.getTime() < Date.now()) return null
   const matches = await bcrypt.compare(code, user.passwordResetCodeHash)
-  if (!matches) throw new AppError('Código inválido', 400)
+  return matches ? user : null
+}
+
+/** Passo 2 (público): valida o código sem consumi-lo, antes de pedir a nova senha. */
+export async function verifyPasswordResetCode(email: string, code: string) {
+  const user = await findUserForResetCode(email, code)
+  if (!user) throw new AppError('Código inválido ou expirado', 400)
+  return { valid: true as const }
+}
+
+/** Passo 3 (público): revalida o código e troca a senha, consumindo o código. */
+export async function resetPasswordByEmail(email: string, code: string, newPassword: string) {
+  const user = await findUserForResetCode(email, code)
+  if (!user) throw new AppError('Código inválido ou expirado', 400)
 
   const passwordHash = await bcrypt.hash(newPassword, 10)
   await db
     .update(users)
     .set({ passwordHash, passwordResetCodeHash: null, passwordResetExpiresAt: null })
-    .where(eq(users.id, userId))
+    .where(eq(users.id, user.id))
 
   return { ok: true as const }
 }
