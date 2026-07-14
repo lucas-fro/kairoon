@@ -121,16 +121,15 @@ interface ForecastItem {
   posted: boolean
   transactionId: string | null
   paidDate: string | null
-  /** só em payroll: comissão do profissional no mês (informativo, não somado) */
+  /** só em payroll: comissão do mês inclusa no valor a pagar (na última parcela) */
   commissionCents: number | null
 }
 
 /**
  * Previsão dos custos fixos do mês: custos fixos manuais + os pagamentos de
  * folha de cada profissional (um item por dia de pagamento). Marca cada item
- * como pago quando há uma transação vinculada no mês. Nos itens de folha,
- * anexa a comissão do profissional no mês (apenas para dar noção, não entra no
- * total das saídas).
+ * como pago quando há uma transação vinculada no mês. Na última parcela de cada
+ * profissional soma a comissão do mês ao valor a pagar — é saída real do caixa.
  */
 export async function getForecast(establishmentId: string, month?: string) {
   const targetMonth = month ?? currentMonth()
@@ -219,23 +218,30 @@ export async function getForecast(establishmentId: string, month?: string) {
   }
 
   for (const employee of activeEmployees) {
-    const commissionCents = commissionByEmployee.get(employee.id) ?? 0
+    const monthCommission = commissionByEmployee.get(employee.id) ?? 0
     const validDays = (employee.paymentDays ?? []).filter((pd) => pd.amountCents > 0)
     validDays.forEach((paymentDay, index) => {
       const posted = postedByPayroll.get(`${employee.id}:${paymentDay.day}`)
+      // Comissão do mês entra na última parcela (para não duplicar). Se já pago,
+      // extrai o que efetivamente foi incluído na transação (valor − salário).
+      const isLast = index === validDays.length - 1
+      const includedCommission = posted
+        ? Math.max(0, posted.amountCents - paymentDay.amountCents)
+        : isLast
+          ? monthCommission
+          : 0
       items.push({
         kind: 'payroll',
         id: `${employee.id}:${paymentDay.day}`,
         employeeId: employee.id,
         description: `Salário de ${employee.name}`,
-        amountCents: posted ? posted.amountCents : paymentDay.amountCents,
+        amountCents: posted ? posted.amountCents : paymentDay.amountCents + includedCommission,
         dayOfMonth: paymentDay.day,
         dueDate: dueDateFor(targetMonth, paymentDay.day),
         posted: Boolean(posted),
         transactionId: posted?.id ?? null,
         paidDate: posted?.date ?? null,
-        // Comissão (informativa) só na última parcela, para não duplicar
-        commissionCents: index === validDays.length - 1 ? commissionCents : null,
+        commissionCents: includedCommission > 0 ? includedCommission : null,
       })
     })
   }
@@ -336,14 +342,41 @@ export async function settlePayroll(
   })
   if (existing) throw new AppError('Este pagamento já foi baixado neste mês', 409)
 
+  // Na última parcela do profissional, soma a comissão do mês ao pagamento —
+  // é saída real do caixa, então precisa ser contabilizada na baixa.
+  const validDays = (employee.paymentDays ?? []).filter((p) => p.amountCents > 0)
+  const isLastPaymentDay =
+    validDays.length > 0 && validDays[validDays.length - 1].day === day
+
+  let amountCents = paymentDay.amountCents
+  let description = `Salário de ${employee.name}`
+  if (isLastPaymentDay) {
+    const [commRow] = await db
+      .select({ total: sql<string>`coalesce(sum(${commissionEntries.commissionCents}), 0)` })
+      .from(commissionEntries)
+      .where(
+        and(
+          eq(commissionEntries.establishmentId, establishmentId),
+          eq(commissionEntries.employeeId, employeeId),
+          gte(commissionEntries.date, monthStart),
+          lte(commissionEntries.date, monthEnd),
+        ),
+      )
+    const commissionCents = Number(commRow?.total ?? 0)
+    if (commissionCents > 0) {
+      amountCents += commissionCents
+      description = `Salário + comissão de ${employee.name}`
+    }
+  }
+
   const [transaction] = await db
     .insert(transactions)
     .values({
       establishmentId,
       employeeId,
       payrollDay: day,
-      description: `Salário de ${employee.name}`,
-      amountCents: paymentDay.amountCents,
+      description,
+      amountCents,
       type: 'expense',
       date: settleDate(month, day),
     })

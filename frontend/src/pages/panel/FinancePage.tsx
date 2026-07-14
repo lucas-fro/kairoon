@@ -5,6 +5,7 @@ import {
   ArrowUpCircle,
   CalendarClock,
   Check,
+  ListFilter,
   Percent,
   Plus,
   Wallet,
@@ -21,6 +22,7 @@ import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { Dialog } from '../../components/ui/Dialog'
+import { DropdownMenu } from '../../components/ui/DropdownMenu'
 import { DialogActions } from '../../components/ui/DialogActions'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Input } from '../../components/ui/Input'
@@ -317,7 +319,7 @@ function FixedCostsForecast({ month }: { month: string }) {
                       </div>
                       {item.kind === 'payroll' && commissionCents > 0 && (
                         <div className="text-xs text-ink-tertiary">
-                          + {formatBRL(commissionCents)} em comissão
+                          inclui {formatBRL(commissionCents)} de comissão
                         </div>
                       )}
                     </Td>
@@ -436,73 +438,114 @@ export function FinancePage() {
   const balanceNegative = (summary?.balanceCents ?? 0) < 0
   const hasReceivable = (summary?.receivableTotalCents ?? 0) > 0
 
+  // Filtros reutilizados inline (desktop) e dentro do painel de filtros (mobile).
+  const presetButtons = (
+    <div className="flex flex-wrap items-center gap-2">
+      {presets.map((preset) => {
+        const active = from === preset.from && to === preset.to
+        return (
+          <Button
+            key={preset.label}
+            type="button"
+            size="sm"
+            variant={active ? 'secondary' : 'ghost'}
+            onClick={() => {
+              setFrom(preset.from)
+              setTo(preset.to)
+            }}
+          >
+            {preset.label}
+          </Button>
+        )
+      })}
+    </div>
+  )
+
+  const renderDateRange = (full: boolean) => (
+    <div className={cn('flex items-center gap-2', full && 'w-full')}>
+      <div className={full ? 'flex-1' : 'w-40'}>
+        <Input
+          type="date"
+          aria-label="Data inicial"
+          value={from}
+          max={to}
+          onChange={(e) => setFrom(e.target.value)}
+        />
+      </div>
+      <span className="text-sm text-ink-tertiary">até</span>
+      <div className={full ? 'flex-1' : 'w-40'}>
+        <Input
+          type="date"
+          aria-label="Data final"
+          value={to}
+          min={from}
+          onChange={(e) => setTo(e.target.value)}
+        />
+      </div>
+    </div>
+  )
+
+  const renderTypeFilter = (full: boolean) => (
+    <div className={full ? 'w-full' : 'w-40'}>
+      <SelectMenu
+        ariaLabel="Tipo de lançamento"
+        value={typeFilter}
+        onChange={(v) => setTypeFilter(v as TransactionType | '')}
+        options={[
+          { value: '', label: 'Todos' },
+          { value: 'income', label: 'Entradas' },
+          { value: 'expense', label: 'Saídas' },
+        ]}
+      />
+    </div>
+  )
+
+  const lancamentoButton = (
+    <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={openNewDialog}>
+      Lançamento
+    </Button>
+  )
+
   return (
     <div>
-      <PageHeader
-        title="Financeiro"
-        actions={
-          <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={openNewDialog}>
-            Novo lançamento
-          </Button>
-        }
-      />
+      <PageHeader title="Financeiro" />
 
-      {/* Toolbar de filtros */}
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          {presets.map((preset) => {
-            const active = from === preset.from && to === preset.to
-            return (
-              <Button
-                key={preset.label}
-                type="button"
-                size="sm"
-                variant={active ? 'secondary' : 'ghost'}
-                onClick={() => {
-                  setFrom(preset.from)
-                  setTo(preset.to)
-                }}
-              >
-                {preset.label}
-              </Button>
-            )
-          })}
-        </div>
+      {/* Toolbar desktop: filtros inline + Lançamento */}
+      <div className="mb-6 hidden flex-wrap items-center gap-3 lg:flex">
+        {presetButtons}
+        {renderDateRange(false)}
+        {renderTypeFilter(false)}
+        <div className="ml-auto">{lancamentoButton}</div>
+      </div>
 
-        <div className="flex items-center gap-2">
-          <div className="w-40">
-            <Input
-              type="date"
-              aria-label="Data inicial"
-              value={from}
-              max={to}
-              onChange={(e) => setFrom(e.target.value)}
-            />
-          </div>
-          <span className="text-sm text-ink-tertiary">até</span>
-          <div className="w-40">
-            <Input
-              type="date"
-              aria-label="Data final"
-              value={to}
-              min={from}
-              onChange={(e) => setTo(e.target.value)}
-            />
-          </div>
-        </div>
+      {/* Toolbar tablet/mobile: filtros dentro do funil + Lançamento */}
+      <div className="mb-6 flex items-center gap-2 lg:hidden">
+        <DropdownMenu
+          align="start"
+          closeOnItemClick={false}
+          panelClassName="w-[min(22rem,calc(100vw-2rem))] space-y-3 p-3"
+          renderTrigger={({ open, toggle }) => (
+            <button
+              type="button"
+              onClick={toggle}
+              aria-haspopup="menu"
+              aria-expanded={open}
+              aria-label="Filtros do financeiro"
+              className={cn(
+                'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors',
+                open ? 'text-primary' : 'text-ink-secondary hover:text-ink',
+              )}
+            >
+              <ListFilter className="h-5 w-5" />
+            </button>
+          )}
+        >
+          {presetButtons}
+          {renderDateRange(true)}
+          {renderTypeFilter(true)}
+        </DropdownMenu>
 
-        <div className="w-40">
-          <SelectMenu
-            ariaLabel="Tipo de lançamento"
-            value={typeFilter}
-            onChange={(v) => setTypeFilter(v as TransactionType | '')}
-            options={[
-              { value: '', label: 'Todos' },
-              { value: 'income', label: 'Entradas' },
-              { value: 'expense', label: 'Saídas' },
-            ]}
-          />
-        </div>
+        <div className="ml-auto">{lancamentoButton}</div>
       </div>
 
       {query.isPending ? (

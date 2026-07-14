@@ -416,11 +416,11 @@ export function AgendaPage() {
               aria-expanded={open}
               aria-label="Filtros da agenda"
               className={cn(
-                'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-surface text-ink-secondary transition-colors hover:bg-surface-hover',
-                open ? 'border-secondary' : 'border-line',
+                'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors',
+                open ? 'text-primary' : 'text-ink-secondary hover:text-ink',
               )}
             >
-              <ListFilter className="h-4 w-4" />
+              <ListFilter className="h-5 w-5" />
             </button>
           )}
         >
