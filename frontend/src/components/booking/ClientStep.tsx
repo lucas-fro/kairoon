@@ -2,7 +2,14 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Cake, Mail, Pencil, Phone, User } from 'lucide-react'
 import { identifyClient } from '../../api/public'
-import { formatPhone, isValidPhone, onlyDigits } from '../../lib/format'
+import {
+  dateBRToIso,
+  formatPhone,
+  isoToDateBR,
+  isValidPhone,
+  maskDateBR,
+  onlyDigits,
+} from '../../lib/format'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { SelectMenu } from '../ui/SelectMenu'
@@ -49,7 +56,7 @@ export function ClientStep({
   const [name, setName] = useState(initialName)
   const [phone, setPhone] = useState(initialPhone)
   const [email, setEmail] = useState(initialEmail)
-  const [birthDate, setBirthDate] = useState(initialBirthDate)
+  const [birthDate, setBirthDate] = useState(isoToDateBR(initialBirthDate))
   const [gender, setGender] = useState(initialGender)
   const [phoneTouched, setPhoneTouched] = useState(false)
   const [checking, setChecking] = useState(false)
@@ -90,7 +97,7 @@ export function ClientStep({
   function handleSubmitDetails(event: FormEvent) {
     event.preventDefault()
     if (!nameValid || !phoneValid || !emailValid) return
-    onContinue(name.trim(), phone, email.trim(), birthDate, gender)
+    onContinue(name.trim(), phone, email.trim(), dateBRToIso(birthDate), gender)
   }
 
   if (phase === 'phone') {
@@ -173,10 +180,11 @@ export function ClientStep({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Input
           label="Nascimento (opcional)"
-          type="date"
+          inputMode="numeric"
+          placeholder="DD/MM/AAAA"
           leftIcon={<Cake className="h-4 w-4" />}
           value={birthDate}
-          onChange={(e) => setBirthDate(e.target.value)}
+          onChange={(e) => setBirthDate(maskDateBR(e.target.value))}
         />
         <SelectMenu
           label="Sexo (opcional)"

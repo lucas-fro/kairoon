@@ -33,7 +33,17 @@ import type { SelectMenuOption } from '../../components/ui/SelectMenu'
 import { PageLoader } from '../../components/ui/Spinner'
 import { useToast } from '../../components/ui/Toast'
 import { describeCouponDiscount, describeCouponValidity } from '../../lib/coupons'
-import { cn, formatBRL, formatDate, formatPhone, isValidPhone, onlyDigits } from '../../lib/format'
+import {
+  cn,
+  dateBRToIso,
+  formatBRL,
+  formatDate,
+  formatPhone,
+  isoToDateBR,
+  isValidPhone,
+  maskDateBR,
+  onlyDigits,
+} from '../../lib/format'
 import type { AppointmentStatus, Client } from '../../types/api'
 
 function getInitials(name: string): string {
@@ -77,7 +87,7 @@ function EditClientDialog({ open, onClose, client }: EditClientDialogProps) {
   const [name, setName] = useState(client.name)
   const [phone, setPhone] = useState(formatPhone(client.phone))
   const [email, setEmail] = useState(client.email ?? '')
-  const [birthDate, setBirthDate] = useState(client.birthDate ?? '')
+  const [birthDate, setBirthDate] = useState(isoToDateBR(client.birthDate))
   const [gender, setGender] = useState(client.gender ?? '')
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({})
   const queryClient = useQueryClient()
@@ -88,7 +98,7 @@ function EditClientDialog({ open, onClose, client }: EditClientDialogProps) {
       setName(client.name)
       setPhone(formatPhone(client.phone))
       setEmail(client.email ?? '')
-      setBirthDate(client.birthDate ?? '')
+      setBirthDate(isoToDateBR(client.birthDate))
       setGender(client.gender ?? '')
       setErrors({})
     }
@@ -118,7 +128,7 @@ function EditClientDialog({ open, onClose, client }: EditClientDialogProps) {
       name: name.trim(),
       phone: onlyDigits(phone),
       email: email.trim(),
-      birthDate,
+      birthDate: dateBRToIso(birthDate),
       gender,
     })
   }
@@ -153,9 +163,10 @@ function EditClientDialog({ open, onClose, client }: EditClientDialogProps) {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input
             label="Nascimento (opcional)"
-            type="date"
+            inputMode="numeric"
+            placeholder="DD/MM/AAAA"
             value={birthDate}
-            onChange={(e) => setBirthDate(e.target.value)}
+            onChange={(e) => setBirthDate(maskDateBR(e.target.value))}
           />
           <SelectMenu
             label="Sexo (opcional)"
@@ -304,11 +315,21 @@ export function ClientDetailPage() {
               {client.email && (
                 <p className="truncate text-sm text-ink-secondary">{client.email}</p>
               )}
-              <p className="mt-0.5 text-xs text-ink-tertiary">
-                Cliente desde {formatDate(client.createdAt.slice(0, 10))}
-                {client.birthDate ? ` · Nasc. ${formatDate(client.birthDate)}` : ''}
-                {client.gender ? ` · ${GENDER_LABEL[client.gender] ?? client.gender}` : ''}
-              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-ink-tertiary">
+                <span className="whitespace-nowrap">
+                  Cliente desde {formatDate(client.createdAt.slice(0, 10))}
+                </span>
+                {client.birthDate && (
+                  <span className="whitespace-nowrap">
+                    Nasc. {formatDate(client.birthDate)}
+                  </span>
+                )}
+                {client.gender && (
+                  <span className="whitespace-nowrap">
+                    {GENDER_LABEL[client.gender] ?? client.gender}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">

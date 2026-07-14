@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
   Check,
-  Crown,
   Equal,
   Pencil,
   Percent,
@@ -25,7 +24,16 @@ import type { EmployeePayload } from '../../api/employees'
 import { getPlan } from '../../api/establishment'
 import { listServices } from '../../api/services'
 import { WEEKDAY_LABELS_SHORT } from '../../lib/dates'
-import { cn, formatBRL, formatPhone, onlyDigits, parseBRLToCents } from '../../lib/format'
+import {
+  cn,
+  dateBRToIso,
+  formatBRL,
+  formatPhone,
+  isoToDateBR,
+  maskDateBR,
+  onlyDigits,
+  parseBRLToCents,
+} from '../../lib/format'
 import type { CommissionType, Employee } from '../../types/api'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
@@ -231,7 +239,7 @@ export function EmployeesTab() {
       photoUrl: employee.photoUrl ?? '',
       email: employee.email ?? '',
       phone: formatPhone(employee.phone ?? ''),
-      birthDate: employee.birthDate ?? '',
+      birthDate: isoToDateBR(employee.birthDate),
       gender: employee.gender ?? '',
       workStart: employee.workStart,
       workEnd: employee.workEnd,
@@ -481,7 +489,7 @@ export function EmployeesTab() {
         photoUrl: form.photoUrl.trim() || undefined,
         email: form.email.trim(),
         phone: onlyDigits(form.phone),
-        birthDate: form.birthDate,
+        birthDate: dateBRToIso(form.birthDate),
         gender: form.gender,
         workStart: form.workStart,
         workEnd: form.workEnd,
@@ -509,17 +517,7 @@ export function EmployeesTab() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <p className="text-sm text-ink-secondary">Profissionais que atendem no seu negócio.</p>
-          {plan && (
-            <Badge tone="brand">
-              <Crown className="h-3 w-3" />
-              {plan.limits.employees >= 90
-                ? `${plan.usage.employees} ${plan.usage.employees === 1 ? 'profissional' : 'profissionais'}`
-                : `${plan.usage.employees} de ${plan.limits.employees}`}
-            </Badge>
-          )}
-        </div>
+        <p className="text-sm text-ink-secondary">Profissionais que atendem no seu negócio.</p>
         <Button leftIcon={<Plus className="h-4 w-4" />} onClick={handleAddClick}>
           Adicionar colaborador
         </Button>
@@ -649,8 +647,9 @@ export function EmployeesTab() {
         title={editing ? 'Editar profissional' : 'Adicionar profissional'}
         maxWidth="max-w-lg"
       >
-        {/* Etapas clicáveis: navegue direto por qualquer uma */}
-        <div className="mb-5 flex items-stretch gap-2">
+        {/* Etapas clicáveis: navegue direto por qualquer uma. No mobile a faixa
+            rola horizontalmente (scroll só nas etapas), sem estourar o diálogo. */}
+        <div className="mb-5 flex items-stretch gap-2 overflow-x-auto">
           {STEPS.map((label, i) => {
             const n = i + 1
             const active = n === step
@@ -660,7 +659,7 @@ export function EmployeesTab() {
                 key={label}
                 type="button"
                 onClick={() => goToStep(n)}
-                className="group flex flex-1 flex-col gap-1.5 text-left"
+                className="group flex shrink-0 flex-col gap-1.5 text-left sm:flex-1"
               >
                 <span className="flex items-center gap-2">
                   <span
@@ -724,9 +723,10 @@ export function EmployeesTab() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Input
                 label="Data de nascimento (opcional)"
-                type="date"
+                inputMode="numeric"
+                placeholder="DD/MM/AAAA"
                 value={form.birthDate}
-                onChange={(e) => setForm((f) => ({ ...f, birthDate: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, birthDate: maskDateBR(e.target.value) }))}
               />
               <SelectMenu
                 label="Sexo (opcional)"
@@ -788,7 +788,7 @@ export function EmployeesTab() {
               <span className="mb-2 block text-[13px] font-medium text-ink-secondary">
                 Dias de trabalho
               </span>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-7 gap-1.5">
                 {WEEKDAY_LABELS_SHORT.map((label, day) => {
                   const on = form.workDays.includes(day)
                   return (
@@ -797,7 +797,7 @@ export function EmployeesTab() {
                       type="button"
                       onClick={() => toggleDay(day)}
                       className={cn(
-                        'h-9 w-12 rounded-lg border text-[13px] font-medium transition-colors',
+                        'h-9 w-full rounded-lg border text-[13px] font-medium transition-colors',
                         on
                           ? 'border-primary bg-primary text-white'
                           : 'border-line text-ink-secondary hover:bg-surface-hover',
@@ -1149,28 +1149,32 @@ export function EmployeesTab() {
                       { dayKey: 'paymentDay2', amountKey: 'paymentAmount2', label: '2º pagamento' },
                     ] as const
                   ).map((row) => (
-                    <div key={row.dayKey} className="flex items-end gap-2">
-                      <div className="w-24 shrink-0">
-                        <SelectMenu
-                          label={row.label}
-                          className="!h-9"
-                          value={form[row.dayKey]}
-                          onChange={(v) => setForm((f) => ({ ...f, [row.dayKey]: v }))}
-                          options={PAY_DAY_OPTIONS.map((day) => ({
-                            value: String(day),
-                            label: `Dia ${day}`,
-                          }))}
+                    <div key={row.dayKey}>
+                      <span className="mb-2 block text-[13px] font-medium text-ink-secondary">
+                        {row.label}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-24 shrink-0">
+                          <SelectMenu
+                            ariaLabel={`${row.label} — dia`}
+                            value={form[row.dayKey]}
+                            onChange={(v) => setForm((f) => ({ ...f, [row.dayKey]: v }))}
+                            options={PAY_DAY_OPTIONS.map((day) => ({
+                              value: String(day),
+                              label: `Dia ${day}`,
+                            }))}
+                          />
+                        </div>
+                        <Input
+                          inputMode="decimal"
+                          placeholder="0,00"
+                          leftIcon={<span className="text-sm">R$</span>}
+                          value={form[row.amountKey]}
+                          onChange={(e) =>
+                            setForm((f) => ({ ...f, [row.amountKey]: e.target.value }))
+                          }
                         />
                       </div>
-                      <Input
-                        inputMode="decimal"
-                        placeholder="0,00"
-                        leftIcon={<span className="text-sm">R$</span>}
-                        value={form[row.amountKey]}
-                        onChange={(e) =>
-                          setForm((f) => ({ ...f, [row.amountKey]: e.target.value }))
-                        }
-                      />
                     </div>
                   ))}
 

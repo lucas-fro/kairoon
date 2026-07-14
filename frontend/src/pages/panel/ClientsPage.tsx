@@ -17,7 +17,16 @@ import type { SelectMenuOption } from '../../components/ui/SelectMenu'
 import { SkeletonList } from '../../components/ui/Skeleton'
 import { Table, TBody, Td, Th, THead, Tr } from '../../components/ui/Table'
 import { useToast } from '../../components/ui/Toast'
-import { cn, formatBRL, formatDate, formatPhone, isValidPhone, onlyDigits } from '../../lib/format'
+import {
+  cn,
+  dateBRToIso,
+  formatBRL,
+  formatDate,
+  formatPhone,
+  isValidPhone,
+  maskDateBR,
+  onlyDigits,
+} from '../../lib/format'
 import type { ClientListItem } from '../../types/api'
 
 function getInitials(name: string): string {
@@ -84,7 +93,7 @@ function NewClientDialog({ open, onClose }: NewClientDialogProps) {
       name: name.trim(),
       phone: onlyDigits(phone),
       email: email.trim(),
-      birthDate,
+      birthDate: dateBRToIso(birthDate),
       gender,
     })
   }
@@ -125,9 +134,10 @@ function NewClientDialog({ open, onClose }: NewClientDialogProps) {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input
             label="Nascimento (opcional)"
-            type="date"
+            inputMode="numeric"
+            placeholder="DD/MM/AAAA"
             value={birthDate}
-            onChange={(e) => setBirthDate(e.target.value)}
+            onChange={(e) => setBirthDate(maskDateBR(e.target.value))}
           />
           <SelectMenu
             label="Sexo (opcional)"
@@ -177,12 +187,6 @@ export function ClientsPage() {
   const clients = data ?? []
   const hasSearch = search.length > 0
 
-  const description = data
-    ? `${clients.length} ${clients.length === 1 ? 'cliente' : 'clientes'} ${
-        hasSearch ? (clients.length === 1 ? 'encontrado' : 'encontrados') : 'na sua base'
-      }`
-    : 'Sua base de clientes'
-
   const countLabel = data
     ? `${clients.length} ${clients.length === 1 ? 'cliente' : 'clientes'}`
     : '—'
@@ -227,7 +231,6 @@ export function ClientsPage() {
     <div>
       <PageHeader
         title="Clientes"
-        description={description}
         actions={
           <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setDialogOpen(true)}>
             Novo cliente

@@ -1,5 +1,5 @@
-import { forwardRef, useId } from 'react'
-import type { InputHTMLAttributes, ReactNode } from 'react'
+import { forwardRef, useId, useRef } from 'react'
+import type { InputHTMLAttributes, MouseEvent, ReactNode } from 'react'
 import { cn } from '../../lib/format'
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -11,12 +11,31 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   rightIcon?: ReactNode
 }
 
+// Tipos nativos cujo seletor (calendário/relógio) só abre ao clicar no ícone;
+// aqui abrimos ao clicar em qualquer parte do campo.
+const PICKER_TYPES = new Set(['date', 'time', 'datetime-local', 'month', 'week'])
+
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { label, error, hint, leftIcon, rightIcon, className, id, ...props },
+  { label, error, hint, leftIcon, rightIcon, className, id, type, onClick, ...props },
   ref,
 ) {
   const generatedId = useId()
   const inputId = id ?? generatedId
+  const localRef = useRef<HTMLInputElement | null>(null)
+
+  const handleClick = (event: MouseEvent<HTMLInputElement>) => {
+    onClick?.(event)
+    if (type && PICKER_TYPES.has(type)) {
+      const el = localRef.current
+      if (el && typeof el.showPicker === 'function') {
+        try {
+          el.showPicker()
+        } catch {
+          // Ignora: alguns navegadores exigem foco prévio ou não suportam showPicker.
+        }
+      }
+    }
+  }
 
   return (
     <div className="w-full">
@@ -32,8 +51,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           </span>
         )}
         <input
-          ref={ref}
+          ref={(el) => {
+            localRef.current = el
+            if (typeof ref === 'function') ref(el)
+            else if (ref) ref.current = el
+          }}
           id={inputId}
+          type={type}
+          onClick={handleClick}
           className={cn(
             'h-10 w-full rounded-lg border bg-surface px-3 text-sm text-ink placeholder:text-ink-tertiary',
             'transition-shadow duration-150 focus:outline-none focus:ring-[3px]',

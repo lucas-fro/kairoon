@@ -34,7 +34,7 @@ import { Skeleton } from '../../components/ui/Skeleton'
 import { Table, TBody, Td, Th, THead, Tr } from '../../components/ui/Table'
 import { CHART_COLORS } from '../../lib/chartColors'
 import { todayStr } from '../../lib/dates'
-import { formatBRL, formatDateLong } from '../../lib/format'
+import { formatBRL } from '../../lib/format'
 import type { AppointmentStatus, DashboardTrendPoint } from '../../types/api'
 
 const STATUS_META: Record<AppointmentStatus, { label: string; tone: 'success' | 'brand' | 'warning' | 'error' }> = {
@@ -200,9 +200,10 @@ function ActivityTrendCard({ trend }: { trend: DashboardTrendPoint[] }) {
             description="Assim que houver agendamentos ou novos clientes, o gráfico aparece aqui."
           />
         ) : (
-          <div className="h-[260px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trend} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+          <div className="overflow-x-auto">
+            <div className="h-[260px] min-w-[480px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={trend} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
                 <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
                 <XAxis
                   dataKey="date"
@@ -242,8 +243,9 @@ function ActivityTrendCard({ trend }: { trend: DashboardTrendPoint[] }) {
                   dot={false}
                   activeDot={{ r: 4 }}
                 />
-              </LineChart>
-            </ResponsiveContainer>
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         )}
       </CardContent>
@@ -264,10 +266,7 @@ export function DashboardPage() {
   const today = todayStr()
 
   const header = (
-    <PageHeader
-      title="Dashboard"
-      description={`Visão geral de hoje, ${formatDateLong(today)}`}
-    />
+    <PageHeader title="Dashboard" />
   )
 
   if (isPending) {

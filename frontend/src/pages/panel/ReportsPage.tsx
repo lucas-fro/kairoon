@@ -320,6 +320,27 @@ function ChartError({ error, onRetry }: { error: unknown; onRetry: () => void })
   )
 }
 
+/**
+ * Envolve um gráfico garantindo uma largura mínima: em telas estreitas o
+ * container gera scroll horizontal em vez de comprimir o gráfico e deixá-lo
+ * ilegível. A altura é fixada aqui para o ResponsiveContainer (height="100%").
+ */
+function ChartScroll({
+  height,
+  minWidth = 520,
+  children,
+}: {
+  height: number | string
+  minWidth?: number
+  children: React.ReactNode
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <div style={{ height, minWidth }}>{children}</div>
+    </div>
+  )
+}
+
 /** Barra horizontal genérica com valores em reais (serviços, clientes, colaboradores). Preenche a altura do pai (flex-1 min-h-0). */
 function RevenueBarChart({ data }: { data: RevenueRow[] }) {
   return (
@@ -717,10 +738,7 @@ export function ReportsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Relatórios"
-        description="Acompanhe faturamento, clientes, serviços e ocupação da agenda"
-      />
+      <PageHeader title="Relatórios" />
 
       {/* Toolbar de período: presets + intervalo customizado */}
       <div className="mb-6 flex flex-wrap items-center gap-3">
@@ -791,7 +809,7 @@ export function ReportsPage() {
                         {formatBRL(totals.expenseCents)}
                       </span>
                     </p>
-                    <div className="h-[300px]">
+                    <ChartScroll height={300}>
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart
                           data={filledRevenue}
@@ -839,7 +857,7 @@ export function ReportsPage() {
                           />
                         </BarChart>
                       </ResponsiveContainer>
-                    </div>
+                    </ChartScroll>
                   </>
                 ),
               })}
@@ -889,7 +907,7 @@ export function ReportsPage() {
                       Total no período:{' '}
                       <span className="font-semibold text-ink">{newClientsTotal}</span>
                     </p>
-                    <div className="h-[280px]">
+                    <ChartScroll height={280}>
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart
                           data={filledNewClients}
@@ -926,7 +944,7 @@ export function ReportsPage() {
                           />
                         </LineChart>
                       </ResponsiveContainer>
-                    </div>
+                    </ChartScroll>
                   </>
                 ),
               })}
@@ -944,7 +962,7 @@ export function ReportsPage() {
                 empty: topServicesEmpty,
                 emptyDescription: 'Nenhum serviço agendado no intervalo selecionado.',
                 children: (
-                  <div style={{ height: servicesRowHeight }}>
+                  <ChartScroll height={servicesRowHeight} minWidth={360}>
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         layout="vertical"
@@ -988,7 +1006,7 @@ export function ReportsPage() {
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
-                  </div>
+                  </ChartScroll>
                 ),
               })}
             </CardContent>
@@ -1005,9 +1023,9 @@ export function ReportsPage() {
                 empty: topServicesRevenueEmpty,
                 emptyDescription: 'Nenhuma receita de serviço no intervalo selecionado.',
                 children: (
-                  <div style={{ height: servicesRowHeight }}>
+                  <ChartScroll height={servicesRowHeight} minWidth={360}>
                     <RevenueBarChart data={topServicesRevenueRows} />
-                  </div>
+                  </ChartScroll>
                 ),
               })}
             </CardContent>
@@ -1024,9 +1042,9 @@ export function ReportsPage() {
                 empty: topClientsEmpty,
                 emptyDescription: 'Nenhum faturamento por cliente no intervalo selecionado.',
                 children: (
-                  <div style={{ height: peopleRowHeight }}>
+                  <ChartScroll height={peopleRowHeight} minWidth={360}>
                     <RevenueBarChart data={topClientRows} />
-                  </div>
+                  </ChartScroll>
                 ),
               })}
             </CardContent>
@@ -1043,9 +1061,9 @@ export function ReportsPage() {
                 empty: employeeRevenueEmpty,
                 emptyDescription: 'Nenhuma receita por colaborador no intervalo selecionado.',
                 children: (
-                  <div style={{ height: peopleRowHeight }}>
+                  <ChartScroll height={peopleRowHeight} minWidth={360}>
                     <RevenueBarChart data={employeeRevenueRows} />
-                  </div>
+                  </ChartScroll>
                 ),
               })}
             </CardContent>
@@ -1071,7 +1089,7 @@ export function ReportsPage() {
                       Taxa de cancelamento:{' '}
                       <span className="font-semibold text-ink">{statusTotals.cancelRate}%</span>
                     </p>
-                    <div className="h-[300px]">
+                    <ChartScroll height={300}>
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart
                           data={filledStatus}
@@ -1115,7 +1133,7 @@ export function ReportsPage() {
                           ))}
                         </BarChart>
                       </ResponsiveContainer>
-                    </div>
+                    </ChartScroll>
                   </>
                 ),
               })}
@@ -1134,9 +1152,9 @@ export function ReportsPage() {
                 emptyDescription: 'Nenhum agendamento no intervalo selecionado.',
                 height: 280,
                 children: (
-                  <div className="h-[280px]">
+                  <ChartScroll height={280}>
                     <BusyHoursChart cells={busyHours} />
-                  </div>
+                  </ChartScroll>
                 ),
               })}
             </CardContent>
@@ -1153,7 +1171,7 @@ export function ReportsPage() {
                 empty: occupancyEmpty,
                 emptyDescription: 'Nenhum horário disponível ou agendado no intervalo selecionado.',
                 children: (
-                  <div className="h-[280px]">
+                  <ChartScroll height={280}>
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={occupancyData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                         <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
@@ -1186,7 +1204,7 @@ export function ReportsPage() {
                         />
                       </BarChart>
                     </ResponsiveContainer>
-                  </div>
+                  </ChartScroll>
                 ),
               })}
             </CardContent>

@@ -12,6 +12,7 @@ import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import { Input } from '../ui/Input'
+import { Textarea } from '../ui/Textarea'
 import { useToast } from '../ui/Toast'
 
 const SYSTEM_PRIMARY = '#1E2F5E'
@@ -33,6 +34,7 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
   )
   const [bannerImageUrl, setBannerImageUrl] = useState(establishment.bannerImageUrl ?? '')
   const [footerMessage, setFooterMessage] = useState(establishment.footerMessage ?? '')
+  const [welcomeMessage, setWelcomeMessage] = useState(establishment.welcomeMessage ?? '')
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -44,6 +46,16 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
     onSuccess: (res) => {
       setEstablishment(res)
       toast.success('Aparência atualizada!')
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : 'Erro inesperado'),
+  })
+
+  // Mensagem de boas-vindas: disponível em qualquer plano e salva sozinha.
+  const welcomeMutation = useMutation({
+    mutationFn: (value: string) => updateEstablishment({ welcomeMessage: value }),
+    onSuccess: (res) => {
+      setEstablishment(res)
+      toast.success('Mensagem de boas-vindas salva!')
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : 'Erro inesperado'),
   })
@@ -76,6 +88,11 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
           <p className="text-center font-display text-lg font-semibold text-ink">
             {establishment.name}
           </p>
+          {welcomeMessage.trim() && (
+            <p className="mt-1 text-center text-sm text-ink-secondary">
+              {welcomeMessage.trim()}
+            </p>
+          )}
           <div className="mt-3 text-center text-xs text-ink-tertiary">
             {isPaid ? (
               footerMessage.trim() ? (
@@ -90,6 +107,28 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
                 Kairoon
               </span>
             )}
+          </div>
+        </div>
+
+        {/* Mensagem de boas-vindas (topo do link público, disponível em todos os planos) */}
+        <div className="space-y-3">
+          <Textarea
+            label="Mensagem de boas-vindas"
+            value={welcomeMessage}
+            onChange={(e) => setWelcomeMessage(e.target.value)}
+            placeholder="Ex.: Bem-vindo! Escolha um horário e até já."
+            hint="Aparece no topo do seu link público."
+          />
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => welcomeMutation.mutate(welcomeMessage.trim())}
+              isLoading={welcomeMutation.isPending}
+              leftIcon={<Save className="h-4 w-4" />}
+            >
+              Salvar mensagem
+            </Button>
           </div>
         </div>
 

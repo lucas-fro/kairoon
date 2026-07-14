@@ -10,6 +10,7 @@ import {
   formatCep,
   formatCnpj,
   formatPhone,
+  formatSlugInput,
   isValidCep,
   isValidCnpj,
   isValidPhone,
@@ -19,12 +20,12 @@ import { fetchAddressByCep } from '../../lib/viacep'
 import type { Establishment, PaymentSettings } from '../../types/api'
 import { Button } from '../ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
+import { HelpTooltip } from '../ui/HelpTooltip'
 import { Input } from '../ui/Input'
 import { SelectMenu } from '../ui/SelectMenu'
 import type { SelectMenuOption } from '../ui/SelectMenu'
 import { Spinner } from '../ui/Spinner'
 import { Switch } from '../ui/Switch'
-import { Textarea } from '../ui/Textarea'
 import { useToast } from '../ui/Toast'
 
 const BUSINESS_TYPE_OPTIONS: SelectMenuOption[] = [
@@ -84,7 +85,6 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
   const [uf, setUf] = useState(establishment.state ?? '')
   const [cepStatus, setCepStatus] = useState<'idle' | 'loading' | 'notfound'>('idle')
   const cepDirty = useRef(false)
-  const [welcomeMessage, setWelcomeMessage] = useState(establishment.welcomeMessage ?? '')
   const [logoUrl, setLogoUrl] = useState(establishment.logoUrl ?? '')
   const [autoConfirm, setAutoConfirm] = useState(establishment.autoConfirm)
 
@@ -147,23 +147,13 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
   const isFormatValid = SLUG_REGEX.test(slug)
   const isSameAsCurrent = slug === currentSlug
   const slugFormatError =
-    slug.length > 0 && !isFormatValid ? 'Formato inválido (veja as regras abaixo)' : undefined
+    slug.length > 0 && !isFormatValid ? 'Formato inválido' : undefined
 
   const mutation = useMutation({
     mutationFn: updateEstablishment,
     onSuccess: (res) => {
       setEstablishment(res)
       toast.success('Dados do estabelecimento atualizados!')
-    },
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : 'Erro inesperado'),
-  })
-
-  // Mensagem de boas-vindas do link público (salva sozinha, na seção do link)
-  const welcomeMutation = useMutation({
-    mutationFn: (value: string) => updateEstablishment({ welcomeMessage: value }),
-    onSuccess: (res) => {
-      setEstablishment(res)
-      toast.success('Mensagem de boas-vindas salva!')
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : 'Erro inesperado'),
   })
@@ -443,7 +433,7 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
                   autoComplete="off"
                   spellCheck={false}
                   value={slug}
-                  onChange={(e) => setSlug(e.target.value.toLowerCase().trim())}
+                  onChange={(e) => setSlug(formatSlugInput(e.target.value))}
                   placeholder="minha-barbearia"
                   className="h-8 w-full min-w-0 rounded-md border border-line bg-surface px-2 pr-8 text-sm text-ink placeholder:text-ink-tertiary focus:border-secondary focus:outline-none focus:ring-[2px] focus:ring-secondary-light"
                 />
@@ -488,11 +478,6 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
             <p className="text-xs font-medium text-success-dark">Link disponível!</p>
           ) : null}
 
-          <p className="text-xs text-ink-tertiary">
-            Permitido: letras minúsculas (a–z), números (0–9) e hífen (-) entre palavras. Não use
-            espaços, acentos, letras maiúsculas ou caracteres especiais (ex.: @, ., /, _).
-          </p>
-
           {!isSameAsCurrent && isFormatValid && (
             <div className="flex justify-end">
               <Button
@@ -507,29 +492,8 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
             </div>
           )}
 
-          {/* Mensagem de boas-vindas exibida no topo do link público */}
-          <div className="space-y-3 border-t border-line-divider pt-4">
-            <Textarea
-              label="Mensagem de boas-vindas"
-              value={welcomeMessage}
-              onChange={(e) => setWelcomeMessage(e.target.value)}
-              placeholder="Ex.: Bem-vindo! Escolha um horário e até já."
-              hint="Aparece no topo do seu link público."
-            />
-            <div className="flex justify-end">
-              <Button
-                type="button"
-                onClick={() => welcomeMutation.mutate(welcomeMessage.trim())}
-                isLoading={welcomeMutation.isPending}
-                leftIcon={<Save className="h-4 w-4" />}
-              >
-                Salvar mensagem
-              </Button>
-            </div>
-          </div>
-
           {/* Confirmação de agendamentos do link público */}
-          <div className="flex items-start justify-between gap-4 border-t border-line-divider pt-4">
+          <div className="flex items-center justify-between gap-4 border-t border-line-divider pt-4">
             <div className="min-w-0">
               <p className="text-sm font-medium text-ink">
                 Confirmar agendamentos automaticamente
@@ -577,7 +541,7 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
 
           {/* Crédito com parcelamento */}
           <div className="space-y-3 rounded-lg border border-line p-4">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-ink">Crédito</p>
                 <p className="mt-0.5 text-xs text-ink-tertiary">
@@ -617,15 +581,11 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
 
             {payments.credit.enabled && (
               <div className="flex items-center justify-between gap-4">
-                <div className="min-w-0">
+                <div className="flex min-w-0 items-center gap-1.5">
                   <p className="text-sm font-medium text-ink">Recebimento</p>
-                  <p className="mt-0.5 text-xs text-ink-tertiary">
-                    Depende da sua maquininha, não do Kairoon: se ela antecipa e cai tudo de uma
-                    vez, use Adiantado; se ela repassa parcela por parcela, use Mês a mês. O
-                    financeiro lança o recebimento igual ao que você recebe.
-                  </p>
+                  <HelpTooltip label="Depende da sua maquininha, não do Kairoon: se ela antecipa e cai tudo de uma vez, use Adiantado; se ela repassa parcela por parcela, use Mês a mês. O financeiro lança o recebimento igual ao que você recebe." />
                 </div>
-                <div className="w-40 shrink-0">
+                <div className="w-32 shrink-0">
                   <SelectMenu
                     ariaLabel="Recebimento do crédito"
                     value={payments.credit.receiptMode ?? 'upfront'}

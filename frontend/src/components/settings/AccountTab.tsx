@@ -7,7 +7,16 @@ import { updateProfile } from '../../api/auth'
 import { ApiError } from '../../api/client'
 import { deleteAccount } from '../../api/establishment'
 import { useAuth } from '../../contexts/AuthContext'
-import { formatCpf, formatPhone, isValidCpf, isValidPhone, onlyDigits } from '../../lib/format'
+import {
+  dateBRToIso,
+  formatCpf,
+  formatPhone,
+  isoToDateBR,
+  isValidCpf,
+  isValidPhone,
+  maskDateBR,
+  onlyDigits,
+} from '../../lib/format'
 import { Button } from '../ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
@@ -27,7 +36,7 @@ export function AccountTab() {
   const [name, setName] = useState(user?.name ?? '')
   const [email, setEmail] = useState(user?.email ?? '')
   const [phone, setPhone] = useState(formatPhone(user?.phone ?? ''))
-  const [birthDate, setBirthDate] = useState(user?.birthDate ?? '')
+  const [birthDate, setBirthDate] = useState(isoToDateBR(user?.birthDate))
   const [cpf, setCpf] = useState(formatCpf(user?.cpf ?? ''))
   const [errors, setErrors] = useState<{ name?: string; email?: string; phone?: string; cpf?: string }>({})
 
@@ -67,7 +76,7 @@ export function AccountTab() {
       name: name.trim(),
       email: email.trim(),
       phone: onlyDigits(phone),
-      birthDate,
+      birthDate: dateBRToIso(birthDate),
       cpf: cpf.trim(),
     })
   }
@@ -107,9 +116,10 @@ export function AccountTab() {
               />
               <Input
                 label="Data de nascimento"
-                type="date"
+                inputMode="numeric"
+                placeholder="DD/MM/AAAA"
                 value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
+                onChange={(e) => setBirthDate(maskDateBR(e.target.value))}
               />
             </div>
             <Input

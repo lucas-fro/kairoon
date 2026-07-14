@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Search, UserPlus, X } from 'lucide-react'
 import { ApiError } from '../../api/client'
 import { createClient, listClients } from '../../api/clients'
-import { formatPhone, isValidPhone, onlyDigits } from '../../lib/format'
+import { dateBRToIso, formatPhone, isValidPhone, maskDateBR, onlyDigits } from '../../lib/format'
 import { Button } from '../ui/Button'
 import { DialogActions } from '../ui/DialogActions'
 import { Input } from '../ui/Input'
@@ -104,7 +104,7 @@ export function ClientPicker({ value, onChange, autoFocus, disabled }: ClientPic
       name,
       phone: onlyDigits(newPhone),
       email: newEmail.trim(),
-      birthDate: newBirthDate,
+      birthDate: dateBRToIso(newBirthDate),
       gender: newGender,
     })
   }
@@ -223,9 +223,10 @@ export function ClientPicker({ value, onChange, autoFocus, disabled }: ClientPic
           <div className="grid grid-cols-2 gap-3">
             <Input
               label="Nascimento (opcional)"
-              type="date"
+              inputMode="numeric"
+              placeholder="DD/MM/AAAA"
               value={newBirthDate}
-              onChange={(e) => setNewBirthDate(e.target.value)}
+              onChange={(e) => setNewBirthDate(maskDateBR(e.target.value))}
             />
             <SelectMenu
               label="Sexo (opcional)"

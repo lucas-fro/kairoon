@@ -14,6 +14,23 @@ export function onlyDigits(value: string): string {
   return value.replace(/\D/g, '')
 }
 
+/**
+ * Sanitiza a entrada de um slug enquanto o usuário digita: minúsculas, sem
+ * acentos, espaços/underscores viram hífen e caracteres inválidos são
+ * descartados. Mantém um hífen final (do espaço recém-digitado) para não
+ * atrapalhar a digitação da próxima palavra.
+ */
+export function formatSlugInput(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // remove acentos
+    .replace(/[\s_]+/g, '-') // espaços e underscore viram hífen
+    .replace(/[^a-z0-9-]/g, '') // descarta o que não for permitido
+    .replace(/-+/g, '-') // colapsa hífens repetidos
+    .replace(/^-+/, '') // sem hífen no início
+}
+
 /** Formata dígitos como telefone BR: (11) 98765-4321 */
 export function formatPhone(value: string): string {
   const digits = onlyDigits(value).slice(0, 11)
@@ -101,6 +118,50 @@ export function isValidCep(value: string): boolean {
 export function formatDate(dateStr: string): string {
   const [year, month, day] = dateStr.split('-')
   return `${day}/${month}/${year}`
+}
+
+/**
+ * Máscara de data enquanto o usuário digita: agrupa os dígitos em 'DD/MM/AAAA'.
+ * Ex.: '02072026' → '02/07/2026', '0207' → '02/07'.
+ */
+export function maskDateBR(value: string): string {
+  const digits = onlyDigits(value).slice(0, 8)
+  const day = digits.slice(0, 2)
+  const month = digits.slice(2, 4)
+  const year = digits.slice(4, 8)
+  let out = day
+  if (month) out += `/${month}`
+  if (year) out += `/${year}`
+  return out
+}
+
+/** 'YYYY-MM-DD' → '02/07/2026' (retorna '' se vazio/incompleto). */
+export function isoToDateBR(iso: string | null | undefined): string {
+  if (!iso || iso.length < 10) return ''
+  const [year, month, day] = iso.slice(0, 10).split('-')
+  if (!year || !month || !day) return ''
+  return `${day}/${month}/${year}`
+}
+
+/**
+ * '02/07/2026' → '2026-07-02' para enviar ao backend.
+ * Retorna '' se a data estiver incompleta ou não for um dia válido de calendário.
+ */
+export function dateBRToIso(value: string): string {
+  const digits = onlyDigits(value)
+  if (digits.length !== 8) return ''
+  const day = Number(digits.slice(0, 2))
+  const month = Number(digits.slice(2, 4))
+  const year = Number(digits.slice(4, 8))
+  const d = new Date(year, month - 1, day)
+  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${year}-${pad(month)}-${pad(day)}`
+}
+
+/** Uma data BR está completa e é um dia de calendário válido? */
+export function isValidDateBR(value: string): boolean {
+  return dateBRToIso(value) !== ''
 }
 
 /** 'YYYY-MM' → 'julho de 2026' */

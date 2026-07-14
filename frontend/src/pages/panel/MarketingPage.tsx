@@ -25,10 +25,7 @@ export function MarketingPage() {
 
   return (
     <div className="w-full">
-      <PageHeader
-        title="Fidelidade"
-        description="Cupons, campanhas automáticas, cartão fidelidade e programa de pontos para atrair e reter clientes."
-      />
+      <PageHeader title="Fidelidade" />
 
       <SectionNav
         tabs={TABS}

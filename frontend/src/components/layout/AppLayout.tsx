@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import { HeaderSlotProvider } from '../../contexts/HeaderSlotContext'
 import { cn } from '../../lib/format'
 import { KairoonMark } from '../brand/Logo'
 import { PendingBookingsListener } from '../realtime/PendingBookingsListener'
@@ -141,10 +142,12 @@ export function AppLayout() {
 
       {/* Coluna de conteúdo (deslocada pela sidebar no desktop) */}
       <div className="lg:ml-[240px]">
-        <AppHeader onOpenMenu={() => setMobileOpen(true)} />
-        <main className="isolate mx-auto max-w-[1760px] px-4 py-3 sm:px-6 lg:px-8 lg:py-4">
-          <Outlet />
-        </main>
+        <HeaderSlotProvider>
+          <AppHeader onOpenMenu={() => setMobileOpen(true)} />
+          <main className="isolate w-full px-4 py-3 sm:px-6 lg:px-8 lg:py-4">
+            <Outlet />
+          </main>
+        </HeaderSlotProvider>
       </div>
 
       {/* Popup em tempo real de agendamentos pendentes do link público */}

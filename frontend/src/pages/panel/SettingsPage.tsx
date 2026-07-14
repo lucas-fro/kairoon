@@ -37,10 +37,7 @@ export function SettingsPage() {
 
   return (
     <div className="w-full">
-      <PageHeader
-        title="Configurações"
-        description="Gerencie o estabelecimento, serviços, equipe, funcionamento e seu plano."
-      />
+      <PageHeader title="Configurações" />
 
       <SectionNav
         tabs={TABS}

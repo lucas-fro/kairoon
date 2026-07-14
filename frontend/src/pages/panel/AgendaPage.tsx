@@ -1,6 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarPlus, ChevronLeft, ChevronRight, Clock, Zap } from 'lucide-react'
+import {
+  CalendarPlus,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  ListFilter,
+  Zap,
+} from 'lucide-react'
 import { listAppointments } from '../../api/appointments'
 import { listEmployees } from '../../api/employees'
 import { getWorkingHours } from '../../api/establishment'
@@ -20,7 +28,9 @@ import {
 } from '../../components/realtime/PendingAppointmentDialog'
 import type { PendingAppointmentView } from '../../components/realtime/PendingAppointmentDialog'
 import { Button } from '../../components/ui/Button'
+import { DropdownItem, DropdownMenu } from '../../components/ui/DropdownMenu'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { useHeaderSlot } from '../../contexts/HeaderSlotContext'
 import { SelectMenu } from '../../components/ui/SelectMenu'
 import { Skeleton } from '../../components/ui/Skeleton'
 import {
@@ -76,7 +86,7 @@ function GridSkeleton() {
 }
 
 export function AgendaPage() {
-  const [view, setView] = useState<ViewMode>('week')
+  const [view, setView] = useState<ViewMode>('day')
   const [refDate, setRefDate] = useState(() => todayStr())
   const [employeeFilter, setEmployeeFilter] = useState('')
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
@@ -249,116 +259,184 @@ export function AgendaPage() {
         ? `${formatDayShort(range.start)} – ${formatDayShort(range.end)}`
         : `${MONTH_LABELS[Number(refDate.slice(5, 7)) - 1]} de ${refDate.slice(0, 4)}`
 
-  return (
-    <div className={cn('flex flex-col', view !== 'month' && 'lg:h-[calc(100vh-6rem)]')}>
-      <PageHeader
-        title="Agenda"
-        description="Veja por dia, semana ou mês. Clique em um horário para agendar."
-        actions={
-          <>
-            <AppointmentSearch
-              onSelect={(appointment) => {
-                setRefDate(appointment.date)
-                setView('week')
-                openAppointment(appointment)
-              }}
-            />
-            <Button
-              size="sm"
-              variant="outline"
-              leftIcon={<Clock className="h-4 w-4 text-primary" />}
-              onClick={() => setWaitlistOpen(true)}
-            >
-              Fila de espera{waitlistCount > 0 ? ` (${waitlistCount})` : ''}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              leftIcon={<Zap className="h-4 w-4 text-primary" />}
-              onClick={() => setWalkInOpen(true)}
-            >
-              Atender agora
-            </Button>
-            <Button
-              size="sm"
-              leftIcon={<CalendarPlus className="h-4 w-4" />}
-              onClick={() => setNewDialog({ employeeId: employeeFilter || undefined })}
-            >
-              Novo agendamento
-            </Button>
-          </>
-        }
-      />
+  // Busca de agendamentos vive na barra do topo (AppHeader), via slot.
+  const handleSearchSelect = useCallback((appointment: Appointment) => {
+    setRefDate(appointment.date)
+    setView('week')
+    if (appointment.status === 'pending') setPendingAppt(toPendingView(appointment))
+    else setSelectedAppointment(appointment)
+  }, [])
+  const searchNode = useMemo(
+    () => <AppointmentSearch onSelect={handleSearchSelect} />,
+    [handleSearchSelect],
+  )
+  useHeaderSlot(searchNode)
 
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        <div className="inline-flex items-center">
+  // Controles de manipulação da agenda — reutilizados inline (desktop) e dentro
+  // do painel de filtros (tablet/mobile).
+  const dateNav = (
+    <div className="flex items-center gap-0.5">
+      <button
+        type="button"
+        onClick={() => navigate(-1)}
+        aria-label="Anterior"
+        className="flex h-8 w-8 items-center justify-center rounded-lg text-primary transition-colors hover:bg-surface-hover"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => setRefDate(todayStr())}
+        className="flex h-8 items-center rounded-lg px-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-hover hover:text-ink"
+      >
+        Hoje
+      </button>
+      <button
+        type="button"
+        onClick={() => navigate(1)}
+        aria-label="Próximo"
+        className="flex h-8 w-8 items-center justify-center rounded-lg text-primary transition-colors hover:bg-surface-hover"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    </div>
+  )
+
+  const renderViewToggle = (full: boolean) => (
+    <div
+      className={cn(
+        'inline-flex overflow-hidden rounded-lg border border-line',
+        full && 'flex w-full',
+      )}
+    >
+      {VIEW_OPTIONS.map((option) => (
+        <button
+          key={option.key}
+          type="button"
+          onClick={() => setView(option.key)}
+          className={cn(
+            'h-8 px-3 text-[13px] font-medium transition-colors duration-150',
+            full && 'flex-1',
+            view === option.key
+              ? 'bg-primary text-white'
+              : 'bg-surface text-ink-secondary hover:bg-surface-hover',
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
+
+  const renderEmployeeFilter = (full: boolean) =>
+    activeEmployees.length > 1 ? (
+      <div className={full ? 'w-full' : 'w-44'}>
+        <SelectMenu
+          triggerClassName="!h-8 !text-[13px]"
+          value={employeeFilter}
+          onChange={setEmployeeFilter}
+          options={[
+            { value: '', label: 'Todos os profissionais' },
+            ...activeEmployees.map((employee) => ({
+              value: employee.id,
+              label: employee.name,
+            })),
+          ]}
+        />
+      </div>
+    ) : null
+
+  // Botão principal "Agendamento" (split) + menu com Fila de espera / Atender agora.
+  const newAppointment = (
+    <DropdownMenu
+      align="end"
+      renderTrigger={({ open, toggle }) => (
+        <div className="inline-flex">
           <Button
-            variant="outline"
             size="sm"
             className="rounded-r-none"
-            onClick={() => navigate(-1)}
-            aria-label="Anterior"
+            leftIcon={<CalendarPlus className="h-4 w-4" />}
+            onClick={() => setNewDialog({ employeeId: employeeFilter || undefined })}
           >
-            <ChevronLeft className="h-4 w-4 text-primary" />
+            Agendamento
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setRefDate(todayStr())}
-            className="-ml-px rounded-none"
+          <button
+            type="button"
+            onClick={toggle}
+            aria-haspopup="menu"
+            aria-expanded={open}
+            aria-label="Mais ações"
+            className="-ml-px inline-flex h-8 items-center justify-center rounded-lg rounded-l-none border-l border-white/20 bg-primary px-1.5 text-white transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/50"
           >
-            Hoje
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="-ml-px rounded-l-none"
-            onClick={() => navigate(1)}
-            aria-label="Próximo"
-          >
-            <ChevronRight className="h-4 w-4 text-primary" />
-          </Button>
+            <ChevronDown className={cn('h-4 w-4 transition-transform', open && 'rotate-180')} />
+          </button>
         </div>
+      )}
+    >
+      <DropdownItem
+        icon={<Clock className="h-4 w-4" />}
+        badge={waitlistCount > 0 ? waitlistCount : undefined}
+        onClick={() => setWaitlistOpen(true)}
+      >
+        Fila de espera
+      </DropdownItem>
+      <DropdownItem icon={<Zap className="h-4 w-4" />} onClick={() => setWalkInOpen(true)}>
+        Atender agora
+      </DropdownItem>
+    </DropdownMenu>
+  )
 
-        <span className="font-display text-sm font-semibold capitalize text-ink">{periodLabel}</span>
+  return (
+    <div className={cn('flex flex-col', view !== 'month' && 'lg:h-[calc(100vh-6rem)]')}>
+      <PageHeader title="Agenda" />
 
-        {/* Alternância de visualização */}
-        <div className="inline-flex overflow-hidden rounded-lg border border-line">
-          {VIEW_OPTIONS.map((option) => (
+      {/* Toolbar desktop: tudo inline */}
+      <div className="mb-3 hidden items-center gap-x-4 lg:flex">
+        {dateNav}
+        <span className="font-display text-sm font-semibold capitalize text-ink">
+          {periodLabel}
+        </span>
+        {renderViewToggle(false)}
+        {renderEmployeeFilter(false)}
+        <div className="ml-auto">{newAppointment}</div>
+      </div>
+
+      {/* Toolbar tablet/mobile: funil · navegação de data · agendamento */}
+      <div className="mb-3 flex items-center gap-2 lg:hidden">
+        {/* Funil: visualização + filtro de profissional */}
+        <DropdownMenu
+          align="start"
+          closeOnItemClick={false}
+          panelClassName="w-[min(20rem,calc(100vw-2rem))] space-y-3 p-3"
+          renderTrigger={({ open, toggle }) => (
             <button
-              key={option.key}
               type="button"
-              onClick={() => setView(option.key)}
+              onClick={toggle}
+              aria-haspopup="menu"
+              aria-expanded={open}
+              aria-label="Filtros da agenda"
               className={cn(
-                'h-8 px-3 text-[13px] font-medium transition-colors duration-150',
-                view === option.key
-                  ? 'bg-primary text-white'
-                  : 'bg-surface text-ink-secondary hover:bg-surface-hover',
+                'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-surface text-ink-secondary transition-colors hover:bg-surface-hover',
+                open ? 'border-secondary' : 'border-line',
               )}
             >
-              {option.label}
+              <ListFilter className="h-4 w-4" />
             </button>
-          ))}
+          )}
+        >
+          {renderViewToggle(true)}
+          {renderEmployeeFilter(true)}
+        </DropdownMenu>
+
+        {/* Navegação de data + período por extenso (pequeno) */}
+        <div className="flex flex-1 flex-col items-center">
+          {dateNav}
+          <span className="max-w-full truncate text-xs capitalize text-ink-secondary">
+            {periodLabel}
+          </span>
         </div>
 
-        <div className="ml-auto flex flex-wrap items-center gap-4">
-          {activeEmployees.length > 1 && (
-            <div className="w-48">
-              <SelectMenu
-                className="!h-8 text-[13px]"
-                value={employeeFilter}
-                onChange={setEmployeeFilter}
-                options={[
-                  { value: '', label: 'Todos os profissionais' },
-                  ...activeEmployees.map((employee) => ({
-                    value: employee.id,
-                    label: employee.name,
-                  })),
-                ]}
-              />
-            </div>
-          )}
-        </div>
+        <div className="shrink-0">{newAppointment}</div>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col">

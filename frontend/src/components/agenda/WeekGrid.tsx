@@ -130,8 +130,10 @@ export function WeekGrid({
         <div
           className="grid"
           style={{
-            gridTemplateColumns: `3.5rem repeat(${columns.length}, minmax(0, 1fr))`,
-            minWidth: columns.length >= 4 ? 900 : undefined,
+            // Cada coluna tem no mínimo 215px; abaixo disso o container rola na
+            // horizontal em vez de comprimir. Em dia/semana com poucas colunas o
+            // 1fr expande para preencher a largura disponível.
+            gridTemplateColumns: `3.5rem repeat(${columns.length}, minmax(215px, 1fr))`,
           }}
         >
           {/* Canto superior esquerdo */}

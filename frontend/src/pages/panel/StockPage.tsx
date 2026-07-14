@@ -162,7 +162,6 @@ export function StockPage() {
     <div>
       <PageHeader
         title="Estoque"
-        description="Produtos disponíveis para venda no fechamento dos atendimentos."
         actions={
           <Button size="sm" onClick={openCreate} leftIcon={<Plus className="h-4 w-4" />}>
             Novo produto

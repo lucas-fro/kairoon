@@ -19,7 +19,10 @@ interface SelectMenuProps {
   ariaLabel?: string
   placeholder?: string
   disabled?: boolean
+  /** Classe do wrapper (largura, etc.). */
   className?: string
+  /** Classe do gatilho/botão (ex.: `!h-8` para toolbars compactas). */
+  triggerClassName?: string
 }
 
 interface MenuRect {
@@ -43,6 +46,7 @@ export function SelectMenu({
   placeholder = 'Selecione…',
   disabled,
   className,
+  triggerClassName,
 }: SelectMenuProps) {
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
@@ -161,6 +165,7 @@ export function SelectMenu({
           'focus:outline-none focus:ring-[3px] focus:ring-secondary-light',
           'disabled:cursor-not-allowed disabled:bg-background disabled:text-ink-disabled',
           open ? 'border-secondary ring-[3px] ring-secondary-light' : 'border-line',
+          triggerClassName,
         )}
       >
         <span className={cn('truncate', selected ? 'text-ink' : 'text-ink-tertiary')}>
@@ -183,7 +188,10 @@ export function SelectMenu({
             style={{
               position: 'fixed',
               left: rect.left,
-              width: rect.width,
+              // Largura mínima = gatilho, mas o menu cresce para caber a opção
+              // mais longa (sem truncar), respeitando a borda da viewport.
+              minWidth: rect.width,
+              maxWidth: 'calc(100vw - 16px)',
               ...(rect.openUp
                 ? { bottom: window.innerHeight - rect.top + 4 }
                 : { top: rect.top + 4 }),
@@ -216,7 +224,7 @@ export function SelectMenu({
                             : 'text-ink-secondary',
                     )}
                   >
-                    <span className="truncate">{option.label}</span>
+                    <span className="whitespace-nowrap">{option.label}</span>
                     {isSelected && !option.disabled && (
                       <Check className="h-4 w-4 shrink-0 text-primary" />
                     )}

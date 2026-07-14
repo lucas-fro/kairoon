@@ -440,7 +440,6 @@ export function FinancePage() {
     <div>
       <PageHeader
         title="Financeiro"
-        description="Fluxo de caixa do seu negócio"
         actions={
           <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={openNewDialog}>
             Novo lançamento
