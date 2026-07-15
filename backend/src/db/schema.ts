@@ -68,6 +68,9 @@ export const users = pgTable('users', {
   // validade). Limpos após uso ou expiração. Ver modules/auth.
   passwordResetCodeHash: text('password_reset_code_hash'),
   passwordResetExpiresAt: timestamp('password_reset_expires_at', { withTimezone: true }),
+  // Tentativas erradas do código atual: o código é queimado após o limite, para
+  // travar força bruta do código de 6 dígitos independentemente do IP de origem.
+  passwordResetAttempts: integer('password_reset_attempts').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

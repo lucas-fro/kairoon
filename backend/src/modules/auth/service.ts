@@ -10,6 +10,16 @@ import type { LoginInput, RegisterInput, UpdateProfileInput } from './schemas'
 /** Código de redefinição de senha válido por 5 minutos. */
 const RESET_CODE_TTL_MS = 5 * 60 * 1000
 
+/** Máximo de tentativas erradas antes de queimar o código atual (anti-brute-force). */
+const MAX_RESET_ATTEMPTS = 5
+
+/**
+ * Hash bcrypt "de mentira" (senha impossível de casar) usado para gastar tempo
+ * comparando quando não há código ativo — assim o tempo de resposta não denuncia
+ * se o e-mail existe / tem um código pendente.
+ */
+const DUMMY_RESET_HASH = bcrypt.hashSync('kairoon-uniform-timing-placeholder', 10)
+
 const DEFAULT_WORKING_HOURS = [
   { dayOfWeek: 0, opensAt: '09:00', closesAt: '18:00', isClosed: true },
   { dayOfWeek: 1, opensAt: '09:00', closesAt: '19:00', isClosed: false },
@@ -166,9 +176,10 @@ export async function requestPasswordResetByEmail(email: string) {
     const passwordResetCodeHash = await bcrypt.hash(code, 10)
     const passwordResetExpiresAt = new Date(Date.now() + RESET_CODE_TTL_MS)
 
+    // Zera o contador de tentativas ao emitir um código novo.
     await db
       .update(users)
-      .set({ passwordResetCodeHash, passwordResetExpiresAt })
+      .set({ passwordResetCodeHash, passwordResetExpiresAt, passwordResetAttempts: 0 })
       .where(eq(users.id, user.id))
 
     void sendPasswordResetEmail(user.email, user.name, code).catch((err) =>
@@ -186,16 +197,43 @@ export async function requestPasswordResetByEmail(email: string) {
 /**
  * Localiza o usuário pelo e-mail e confere o código (válido e não expirado) sem
  * consumi-lo. Retorna null em qualquer falha — o chamador devolve sempre a mesma
- * mensagem, sem distinguir e-mail inexistente de código errado.
+ * mensagem, sem distinguir e-mail inexistente de código errado. Sempre compara um
+ * hash (dummy quando não há código ativo) para o tempo de resposta ser uniforme, e
+ * conta cada tentativa errada, queimando o código após o limite (anti-brute-force).
  */
 async function findUserForResetCode(email: string, code: string) {
   const user = await db.query.users.findFirst({
     where: eq(users.email, email.toLowerCase().trim()),
   })
-  if (!user || !user.passwordResetCodeHash || !user.passwordResetExpiresAt) return null
-  if (user.passwordResetExpiresAt.getTime() < Date.now()) return null
-  const matches = await bcrypt.compare(code, user.passwordResetCodeHash)
-  return matches ? user : null
+
+  const storedHash = user?.passwordResetCodeHash
+  const notExpired = Boolean(
+    user?.passwordResetExpiresAt && user.passwordResetExpiresAt.getTime() >= Date.now(),
+  )
+  const hasActiveCode = Boolean(storedHash) && notExpired
+
+  // Comparação sempre executada (timing uniforme), contra o hash real ou o dummy.
+  const matches = await bcrypt.compare(
+    code,
+    hasActiveCode && storedHash ? storedHash : DUMMY_RESET_HASH,
+  )
+
+  if (user && hasActiveCode && matches) return user
+
+  // Tentativa errada num código ativo: incrementa e queima após o limite.
+  if (user && hasActiveCode) {
+    const attempts = (user.passwordResetAttempts ?? 0) + 1
+    await db
+      .update(users)
+      .set(
+        attempts >= MAX_RESET_ATTEMPTS
+          ? { passwordResetCodeHash: null, passwordResetExpiresAt: null, passwordResetAttempts: 0 }
+          : { passwordResetAttempts: attempts },
+      )
+      .where(eq(users.id, user.id))
+  }
+
+  return null
 }
 
 /** Passo 2 (público): valida o código sem consumi-lo, antes de pedir a nova senha. */
@@ -213,7 +251,12 @@ export async function resetPasswordByEmail(email: string, code: string, newPassw
   const passwordHash = await bcrypt.hash(newPassword, 10)
   await db
     .update(users)
-    .set({ passwordHash, passwordResetCodeHash: null, passwordResetExpiresAt: null })
+    .set({
+      passwordHash,
+      passwordResetCodeHash: null,
+      passwordResetExpiresAt: null,
+      passwordResetAttempts: 0,
+    })
     .where(eq(users.id, user.id))
 
   return { ok: true as const }

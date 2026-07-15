@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "password_reset_attempts" integer DEFAULT 0 NOT NULL;
