@@ -1,6 +1,6 @@
 import { desc, eq } from 'drizzle-orm'
 import { db } from '../../db'
-import { establishments, payments, subscriptions } from '../../db/schema'
+import { establishments, payments, subscriptions, users } from '../../db/schema'
 import {
   cancelAsaasSubscription,
   createCreditCardSubscription,
@@ -8,7 +8,15 @@ import {
   updateAsaasSubscription,
 } from '../../lib/asaasClient'
 import { AppError } from '../../lib/errors'
-import { addBillingCycle, centsToReais, getPlanCycleCents, type BillingCycle, type PlanSlug } from '../../lib/plans'
+import { sendPaymentReceiptEmail } from '../../lib/mailer'
+import {
+  PLANS,
+  addBillingCycle,
+  centsToReais,
+  getPlanCycleCents,
+  type BillingCycle,
+  type PlanSlug,
+} from '../../lib/plans'
 import type { SubscribeInput, WebhookInput } from './schemas'
 
 /** Dias de tolerância após um PAYMENT_OVERDUE antes do downgrade pro free. */
@@ -190,6 +198,13 @@ export async function handleWebhook(event: string, payment: WebhookInput['paymen
   const mappedStatus = PAYMENT_STATUS_MAP[payment.status ?? ''] ?? 'pending'
   const paidAt = payment.clientPaymentDate ? new Date(payment.clientPaymentDate) : null
 
+  // Este pagamento já constava como pago? Evita enviar dois comprovantes quando
+  // CONFIRMED e RECEIVED chegam para a mesma cobrança.
+  const existingPayment = await db.query.payments.findFirst({
+    where: eq(payments.asaasPaymentId, payment.id),
+  })
+  const wasAlreadyPaid = existingPayment?.status === 'confirmed' || existingPayment?.status === 'received'
+
   await db
     .insert(payments)
     .values({
@@ -208,12 +223,13 @@ export async function handleWebhook(event: string, payment: WebhookInput['paymen
 
   if (event === 'PAYMENT_CONFIRMED' || event === 'PAYMENT_RECEIVED') {
     const dueDate = payment.dueDate ? new Date(payment.dueDate) : new Date()
+    const nextChargeDate = addBillingCycle(dueDate, subscription.billingCycle)
     await db
       .update(subscriptions)
       .set({
         status: 'active',
         graceUntil: null,
-        currentPeriodEnd: addBillingCycle(dueDate, subscription.billingCycle),
+        currentPeriodEnd: nextChargeDate,
         updatedAt: new Date(),
       })
       .where(eq(subscriptions.id, subscription.id))
@@ -221,6 +237,12 @@ export async function handleWebhook(event: string, payment: WebhookInput['paymen
       .update(establishments)
       .set({ plan: subscription.planSlug })
       .where(eq(establishments.id, subscription.establishmentId))
+
+    // Comprovante da Kairoon (além do e-mail que o próprio Asaas dispara).
+    // Fire-and-forget: envio de e-mail nunca deve travar nem falhar o webhook.
+    if (!wasAlreadyPaid) {
+      void sendPaymentReceipt(subscription, payment, paidAt, nextChargeDate)
+    }
   } else if (event === 'PAYMENT_OVERDUE') {
     const graceUntil = new Date()
     graceUntil.setDate(graceUntil.getDate() + GRACE_DAYS)
@@ -228,5 +250,38 @@ export async function handleWebhook(event: string, payment: WebhookInput['paymen
       .update(subscriptions)
       .set({ status: 'past_due', graceUntil, updatedAt: new Date() })
       .where(eq(subscriptions.id, subscription.id))
+  }
+}
+
+/**
+ * Envia o comprovante de pagamento pro dono da conta. Nunca lança: qualquer
+ * falha de e-mail é só logada, pra não afetar o processamento do webhook.
+ */
+async function sendPaymentReceipt(
+  subscription: typeof subscriptions.$inferSelect,
+  payment: NonNullable<WebhookInput['payment']>,
+  paidAt: Date | null,
+  nextChargeDate: Date,
+) {
+  try {
+    const establishment = await db.query.establishments.findFirst({
+      where: eq(establishments.id, subscription.establishmentId),
+    })
+    if (!establishment) return
+    const owner = await db.query.users.findFirst({ where: eq(users.id, establishment.ownerId) })
+    if (!owner) return
+
+    await sendPaymentReceiptEmail({
+      to: owner.email,
+      name: owner.name,
+      planName: PLANS[subscription.planSlug as PlanSlug]?.name ?? subscription.planSlug,
+      billingCycle: subscription.billingCycle,
+      amountCents: Math.round((payment.value ?? 0) * 100),
+      paidAt,
+      nextChargeDate,
+      invoiceUrl: payment.invoiceUrl ?? null,
+    })
+  } catch (err) {
+    console.error('[payments] falha ao enviar comprovante de pagamento:', err)
   }
 }

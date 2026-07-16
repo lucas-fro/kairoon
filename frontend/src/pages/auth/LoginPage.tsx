@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { AlertCircle, Eye, EyeOff, Lock, Mail } from 'lucide-react'
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { ApiError } from '../../api/client'
 import { KairoonLogotype } from '../../components/brand/Logo'
 import { Button } from '../../components/ui/Button'
@@ -12,7 +12,16 @@ export function LoginPage() {
   const { isAuthenticated, login } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const from = (location.state as { from?: string } | null)?.from
+  const [searchParams] = useSearchParams()
+  // Destino pós-login: o `from` do state (rota protegida) tem prioridade;
+  // senão, se veio de um card de plano da LP (?plan=&cycle=), vai pro checkout.
+  const stateFrom = (location.state as { from?: string } | null)?.from
+  const planParam = searchParams.get('plan')
+  const checkoutFrom =
+    planParam === 'basico' || planParam === 'essencial'
+      ? `/checkout?plan=${planParam}&cycle=${searchParams.get('cycle') === 'yearly' ? 'yearly' : 'monthly'}`
+      : undefined
+  const from = stateFrom ?? checkoutFrom
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -138,7 +147,7 @@ export function LoginPage() {
           <p className="mt-6 text-center text-sm text-ink-secondary">
             Ainda não tem conta?{' '}
             <Link
-              to="/register"
+              to={{ pathname: '/register', search: location.search }}
               state={location.state}
               className="font-medium text-primary transition-colors duration-150 hover:text-primary-hover hover:underline"
             >

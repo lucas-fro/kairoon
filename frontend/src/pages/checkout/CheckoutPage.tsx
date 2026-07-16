@@ -266,8 +266,18 @@ export function CheckoutPage() {
           {/* Formulário */}
           <Card className="order-2 lg:order-1">
             <CardContent className="p-5 sm:p-7">
-              <h1 className="font-display text-xl font-semibold text-ink">Finalizar assinatura</h1>
-              <p className="mt-1 text-sm text-ink-secondary">Preencha as etapas abaixo pra ativar seu plano.</p>
+              <div className="flex items-start justify-between gap-4 border-b border-line-divider pb-4">
+                <div>
+                  <h1 className="font-display text-xl font-semibold text-ink">Finalizar assinatura</h1>
+                  <p className="mt-1 text-sm text-ink-secondary">Preencha as etapas abaixo pra ativar seu plano.</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <span className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-ink-tertiary">
+                    Processado por
+                  </span>
+                  <img src="/asaas_logo.png" alt="Asaas" className="ml-auto h-6 w-auto sm:h-7" />
+                </div>
+              </div>
 
               <form onSubmit={handleSubmit} noValidate className="mt-6 space-y-3">
                 <CheckoutSection
@@ -445,15 +455,15 @@ export function CheckoutPage() {
                   isLoading={isSubmitting}
                   leftIcon={<Lock className="h-4 w-4" />}
                 >
-                  Assinar {plan ? `— ${formatBRL(cycleCents ?? 0)}` : ''}
+                  Assinar {plan ? `por ${formatBRL(cycleCents ?? 0)}` : ''}
                 </Button>
 
-                <div className="flex flex-col items-center gap-2 pt-1">
-                  <img src="/asaas_logo.png" alt="Asaas" className="h-5 w-auto opacity-70" />
-                  <p className="flex items-center gap-1.5 text-center text-xs text-ink-tertiary">
-                    <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
-                    Pagamento processado com segurança pelo Asaas — seus dados de cartão nunca ficam salvos no
-                    Kairoon.
+                <div className="mt-1 flex items-center gap-3 rounded-lg bg-success-light px-4 py-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white">
+                    <ShieldCheck className="h-5 w-5 text-success-dark" />
+                  </span>
+                  <p className="text-xs leading-snug text-ink-secondary">
+                    Pagamento processado com segurança pelo Asaas. Seus dados de cartão nunca ficam salvos no Kairoon.
                   </p>
                 </div>
               </form>

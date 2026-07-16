@@ -19,7 +19,7 @@ import {
   X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { checkSlugAvailability } from '../../api/auth'
 import { ApiError } from '../../api/client'
 import { KairoonLogotype } from '../../components/brand/Logo'
@@ -195,7 +195,17 @@ export function RegisterPage() {
   const { isAuthenticated, register } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const from = (location.state as { from?: string } | null)?.from
+  const [searchParams] = useSearchParams()
+  // Destino pós-cadastro: o `from` guardado no state (quando veio de uma rota
+  // protegida) tem prioridade; senão, se veio de um card de plano da LP
+  // (?plan=&cycle=), leva direto pro checkout daquele plano.
+  const stateFrom = (location.state as { from?: string } | null)?.from
+  const planParam = searchParams.get('plan')
+  const checkoutFrom =
+    planParam === 'basico' || planParam === 'essencial'
+      ? `/checkout?plan=${planParam}&cycle=${searchParams.get('cycle') === 'yearly' ? 'yearly' : 'monthly'}`
+      : undefined
+  const from = stateFrom ?? checkoutFrom
 
   const [step, setStep] = useState(1)
 
@@ -733,7 +743,7 @@ export function RegisterPage() {
             <p className="mt-5 text-center text-sm text-ink-secondary">
               Já tem conta?{' '}
               <Link
-                to="/login"
+                to={{ pathname: '/login', search: location.search }}
                 state={location.state}
                 className="font-medium text-primary transition-colors duration-150 hover:text-primary-hover hover:underline"
               >
