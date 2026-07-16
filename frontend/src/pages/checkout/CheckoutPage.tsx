@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   AlertCircle,
   ArrowLeft,
+  Calendar,
   CreditCard,
   Home,
   IdCard,
@@ -23,7 +24,6 @@ import { BillingCycleToggle, getAnnualDiscountPercent } from '../../components/p
 import { Button } from '../../components/ui/Button'
 import { Card, CardContent } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
-import { Select } from '../../components/ui/Select'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { useToast } from '../../components/ui/Toast'
 import { useAuth } from '../../contexts/AuthContext'
@@ -42,12 +42,16 @@ import type { BillingCycle, PlanSlug } from '../../types/api'
 import { CheckoutSection } from './CheckoutSection'
 
 const EMAIL_REGEX = /^\S+@\S+\.\S+$/
-const MONTHS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'))
-const CURRENT_YEAR = new Date().getFullYear()
-const YEARS = Array.from({ length: 15 }, (_, i) => String(CURRENT_YEAR + i))
 
 function formatCardNumber(value: string): string {
   return onlyDigits(value).slice(0, 19).replace(/(\d{4})(?=\d)/g, '$1 ')
+}
+
+/** Formata a validade digitada como MM/AA (só dígitos, barra automática). */
+function formatExpiry(value: string): string {
+  const digits = onlyDigits(value).slice(0, 4)
+  if (digits.length <= 2) return digits
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`
 }
 
 export function CheckoutPage() {
@@ -70,8 +74,7 @@ export function CheckoutPage() {
   // Etapa 1 — cartão
   const [holderName, setHolderName] = useState('')
   const [cardNumber, setCardNumber] = useState('')
-  const [expiryMonth, setExpiryMonth] = useState('')
-  const [expiryYear, setExpiryYear] = useState('')
+  const [expiry, setExpiry] = useState('')
   const [ccv, setCcv] = useState('')
 
   // Etapa 2 — dados pessoais
@@ -98,11 +101,22 @@ export function CheckoutPage() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Validade: parseia MM/AA e confere que o mês é válido e não está no passado.
+  const expiryDigits = onlyDigits(expiry)
+  const expMonth = expiryDigits.slice(0, 2)
+  const expYear2 = expiryDigits.slice(2, 4)
+  const expiryValid = (() => {
+    if (!/^(0[1-9]|1[0-2])$/.test(expMonth) || expYear2.length !== 2) return false
+    const now = new Date()
+    const year = 2000 + Number(expYear2)
+    const month = Number(expMonth)
+    return year > now.getFullYear() || (year === now.getFullYear() && month >= now.getMonth() + 1)
+  })()
+
   const cardComplete =
     holderName.trim().length >= 2 &&
     onlyDigits(cardNumber).length >= 13 &&
-    /^(0[1-9]|1[0-2])$/.test(expiryMonth) &&
-    /^\d{4}$/.test(expiryYear) &&
+    expiryValid &&
     /^\d{3,4}$/.test(ccv)
 
   const personalComplete =
@@ -181,8 +195,8 @@ export function CheckoutPage() {
         card: {
           holderName: holderName.trim(),
           number: onlyDigits(cardNumber),
-          expiryMonth,
-          expiryYear,
+          expiryMonth: expMonth,
+          expiryYear: `20${expYear2}`,
           ccv,
         },
         holder: {
@@ -304,33 +318,18 @@ export function CheckoutPage() {
                     value={formatCardNumber(cardNumber)}
                     onChange={(e) => setCardNumber(e.target.value)}
                   />
-                  <div className="grid grid-cols-3 gap-3">
-                    <Select
-                      label="Mês"
-                      autoComplete="cc-exp-month"
-                      value={expiryMonth}
-                      onChange={(e) => setExpiryMonth(e.target.value)}
-                    >
-                      <option value="">MM</option>
-                      {MONTHS.map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))}
-                    </Select>
-                    <Select
-                      label="Ano"
-                      autoComplete="cc-exp-year"
-                      value={expiryYear}
-                      onChange={(e) => setExpiryYear(e.target.value)}
-                    >
-                      <option value="">AAAA</option>
-                      {YEARS.map((y) => (
-                        <option key={y} value={y}>
-                          {y}
-                        </option>
-                      ))}
-                    </Select>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input
+                      label="Validade"
+                      inputMode="numeric"
+                      autoComplete="cc-exp"
+                      placeholder="MM/AA"
+                      maxLength={5}
+                      leftIcon={<Calendar className="h-4 w-4" />}
+                      value={expiry}
+                      onChange={(e) => setExpiry(formatExpiry(e.target.value))}
+                      error={expiry.length === 5 && !expiryValid ? 'Validade inválida' : undefined}
+                    />
                     <Input
                       label="CVV"
                       inputMode="numeric"
