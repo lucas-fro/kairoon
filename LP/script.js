@@ -151,6 +151,19 @@
           billing.textContent = period === 'annual' ? 'cobrado anualmente' : 'cobrado mensalmente';
         }
 
+        // No anual, mostra embaixo o valor total cobrado de uma vez no ano
+        // (o número grande do card continua sendo o equivalente por mês).
+        var annualTotal = card.querySelector('.plan-annual-total');
+        if (annualTotal) {
+          if (period === 'annual') {
+            var totalPerYear = Number(amount.getAttribute('data-annual')) * 12;
+            annualTotal.textContent = 'Total de R$' + totalPerYear.toLocaleString('pt-BR') + '/ano';
+            annualTotal.hidden = false;
+          } else {
+            annualTotal.hidden = true;
+          }
+        }
+
         // Propaga o ciclo escolhido pro checkout (cards Básico/Essencial only).
         var cta = card.querySelector('[data-plan-cta]');
         if (cta) {

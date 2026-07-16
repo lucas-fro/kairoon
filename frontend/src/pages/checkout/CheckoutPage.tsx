@@ -7,6 +7,7 @@ import { getMe } from '../../api/auth'
 import { ApiError } from '../../api/client'
 import { getPlans, subscribe } from '../../api/payments'
 import { KairoonLogotype } from '../../components/brand/Logo'
+import { BillingCycleToggle, getAnnualDiscountPercent } from '../../components/payments/BillingCycleToggle'
 import { Button } from '../../components/ui/Button'
 import { Card, CardContent } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
@@ -39,11 +40,14 @@ export function CheckoutPage() {
 
   const requestedPlan = searchParams.get('plan')
   const planSlug: PlanSlug = requestedPlan === 'basico' ? 'basico' : 'essencial'
-  const billingCycle: BillingCycle = searchParams.get('cycle') === 'yearly' ? 'yearly' : 'monthly'
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>(
+    searchParams.get('cycle') === 'yearly' ? 'yearly' : 'monthly',
+  )
 
   const plansQuery = useQuery({ queryKey: ['payments', 'plans'], queryFn: getPlans })
   const plan = plansQuery.data?.[planSlug]
   const cycleCents = plan ? (billingCycle === 'yearly' ? plan.yearlyCents : plan.monthlyCents) : null
+  const discountPercent = plan ? getAnnualDiscountPercent(plan.monthlyCents, plan.yearlyCents) : 0
 
   // Cartão
   const [holderName, setHolderName] = useState('')
@@ -136,20 +140,33 @@ export function CheckoutPage() {
           <CardContent className="p-6 sm:p-8">
             <h1 className="font-display text-xl font-semibold text-ink">Assinar plano</h1>
 
-            <div className="mt-4 flex items-center justify-between rounded-lg bg-background px-4 py-3">
+            <div className="mt-4">
+              <BillingCycleToggle value={billingCycle} onChange={setBillingCycle} discountPercent={discountPercent} />
+            </div>
+
+            <div className="mt-3 rounded-lg bg-background px-4 py-3">
               {plansQuery.isPending && <Skeleton className="h-5 w-40" />}
               {plan && (
-                <>
+                <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium text-ink">Plano {plan.name}</p>
                     <p className="text-xs text-ink-secondary">
-                      {billingCycle === 'yearly' ? 'Cobrado anualmente' : 'Cobrado mensalmente'}
+                      {billingCycle === 'yearly'
+                        ? 'Cobrado uma vez por ano'
+                        : 'Cobrado mensalmente'}
                     </p>
                   </div>
-                  <p className="font-display text-lg font-semibold text-primary">
-                    {formatBRL(cycleCents ?? 0)}
-                  </p>
-                </>
+                  <div className="text-right">
+                    <p className="font-display text-lg font-semibold text-primary">
+                      {formatBRL(cycleCents ?? 0)}
+                    </p>
+                    {billingCycle === 'yearly' && (
+                      <p className="text-xs text-ink-tertiary">
+                        equivale a {formatBRL(plan.yearlyCents / 12)}/mês
+                      </p>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
 

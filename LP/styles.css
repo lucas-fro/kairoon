@@ -1267,6 +1267,17 @@ button {
   color: var(--color-ink-tertiary);
 }
 
+.plan-annual-total {
+  margin-top: 2px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.plan-annual-total[hidden] {
+  display: none;
+}
+
 .plan-card .btn {
   margin-top: 22px;
 }
