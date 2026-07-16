@@ -3,6 +3,7 @@ import { db } from '../../db'
 import { employees, establishments, timeBlocks, users, workingHours } from '../../db/schema'
 import { timeToMinutes } from '../../lib/datetime'
 import { AppError } from '../../lib/errors'
+import { getEffectivePlan } from '../../lib/plan'
 import type {
   CreateTimeBlockInput,
   UpdateEstablishmentInput,
@@ -134,11 +135,7 @@ export async function updateWorkingHours(
 }
 
 export async function getPlan(establishmentId: string) {
-  const establishment = await db.query.establishments.findFirst({
-    columns: { plan: true },
-    where: eq(establishments.id, establishmentId),
-  })
-  if (!establishment) throw new AppError('Estabelecimento não encontrado', 404)
+  const plan = await getEffectivePlan(establishmentId)
 
   const [row] = await db
     .select({ count: sql<string>`count(*)` })
@@ -146,7 +143,7 @@ export async function getPlan(establishmentId: string) {
     .where(eq(employees.establishmentId, establishmentId))
 
   return {
-    plan: establishment.plan,
+    plan,
     limits: PLAN_LIMITS,
     usage: { employees: Number(row?.count ?? 0) },
   }

@@ -150,6 +150,15 @@
         if (billing) {
           billing.textContent = period === 'annual' ? 'cobrado anualmente' : 'cobrado mensalmente';
         }
+
+        // Propaga o ciclo escolhido pro checkout (cards Básico/Essencial only).
+        var cta = card.querySelector('[data-plan-cta]');
+        if (cta) {
+          var cycle = period === 'annual' ? 'yearly' : 'monthly';
+          var url = new URL(cta.getAttribute('href'), window.location.href);
+          url.searchParams.set('cycle', cycle);
+          cta.setAttribute('href', url.toString());
+        }
       });
     }
 

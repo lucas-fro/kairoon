@@ -55,6 +55,24 @@ export const loyaltyRewardTypeEnum = pgEnum('loyalty_reward_type', [
 
 export const pointsEntryTypeEnum = pgEnum('points_entry_type', ['earn', 'redeem'])
 
+export const subscriptionStatusEnum = pgEnum('subscription_status', [
+  'pending',
+  'active',
+  'past_due',
+  'canceled',
+])
+
+export const billingCycleEnum = pgEnum('billing_cycle', ['monthly', 'yearly'])
+
+export const paymentStatusEnum = pgEnum('payment_status', [
+  'pending',
+  'confirmed',
+  'received',
+  'overdue',
+  'refunded',
+  'failed',
+])
+
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
@@ -679,6 +697,63 @@ export const pointsEntries = pgTable(
   ],
 )
 
+// Assinatura paga do estabelecimento (cobrança recorrente via Asaas). 1 por
+// estabelecimento — cancelar não apaga a linha, só marca status/canceledAt
+// (mantém acesso até currentPeriodEnd, ver lib/plan.ts#getEffectivePlan).
+export const subscriptions = pgTable(
+  'subscriptions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    establishmentId: uuid('establishment_id')
+      .notNull()
+      .references(() => establishments.id, { onDelete: 'cascade' }),
+    planSlug: text('plan_slug').notNull(),
+    billingCycle: billingCycleEnum('billing_cycle').notNull(),
+    status: subscriptionStatusEnum('status').notNull().default('pending'),
+    asaasCustomerId: text('asaas_customer_id').notNull(),
+    asaasSubscriptionId: text('asaas_subscription_id').notNull(),
+    // Token reutilizável do cartão (nunca o número completo) — permite
+    // reassinar/trocar de plano sem pedir os dados do cartão de novo.
+    creditCardToken: text('credit_card_token'),
+    cardLast4: text('card_last4'),
+    cardBrand: text('card_brand'),
+    currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),
+    // Prazo de tolerância após um PAYMENT_OVERDUE; expirado = rebaixa pro free
+    // (ver getEffectivePlan). Null = sem atraso em aberto.
+    graceUntil: timestamp('grace_until', { withTimezone: true }),
+    canceledAt: timestamp('canceled_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('subscriptions_establishment_idx').on(t.establishmentId),
+    uniqueIndex('subscriptions_asaas_subscription_idx').on(t.asaasSubscriptionId),
+  ],
+)
+
+// Log de cobranças recebidas via webhook do Asaas — existe principalmente
+// para idempotência (asaasPaymentId único: o Asaas reenvia webhook em não-2xx).
+export const payments = pgTable(
+  'payments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    subscriptionId: uuid('subscription_id')
+      .notNull()
+      .references(() => subscriptions.id, { onDelete: 'cascade' }),
+    asaasPaymentId: text('asaas_payment_id').notNull(),
+    status: paymentStatusEnum('status').notNull(),
+    amountCents: integer('amount_cents').notNull(),
+    dueDate: date('due_date', { mode: 'string' }).notNull(),
+    paidAt: timestamp('paid_at', { withTimezone: true }),
+    invoiceUrl: text('invoice_url'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('payments_asaas_payment_idx').on(t.asaasPaymentId),
+    index('payments_subscription_idx').on(t.subscriptionId),
+  ],
+)
+
 export const usersRelations = relations(users, ({ many }) => ({
   establishments: many(establishments),
 }))
@@ -702,6 +777,7 @@ export const establishmentsRelations = relations(establishments, ({ one, many })
   pointsPrograms: many(pointsPrograms),
   pointsRewards: many(pointsRewards),
   pointsEntries: many(pointsEntries),
+  subscriptions: many(subscriptions),
 }))
 
 export const productsRelations = relations(products, ({ one }) => ({
@@ -914,5 +990,20 @@ export const waitlistEntriesRelations = relations(waitlistEntries, ({ one }) => 
   scheduledAppointment: one(appointments, {
     fields: [waitlistEntries.scheduledAppointmentId],
     references: [appointments.id],
+  }),
+}))
+
+export const subscriptionsRelations = relations(subscriptions, ({ one, many }) => ({
+  establishment: one(establishments, {
+    fields: [subscriptions.establishmentId],
+    references: [establishments.id],
+  }),
+  payments: many(payments),
+}))
+
+export const paymentsRelations = relations(payments, ({ one }) => ({
+  subscription: one(subscriptions, {
+    fields: [payments.subscriptionId],
+    references: [subscriptions.id],
   }),
 }))

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { AlertCircle, Eye, EyeOff, Lock, Mail } from 'lucide-react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError } from '../../api/client'
 import { KairoonLogotype } from '../../components/brand/Logo'
 import { Button } from '../../components/ui/Button'
@@ -11,6 +11,8 @@ import { useAuth } from '../../contexts/AuthContext'
 export function LoginPage() {
   const { isAuthenticated, login } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const from = (location.state as { from?: string } | null)?.from
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -18,7 +20,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  if (isAuthenticated) return <Navigate to="/app" replace />
+  if (isAuthenticated) return <Navigate to={from ?? '/app'} replace />
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -31,7 +33,7 @@ export function LoginPage() {
     setIsSubmitting(true)
     try {
       await login(trimmedEmail, password)
-      navigate('/app')
+      navigate(from ?? '/app')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro inesperado')
       setIsSubmitting(false)
@@ -137,6 +139,7 @@ export function LoginPage() {
             Ainda não tem conta?{' '}
             <Link
               to="/register"
+              state={location.state}
               className="font-medium text-primary transition-colors duration-150 hover:text-primary-hover hover:underline"
             >
               Criar conta grátis
