@@ -563,8 +563,6 @@ export interface Subscription {
   planSlug: string
   billingCycle: BillingCycle
   status: SubscriptionStatus
-  cardLast4: string | null
-  cardBrand: string | null
   currentPeriodEnd: string | null
   graceUntil: string | null
   canceledAt: string | null

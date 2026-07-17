@@ -93,13 +93,6 @@ export interface AsaasSubscription {
   nextDueDate: string
   value: number
   cycle: 'MONTHLY' | 'YEARLY'
-  // Presente na criação com cartão: token reutilizável + dados mascarados
-  // (nunca o número completo) pra exibir "•••• 4444" na UI.
-  creditCard?: {
-    creditCardNumber?: string
-    creditCardBrand?: string
-    creditCardToken?: string
-  }
 }
 
 export async function createCreditCardSubscription(input: {

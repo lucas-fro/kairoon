@@ -712,11 +712,6 @@ export const subscriptions = pgTable(
     status: subscriptionStatusEnum('status').notNull().default('pending'),
     asaasCustomerId: text('asaas_customer_id').notNull(),
     asaasSubscriptionId: text('asaas_subscription_id').notNull(),
-    // Token reutilizável do cartão (nunca o número completo) — permite
-    // reassinar/trocar de plano sem pedir os dados do cartão de novo.
-    creditCardToken: text('credit_card_token'),
-    cardLast4: text('card_last4'),
-    cardBrand: text('card_brand'),
     currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),
     // Prazo de tolerância após um PAYMENT_OVERDUE; expirado = rebaixa pro free
     // (ver getEffectivePlan). Null = sem atraso em aberto.

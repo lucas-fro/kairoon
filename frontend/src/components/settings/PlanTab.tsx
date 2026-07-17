@@ -4,7 +4,7 @@ import { Check, Crown, MessageCircle, Palette, QrCode, Sparkles, UserCircle, Use
 import type { LucideIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { getPlan } from '../../api/establishment'
-import { cancelSubscription, changePlan, getPlans, getSubscription } from '../../api/payments'
+import { cancelSubscription, getPlans, getSubscription } from '../../api/payments'
 import { formatBRL, formatDate } from '../../lib/format'
 import type { BillingCycle, PlanSlug } from '../../types/api'
 import { BillingCycleToggle, getAnnualDiscountPercent } from '../payments/BillingCycleToggle'
@@ -45,7 +45,6 @@ function toIsoDate(value: string): string {
 export function PlanTab() {
   const [upgradeOpen, setUpgradeOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
-  const [pendingPlanSlug, setPendingPlanSlug] = useState<PlanSlug | null>(null)
   const [selectedCycle, setSelectedCycle] = useState<BillingCycle>('monthly')
   const navigate = useNavigate()
   const toast = useToast()
@@ -66,41 +65,14 @@ export function PlanTab() {
     onError: () => toast.error('Não foi possível cancelar a assinatura. Tente novamente.'),
   })
 
-  const changePlanMutation = useMutation({
-    mutationFn: changePlan,
-    onSuccess: () => {
-      toast.success('Plano alterado! A nova cobrança vale a partir do próximo ciclo.')
-      setPendingPlanSlug(null)
-      setUpgradeOpen(false)
-      queryClient.invalidateQueries({ queryKey: ['payments', 'subscription'] })
-      queryClient.invalidateQueries({ queryKey: ['plan'] })
-    },
-    onError: () => toast.error('Não foi possível trocar de plano. Tente novamente.'),
-  })
-
   const planName = planQuery.data?.plan ?? 'free'
   const planLabel = `Plano ${planName.charAt(0).toUpperCase()}${planName.slice(1)}`
 
   const subscription = subscriptionQuery.data?.subscription ?? null
   const hasSubscriptionRecord = subscription !== null
   const canCancel = subscription !== null && subscription.status !== 'canceled'
-  // Só dá pra trocar in-place (sem pedir cartão) quando a assinatura já está
-  // ativa — 'pending'/'past_due' precisam se resolver antes, e sem assinatura
-  // nenhuma o primeiro cartão precisa ser coletado no checkout.
-  const canChangeInPlace = subscription?.status === 'active'
-
-  function openUpgradeDialog() {
-    setSelectedCycle(subscription?.billingCycle ?? 'monthly')
-    setUpgradeOpen(true)
-  }
 
   function handlePickPlan(planSlug: PlanSlug) {
-    if (canChangeInPlace) {
-      if (planSlug === subscription?.planSlug && selectedCycle === subscription?.billingCycle) return
-      setPendingPlanSlug(planSlug)
-      return
-    }
-    setUpgradeOpen(false)
     navigate(`/checkout?plan=${planSlug}&cycle=${selectedCycle}`)
   }
 
@@ -152,9 +124,6 @@ export function PlanTab() {
             <p>
               Status:{' '}
               <span className="font-medium text-ink">{STATUS_LABEL[subscription.status] ?? subscription.status}</span>
-              {subscription.cardBrand && subscription.cardLast4 && (
-                <span className="text-ink-tertiary"> · {subscription.cardBrand} •••• {subscription.cardLast4}</span>
-              )}
             </p>
             {subscription.status === 'canceled' && subscription.currentPeriodEnd && (
               <p className="mt-1">
@@ -175,8 +144,8 @@ export function PlanTab() {
               Cancelar assinatura
             </Button>
           )}
-          <Button type="button" onClick={openUpgradeDialog} leftIcon={<Sparkles className="h-4 w-4" />}>
-            {canChangeInPlace ? 'Trocar de plano' : 'Fazer upgrade'}
+          <Button type="button" onClick={() => setUpgradeOpen(true)} leftIcon={<Sparkles className="h-4 w-4" />}>
+            Fazer upgrade
           </Button>
         </div>
       </CardContent>
@@ -198,18 +167,16 @@ export function PlanTab() {
           ))}
         </ul>
 
-        {plansQuery.data && (
-          <div className="mb-4">
-            <BillingCycleToggle
-              value={selectedCycle}
-              onChange={setSelectedCycle}
-              discountPercent={getAnnualDiscountPercent(
-                (plansQuery.data.essencial ?? Object.values(plansQuery.data)[0]).monthlyCents,
-                (plansQuery.data.essencial ?? Object.values(plansQuery.data)[0]).yearlyCents,
-              )}
-            />
-          </div>
-        )}
+        <div className="mb-4">
+          <BillingCycleToggle
+            value={selectedCycle}
+            onChange={setSelectedCycle}
+            discountPercent={plansQuery.data ? getAnnualDiscountPercent(
+              (plansQuery.data.essencial ?? Object.values(plansQuery.data)[0]).monthlyCents,
+              (plansQuery.data.essencial ?? Object.values(plansQuery.data)[0]).yearlyCents,
+            ) : 0}
+          />
+        </div>
 
         <div className="space-y-2">
           {plansQuery.isPending && <Skeleton className="h-16 w-full" />}
@@ -220,21 +187,15 @@ export function PlanTab() {
                 { name: string; monthlyCents: number; yearlyCents: number },
               ][]
             ).map(([slug, info]) => {
-              const isCurrent =
-                canChangeInPlace && slug === subscription?.planSlug && selectedCycle === subscription?.billingCycle
               const priceCents = selectedCycle === 'yearly' ? info.yearlyCents : info.monthlyCents
               return (
                 <button
                   key={slug}
                   type="button"
-                  disabled={isCurrent}
                   onClick={() => handlePickPlan(slug)}
-                  className="flex w-full items-center justify-between rounded-lg border border-line px-4 py-3 text-left transition-colors duration-150 hover:border-secondary hover:bg-secondary-light disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-line disabled:hover:bg-transparent"
+                  className="flex w-full items-center justify-between rounded-lg border border-line px-4 py-3 text-left transition-colors duration-150 hover:border-secondary hover:bg-secondary-light"
                 >
-                  <span className="font-medium text-ink">
-                    {info.name}
-                    {isCurrent && <span className="ml-2 text-xs font-normal text-ink-tertiary">(plano atual)</span>}
-                  </span>
+                  <span className="font-medium text-ink">{info.name}</span>
                   <span className="text-right">
                     <span className="block text-sm font-medium text-primary">
                       {formatBRL(priceCents)}
@@ -267,20 +228,6 @@ export function PlanTab() {
         confirmLabel="Cancelar assinatura"
         danger
         isLoading={cancelMutation.isPending}
-      />
-
-      <ConfirmDialog
-        open={pendingPlanSlug !== null}
-        onClose={() => setPendingPlanSlug(null)}
-        onConfirm={() => {
-          if (pendingPlanSlug) {
-            changePlanMutation.mutate({ planSlug: pendingPlanSlug, billingCycle: selectedCycle })
-          }
-        }}
-        title={`Trocar para o plano ${pendingPlanSlug ? plansQuery.data?.[pendingPlanSlug]?.name : ''} (${selectedCycle === 'yearly' ? 'anual' : 'mensal'})?`}
-        description="O novo valor passa a valer a partir da próxima cobrança, usando o mesmo cartão já cadastrado."
-        confirmLabel="Confirmar troca"
-        isLoading={changePlanMutation.isPending}
       />
     </Card>
   )
