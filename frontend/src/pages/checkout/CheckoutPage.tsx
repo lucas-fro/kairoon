@@ -240,8 +240,8 @@ export function CheckoutPage() {
         </Link>
 
         <div className="grid gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
-          {/* Resumo da compra */}
-          <div className="order-1 lg:order-2 lg:sticky lg:top-8">
+          {/* Resumo da compra (no mobile fica embaixo do formulário) */}
+          <div className="order-2 lg:sticky lg:top-8">
             <Card>
               <CardContent className="p-5 sm:p-6">
                 <h2 className="font-display text-base font-semibold text-ink">Resumo da assinatura</h2>
@@ -278,7 +278,7 @@ export function CheckoutPage() {
           </div>
 
           {/* Formulário */}
-          <Card className="order-2 lg:order-1">
+          <Card className="order-1">
             <CardContent className="p-5 sm:p-7">
               <div className="flex items-start justify-between gap-4 border-b border-line-divider pb-4">
                 <div>
