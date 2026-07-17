@@ -269,9 +269,33 @@ export function CheckoutPage() {
                   )}
                 </div>
 
-                <div className="mt-4 flex items-start gap-2.5 rounded-lg bg-background px-3 py-2.5 text-xs text-ink-secondary">
-                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-success-dark" />
-                  Cobrança recorrente processada com segurança pelo Asaas. Cancele quando quiser, sem multa.
+                {submitError && (
+                  <div className="mt-4 flex items-start gap-2 rounded-lg bg-error-light px-3 py-2.5 text-sm text-error-dark">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>{submitError}</span>
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  form="checkout-form"
+                  size="lg"
+                  className="mt-4 w-full"
+                  disabled={!formValid || !plan}
+                  isLoading={isSubmitting}
+                  leftIcon={<Lock className="h-4 w-4" />}
+                >
+                  Assinar {plan ? `por ${formatBRL(cycleCents ?? 0)}` : ''}
+                </Button>
+
+                <div className="mt-3 flex items-center gap-3 rounded-lg bg-success-light px-4 py-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white">
+                    <ShieldCheck className="h-5 w-5 text-success-dark" />
+                  </span>
+                  <p className="text-xs leading-snug text-ink-secondary">
+                    Pagamento seguro processado pelo Asaas. Seus dados de cartão não ficam salvos no Kairoon e você
+                    cancela quando quiser, sem multa.
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -293,7 +317,7 @@ export function CheckoutPage() {
                 </div>
               </div>
 
-              <form onSubmit={handleSubmit} noValidate className="mt-6 space-y-3">
+              <form id="checkout-form" onSubmit={handleSubmit} noValidate className="mt-6 space-y-3">
                 <CheckoutSection
                   step={1}
                   title="Dados do cartão"
@@ -438,33 +462,6 @@ export function CheckoutPage() {
                     </div>
                   )}
                 </CheckoutSection>
-
-                {submitError && (
-                  <div className="flex items-start gap-2 rounded-lg bg-error-light px-3 py-2.5 text-sm text-error-dark">
-                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>{submitError}</span>
-                  </div>
-                )}
-
-                <Button
-                  type="submit"
-                  size="lg"
-                  className="w-full"
-                  disabled={!formValid || !plan}
-                  isLoading={isSubmitting}
-                  leftIcon={<Lock className="h-4 w-4" />}
-                >
-                  Assinar {plan ? `por ${formatBRL(cycleCents ?? 0)}` : ''}
-                </Button>
-
-                <div className="mt-1 flex items-center gap-3 rounded-lg bg-success-light px-4 py-3">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white">
-                    <ShieldCheck className="h-5 w-5 text-success-dark" />
-                  </span>
-                  <p className="text-xs leading-snug text-ink-secondary">
-                    Pagamento processado com segurança pelo Asaas. Seus dados de cartão nunca ficam salvos no Kairoon.
-                  </p>
-                </div>
               </form>
             </CardContent>
           </Card>
