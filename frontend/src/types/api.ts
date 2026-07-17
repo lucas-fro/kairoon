@@ -538,9 +538,18 @@ export interface BusyHourCell {
   count: number
 }
 
+export type PlanFeatureKey =
+  | 'personalizacao'
+  | 'estoque'
+  | 'fidelidade'
+  | 'relatorios'
+  | 'financeiro'
+  | 'cupons'
+
 export interface PlanInfo {
   plan: string
   limits: { employees: number; establishments: number }
+  features: Record<PlanFeatureKey, boolean>
   usage: { employees: number }
 }
 

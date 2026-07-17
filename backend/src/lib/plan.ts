@@ -2,14 +2,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '../db'
 import { establishments, subscriptions } from '../db/schema'
 import { AppError } from './errors'
-
-/**
- * Gate de plano dos módulos de marketing (cupons/campanhas/fidelidade/pontos).
- * Nasce DESLIGADO: os recursos valem para todos os planos. Quando a cobrança
- * existir, trocar para true — todo create/update dos módulos já chama
- * assertPaidPlan condicionado a esta constante.
- */
-export const MARKETING_REQUIRES_PRO = false
+import { minPlanNameForFeature, planHasFeature, type PlanFeature } from './plans'
 
 /**
  * Reavaliação "preguiçosa" (sem cron) do plano efetivo: `establishments.plan`
@@ -57,6 +50,17 @@ export async function getEffectivePlan(establishmentId: string): Promise<string>
 export async function assertPaidPlan(establishmentId: string) {
   const plan = await getEffectivePlan(establishmentId)
   if (plan === 'free') {
-    throw new AppError('Disponível no plano Pro', 403)
+    throw new AppError('Disponível em um plano pago', 403)
+  }
+}
+
+/**
+ * Garante que o plano efetivo do estabelecimento libera um recurso específico.
+ * A regra de qual plano tem o quê vive em lib/plans.ts (PLAN_TIERS).
+ */
+export async function assertFeature(establishmentId: string, feature: PlanFeature) {
+  const plan = await getEffectivePlan(establishmentId)
+  if (!planHasFeature(plan, feature)) {
+    throw new AppError(`Disponível a partir do plano ${minPlanNameForFeature(feature)}`, 403)
   }
 }

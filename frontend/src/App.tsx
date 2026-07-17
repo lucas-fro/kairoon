@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from './components/layout/AppLayout'
+import { FeatureGate } from './components/plan/FeatureGate'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { LoginPage } from './pages/auth/LoginPage'
 import { RegisterPage } from './pages/auth/RegisterPage'
@@ -49,10 +50,31 @@ export function App() {
           <Route path="agenda" element={<AgendaPage />} />
           <Route path="clientes" element={<ClientsPage />} />
           <Route path="clientes/:id" element={<ClientDetailPage />} />
-          <Route path="estoque" element={<StockPage />} />
+          <Route
+            path="estoque"
+            element={
+              <FeatureGate feature="estoque">
+                <StockPage />
+              </FeatureGate>
+            }
+          />
           <Route path="fidelidade" element={<MarketingPage />} />
-          <Route path="relatorios" element={<ReportsPage />} />
-          <Route path="financeiro" element={<FinancePage />} />
+          <Route
+            path="relatorios"
+            element={
+              <FeatureGate feature="relatorios">
+                <ReportsPage />
+              </FeatureGate>
+            }
+          />
+          <Route
+            path="financeiro"
+            element={
+              <FeatureGate feature="financeiro">
+                <FinancePage />
+              </FeatureGate>
+            }
+          />
           {/* Serviços agora vivem dentro de Configurações (aba própria) */}
           <Route
             path="servicos"

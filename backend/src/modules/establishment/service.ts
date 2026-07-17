@@ -4,14 +4,12 @@ import { employees, establishments, timeBlocks, users, workingHours } from '../.
 import { timeToMinutes } from '../../lib/datetime'
 import { AppError } from '../../lib/errors'
 import { getEffectivePlan } from '../../lib/plan'
+import { planFeatureMap, planTier } from '../../lib/plans'
 import type {
   CreateTimeBlockInput,
   UpdateEstablishmentInput,
   UpdateWorkingHoursInput,
 } from './schemas'
-
-// Limite de profissionais temporariamente elevado (fase de testes)
-const PLAN_LIMITS = { employees: 99, establishments: 1 }
 
 function isUniqueViolation(err: unknown): boolean {
   const error = err as { code?: string; cause?: { code?: string } }
@@ -136,6 +134,7 @@ export async function updateWorkingHours(
 
 export async function getPlan(establishmentId: string) {
   const plan = await getEffectivePlan(establishmentId)
+  const tier = planTier(plan)
 
   const [row] = await db
     .select({ count: sql<string>`count(*)` })
@@ -144,7 +143,8 @@ export async function getPlan(establishmentId: string) {
 
   return {
     plan,
-    limits: PLAN_LIMITS,
+    limits: { employees: tier.employees, establishments: 1 },
+    features: planFeatureMap(plan),
     usage: { employees: Number(row?.count ?? 0) },
   }
 }

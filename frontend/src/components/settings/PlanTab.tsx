@@ -1,6 +1,18 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Crown, MessageCircle, Palette, QrCode, Sparkles, UserCircle, Users } from 'lucide-react'
+import {
+  BarChart3,
+  Boxes,
+  Check,
+  Crown,
+  Gift,
+  Palette,
+  Sparkles,
+  Ticket,
+  UserCircle,
+  Users,
+  Wallet,
+} from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { getPlan } from '../../api/establishment'
@@ -19,16 +31,19 @@ import { useToast } from '../ui/Toast'
 
 const FREE_FEATURES = [
   '1 profissional',
-  'Agendamentos ilimitados',
+  'Agenda e agendamentos ilimitados',
   'Link público de agendamento',
-  'Relatórios essenciais',
+  'Cadastro de clientes e histórico',
 ]
 
 const PRO_BENEFITS: { icon: LucideIcon; label: string }[] = [
-  { icon: Users, label: 'Múltiplos profissionais' },
-  { icon: MessageCircle, label: 'Lembretes automáticos por WhatsApp' },
-  { icon: QrCode, label: 'Sinal de agendamento via Pix' },
+  { icon: Users, label: 'Mais profissionais e comissões da equipe' },
   { icon: Palette, label: 'Página de agendamento personalizada' },
+  { icon: Boxes, label: 'Controle de estoque' },
+  { icon: Gift, label: 'Fidelidade e programa de pontos' },
+  { icon: BarChart3, label: 'Relatórios completos' },
+  { icon: Wallet, label: 'Controle financeiro completo (Essencial)' },
+  { icon: Ticket, label: 'Cupons e campanhas de marketing (Essencial)' },
 ]
 
 const STATUS_LABEL: Record<string, string> = {

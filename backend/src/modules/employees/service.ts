@@ -1,8 +1,10 @@
 import { and, asc, eq, inArray, ne } from 'drizzle-orm'
 import { db } from '../../db'
-import { employeeCommissions, employees, establishments, services } from '../../db/schema'
+import { employeeCommissions, employees, services } from '../../db/schema'
 import { timeToMinutes } from '../../lib/datetime'
 import { AppError } from '../../lib/errors'
+import { getEffectivePlan } from '../../lib/plan'
+import { planEmployeeLimit } from '../../lib/plans'
 import type { CreateEmployeeInput, UpdateEmployeeInput } from './schemas'
 
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -142,22 +144,18 @@ export async function createEmployee(establishmentId: string, input: CreateEmplo
   validateSchedule(data)
   validatePayroll(data)
 
-  const establishment = await db.query.establishments.findFirst({
-    where: eq(establishments.id, establishmentId),
-    columns: { plan: true },
-  })
-  if (!establishment) throw new AppError('Estabelecimento não encontrado', 404)
-
-  // Limite de profissionais temporariamente desativado (fase de testes)
-  const FREE_EMPLOYEE_LIMIT = 99
-  if (establishment.plan === 'free') {
-    const rows = await db
-      .select({ id: employees.id })
-      .from(employees)
-      .where(eq(employees.establishmentId, establishmentId))
-    if (rows.length >= FREE_EMPLOYEE_LIMIT) {
-      throw new AppError('Limite de profissionais atingido para o seu plano.', 403)
-    }
+  // Limite de profissionais por plano (free: 1, básico: 5, essencial: ilimitado).
+  const plan = await getEffectivePlan(establishmentId)
+  const limit = planEmployeeLimit(plan)
+  const currentCount = await db
+    .select({ id: employees.id })
+    .from(employees)
+    .where(eq(employees.establishmentId, establishmentId))
+  if (currentCount.length >= limit) {
+    throw new AppError(
+      'Limite de profissionais do seu plano atingido. Faça upgrade para adicionar mais.',
+      403,
+    )
   }
 
   return db.transaction(async (tx) => {

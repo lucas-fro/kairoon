@@ -3,7 +3,7 @@ import { db } from '../../db'
 import { clients, pointsEntries, pointsPrograms, pointsRewards, services } from '../../db/schema'
 import { AppError } from '../../lib/errors'
 import { lockClientLoyalty } from '../../lib/locks'
-import { MARKETING_REQUIRES_PRO, assertPaidPlan } from '../../lib/plan'
+import { assertFeature } from '../../lib/plan'
 import { mintPersonalCoupon } from '../coupons/service'
 import type { DbTransaction } from '../coupons/service'
 import type {
@@ -60,7 +60,7 @@ export async function getProgram(establishmentId: string) {
 }
 
 export async function upsertProgram(establishmentId: string, input: UpsertPointsProgramInput) {
-  if (MARKETING_REQUIRES_PRO) await assertPaidPlan(establishmentId)
+  await assertFeature(establishmentId, 'fidelidade')
   const values = {
     establishmentId,
     active: input.active,
@@ -83,7 +83,7 @@ export async function listRewards(establishmentId: string) {
 }
 
 export async function createReward(establishmentId: string, input: CreatePointsRewardInput) {
-  if (MARKETING_REQUIRES_PRO) await assertPaidPlan(establishmentId)
+  await assertFeature(establishmentId, 'fidelidade')
   const isFreeService = input.rewardType === 'free_service'
   const rewardServiceIds = normalizeRewardServiceIds(input.rewardType, input.rewardServiceIds)
   if (rewardServiceIds) await assertRewardServicesBelong(establishmentId, rewardServiceIds)
@@ -107,7 +107,7 @@ export async function updateReward(
   id: string,
   input: UpdatePointsRewardInput,
 ) {
-  if (MARKETING_REQUIRES_PRO) await assertPaidPlan(establishmentId)
+  await assertFeature(establishmentId, 'fidelidade')
   const existing = await db.query.pointsRewards.findFirst({
     where: and(eq(pointsRewards.id, id), eq(pointsRewards.establishmentId, establishmentId)),
   })

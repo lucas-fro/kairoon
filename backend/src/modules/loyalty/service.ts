@@ -3,7 +3,7 @@ import { db } from '../../db'
 import { clients, loyaltyPrograms, loyaltyRedemptions, loyaltyStamps, services } from '../../db/schema'
 import { AppError } from '../../lib/errors'
 import { lockClientLoyalty } from '../../lib/locks'
-import { MARKETING_REQUIRES_PRO, assertPaidPlan } from '../../lib/plan'
+import { assertFeature } from '../../lib/plan'
 import { mintPersonalCoupon } from '../coupons/service'
 import type { DbTransaction } from '../coupons/service'
 import type { RedeemLoyaltyInput, UpsertLoyaltyProgramInput } from './schemas'
@@ -48,7 +48,7 @@ async function assertRewardServicesBelong(establishmentId: string, serviceIds: s
 }
 
 export async function upsertProgram(establishmentId: string, input: UpsertLoyaltyProgramInput) {
-  if (MARKETING_REQUIRES_PRO) await assertPaidPlan(establishmentId)
+  await assertFeature(establishmentId, 'fidelidade')
 
   // free_service pode valer para um ou mais serviços; vazio = qualquer serviço.
   const rewardServiceIds =

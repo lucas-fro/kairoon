@@ -9,6 +9,79 @@ export const PLANS = {
 export type PlanSlug = keyof typeof PLANS
 export type BillingCycle = 'monthly' | 'yearly'
 
+// ---------------------------------------------------------------------------
+// Matriz de planos: fonte ÚNICA da verdade de o que cada plano libera e limita.
+// Para mover um recurso de plano, mexa só aqui (o backend aplica e o getPlan
+// devolve isto pro frontend gatear a UI). 'free' também entra na matriz.
+// ---------------------------------------------------------------------------
+
+/** Recursos gateáveis por plano. */
+export const PLAN_FEATURES = [
+  'personalizacao', // página de agendamento personalizada (cor, banner, sem marca Kairoon)
+  'estoque', // controle de estoque de produtos
+  'fidelidade', // cartão de fidelidade e programa de pontos
+  'relatorios', // relatórios de desempenho
+  'financeiro', // controle financeiro (fluxo de caixa, despesas)
+  'cupons', // cupons e campanhas de marketing
+] as const
+
+export type PlanFeature = (typeof PLAN_FEATURES)[number]
+
+/** Sentinela de "ilimitado" para limites numéricos (JSON não serializa Infinity). */
+export const UNLIMITED = 999
+
+interface PlanTier {
+  rank: number
+  /** Máximo de profissionais cadastráveis (UNLIMITED = ilimitado). */
+  employees: number
+  features: PlanFeature[]
+}
+
+export const PLAN_TIERS: Record<'free' | PlanSlug, PlanTier> = {
+  free: { rank: 0, employees: 1, features: [] },
+  basico: {
+    rank: 1,
+    employees: 5,
+    features: ['personalizacao', 'estoque', 'fidelidade', 'relatorios'],
+  },
+  essencial: {
+    rank: 2,
+    employees: UNLIMITED,
+    features: ['personalizacao', 'estoque', 'fidelidade', 'relatorios', 'financeiro', 'cupons'],
+  },
+}
+
+export function planTier(plan: string): PlanTier {
+  return PLAN_TIERS[plan as keyof typeof PLAN_TIERS] ?? PLAN_TIERS.free
+}
+
+export function planHasFeature(plan: string, feature: PlanFeature): boolean {
+  return planTier(plan).features.includes(feature)
+}
+
+export function planEmployeeLimit(plan: string): number {
+  return planTier(plan).employees
+}
+
+/** Nome do plano mais barato que inclui o recurso (para mensagens de upgrade). */
+export function minPlanNameForFeature(feature: PlanFeature): string {
+  if (PLAN_TIERS.basico.features.includes(feature)) return PLANS.basico.name
+  if (PLAN_TIERS.essencial.features.includes(feature)) return PLANS.essencial.name
+  return 'pago'
+}
+
+/** Mapa { feature: boolean } do que o plano libera (consumido pelo frontend). */
+export function planFeatureMap(plan: string): Record<PlanFeature, boolean> {
+  const tier = planTier(plan)
+  return PLAN_FEATURES.reduce(
+    (acc, feature) => {
+      acc[feature] = tier.features.includes(feature)
+      return acc
+    },
+    {} as Record<PlanFeature, boolean>,
+  )
+}
+
 export function isPlanSlug(value: string): value is PlanSlug {
   return value in PLANS
 }

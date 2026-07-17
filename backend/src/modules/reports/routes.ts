@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import { assertFeature } from '../../lib/plan'
 import {
   dateRangeQuerySchema,
   groupedQuerySchema,
@@ -9,6 +10,10 @@ import * as reportsService from './service'
 
 export async function reportsRoutes(app: FastifyInstance) {
   app.addHook('preHandler', app.authenticate)
+  // Relatórios são um recurso de plano pago (básico ou superior).
+  app.addHook('preHandler', async (request) => {
+    await assertFeature(request.user.establishmentId, 'relatorios')
+  })
 
   app.get('/revenue', async (request) => {
     const query = revenueQuerySchema.parse(request.query)
