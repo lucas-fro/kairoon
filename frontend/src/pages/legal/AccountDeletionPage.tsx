@@ -2,7 +2,7 @@ import { LegalPageLayout } from './LegalPageLayout'
 
 export function AccountDeletionPage() {
   return (
-    <LegalPageLayout current="exclusao" title="Exclusão de Conta" updatedAt="7 de julho de 2026">
+    <LegalPageLayout current="exclusao" title="Exclusão de Conta" updatedAt="17 de julho de 2026">
       <p>
         Você pode excluir sua conta Kairoon e todos os dados associados a ela a qualquer momento,
         diretamente pelo painel, sem precisar entrar em contato com o suporte. Esta página explica
@@ -11,7 +11,7 @@ export function AccountDeletionPage() {
 
       <h2>1. Como excluir sua conta</h2>
       <p>
-        Acesse sua conta em kairoon.app, vá até <strong>Configurações</strong> e abra a aba{' '}
+        Acesse sua conta em kairoon.com.br, vá até <strong>Configurações</strong> e abra a aba{' '}
         <strong>Conta</strong>. Na seção <strong>Zona de perigo</strong>, clique em{' '}
         <strong>"Excluir conta e todos os dados"</strong> e confirme a ação na janela de
         confirmação que será exibida.
@@ -35,7 +35,7 @@ export function AccountDeletionPage() {
       <p>
         Caso tenha perdido o acesso ao e-mail ou à senha e não consiga entrar no painel para
         excluir a conta por conta própria, entre em contato pelo e-mail{' '}
-        <strong>suporte@kairoon.app</strong> solicitando a exclusão. Podemos pedir informações para
+        <strong>contato@kairoon.com.br</strong> solicitando a exclusão. Podemos pedir informações para
         confirmar que você é o titular da conta antes de prosseguir.
       </p>
 
