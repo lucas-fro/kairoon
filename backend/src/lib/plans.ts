@@ -38,7 +38,17 @@ interface PlanTier {
   features: PlanFeature[]
 }
 
-export const PLAN_TIERS: Record<'free' | PlanSlug, PlanTier> = {
+const ALL_FEATURES: PlanFeature[] = [
+  'personalizacao',
+  'estoque',
+  'fidelidade',
+  'financeiro',
+  'relatorios',
+  'relatorios_avancados',
+  'cupons',
+]
+
+export const PLAN_TIERS: Record<'free' | PlanSlug | 'profissional', PlanTier> = {
   free: { rank: 0, employees: 1, features: [] },
   basico: {
     rank: 1,
@@ -47,16 +57,15 @@ export const PLAN_TIERS: Record<'free' | PlanSlug, PlanTier> = {
   },
   essencial: {
     rank: 2,
+    employees: 10,
+    features: ALL_FEATURES,
+  },
+  // Plano sob consulta (contratado via vendas e definido manualmente no banco,
+  // não passa pelo checkout): tudo do Essencial + profissionais ilimitados.
+  profissional: {
+    rank: 3,
     employees: UNLIMITED,
-    features: [
-      'personalizacao',
-      'estoque',
-      'fidelidade',
-      'financeiro',
-      'relatorios',
-      'relatorios_avancados',
-      'cupons',
-    ],
+    features: ALL_FEATURES,
   },
 }
 
