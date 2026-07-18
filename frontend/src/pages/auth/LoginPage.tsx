@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { AlertCircle, CheckCircle2, Eye, EyeOff, Lock, Mail } from 'lucide-react'
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { ApiError } from '../../api/client'
 import { AuthShell } from '../../components/auth/AuthShell'
 import { Button } from '../../components/ui/Button'
@@ -12,9 +12,20 @@ export function LoginPage() {
   const { isAuthenticated, login } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
 
   // Aviso de sucesso ao voltar da recuperação de senha.
   const resetSuccess = Boolean((location.state as { resetSuccess?: boolean } | null)?.resetSuccess)
+
+  // Destino pós-login: o `from` do state (rota protegida) tem prioridade;
+  // senão, se veio de um card de plano da LP (?plan=&cycle=), vai pro checkout.
+  const stateFrom = (location.state as { from?: string } | null)?.from
+  const planParam = searchParams.get('plan')
+  const checkoutFrom =
+    planParam === 'basico' || planParam === 'essencial'
+      ? `/checkout?plan=${planParam}&cycle=${searchParams.get('cycle') === 'yearly' ? 'yearly' : 'monthly'}`
+      : undefined
+  const from = stateFrom ?? checkoutFrom
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -22,7 +33,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  if (isAuthenticated) return <Navigate to="/app" replace />
+  if (isAuthenticated) return <Navigate to={from ?? '/app'} replace />
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -35,7 +46,7 @@ export function LoginPage() {
     setIsSubmitting(true)
     try {
       await login(trimmedEmail, password)
-      navigate('/app')
+      navigate(from ?? '/app')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro inesperado')
       setIsSubmitting(false)
@@ -118,7 +129,8 @@ export function LoginPage() {
       <p className="mt-6 text-center text-sm text-ink-secondary">
         Ainda não tem conta?{' '}
         <Link
-          to="/register"
+          to={{ pathname: '/register', search: location.search }}
+          state={location.state}
           className="font-medium text-primary transition-colors duration-150 hover:text-primary-hover hover:underline"
         >
           Criar conta grátis

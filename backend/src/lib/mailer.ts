@@ -116,6 +116,83 @@ export async function sendWelcomeEmail(to: string, name: string, establishmentNa
   })
 }
 
+function formatBRL(cents: number): string {
+  return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+function formatDatePt(date: Date): string {
+  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+interface PaymentReceiptArgs {
+  to: string
+  name: string
+  planName: string
+  billingCycle: 'monthly' | 'yearly'
+  amountCents: number
+  paidAt: Date | null
+  nextChargeDate: Date | null
+  invoiceUrl: string | null
+}
+
+/** Comprovante enviado quando uma cobrança da assinatura é confirmada. */
+export async function sendPaymentReceiptEmail(args: PaymentReceiptArgs) {
+  const { to, name, planName, billingCycle, amountCents, paidAt, nextChargeDate, invoiceUrl } = args
+  const cycleLabel = billingCycle === 'yearly' ? 'Anual' : 'Mensal'
+  const paidLabel = formatDatePt(paidAt ?? new Date())
+  const amountLabel = formatBRL(amountCents)
+
+  const row = (label: string, value: string) => `
+    <tr>
+      <td style="padding:8px 0;font-size:14px;color:${BRAND.inkSoft};">${label}</td>
+      <td style="padding:8px 0;font-size:14px;font-weight:600;color:${BRAND.ink};text-align:right;">${value}</td>
+    </tr>`
+
+  const html = layout(`
+    <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:${BRAND.navy};">Pagamento confirmado</h1>
+    <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:${BRAND.inkSoft};">
+      Olá, ${firstName(name)}. Recebemos o pagamento da sua assinatura do plano
+      <strong style="color:${BRAND.ink};">${planName}</strong>. Obrigado por assinar o Kairoon!
+    </p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.bg};border:1px solid ${BRAND.line};border-radius:12px;padding:8px 16px;margin-bottom:20px;">
+      ${row('Plano', planName)}
+      ${row('Cobrança', cycleLabel)}
+      ${row('Valor pago', amountLabel)}
+      ${row('Data', paidLabel)}
+      ${nextChargeDate ? row('Próxima cobrança', formatDatePt(nextChargeDate)) : ''}
+    </table>
+    ${
+      invoiceUrl
+        ? `<div style="text-align:center;margin-bottom:20px;">
+            <a href="${invoiceUrl}" style="display:inline-block;background:${BRAND.navy};color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 24px;border-radius:8px;">
+              Ver comprovante completo
+            </a>
+          </div>`
+        : ''
+    }
+    <p style="margin:0;font-size:13px;line-height:1.6;color:#94A3B8;">
+      Você pode gerenciar ou cancelar sua assinatura a qualquer momento em
+      <a href="${APP_URL}/app" style="color:${BRAND.blue};text-decoration:none;font-weight:600;">Configurações &rsaquo; Planos</a>.
+    </p>
+  `)
+
+  const textLines = [
+    `Pagamento confirmado. Olá, ${firstName(name)}.`,
+    `Plano: ${planName} (${cycleLabel})`,
+    `Valor pago: ${amountLabel}`,
+    `Data: ${paidLabel}`,
+    nextChargeDate ? `Próxima cobrança: ${formatDatePt(nextChargeDate)}` : '',
+    invoiceUrl ? `Comprovante completo: ${invoiceUrl}` : '',
+  ].filter(Boolean)
+
+  await sendEmail({
+    to,
+    subject: `Comprovante de pagamento: plano ${planName}`,
+    html,
+    text: textLines.join('\n'),
+  })
+}
+
 export async function sendPasswordResetEmail(to: string, name: string, code: string) {
   // Sem chave: registra o código no log para não travar o dev local.
   if (!resend) {

@@ -4,6 +4,7 @@ import { CampaignsTab } from '../../components/marketing/CampaignsTab'
 import { CouponsTab } from '../../components/marketing/CouponsTab'
 import { LoyaltyCardTab } from '../../components/marketing/LoyaltyCardTab'
 import { PointsTab } from '../../components/marketing/PointsTab'
+import { FeatureGate } from '../../components/plan/FeatureGate'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { SectionNav } from '../../components/ui/SectionNav'
 import type { TabItem } from '../../components/ui/Tabs'
@@ -15,7 +16,9 @@ const TABS: TabItem[] = [
   { key: 'pontos', label: 'Pontos', icon: Coins },
 ]
 
-const DEFAULT_TAB = 'cupons'
+// Abre no cartão de fidelidade (disponível já no plano Básico); cupons e
+// campanhas exigem o Essencial e são gateados individualmente abaixo.
+const DEFAULT_TAB = 'cartao'
 
 export function MarketingPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -32,10 +35,26 @@ export function MarketingPage() {
         active={activeTab}
         onChange={(key) => setSearchParams({ tab: key })}
       >
-        {activeTab === 'cupons' && <CouponsTab />}
-        {activeTab === 'campanhas' && <CampaignsTab />}
-        {activeTab === 'cartao' && <LoyaltyCardTab />}
-        {activeTab === 'pontos' && <PointsTab />}
+        {activeTab === 'cupons' && (
+          <FeatureGate feature="cupons">
+            <CouponsTab />
+          </FeatureGate>
+        )}
+        {activeTab === 'campanhas' && (
+          <FeatureGate feature="cupons">
+            <CampaignsTab />
+          </FeatureGate>
+        )}
+        {activeTab === 'cartao' && (
+          <FeatureGate feature="fidelidade">
+            <LoyaltyCardTab />
+          </FeatureGate>
+        )}
+        {activeTab === 'pontos' && (
+          <FeatureGate feature="fidelidade">
+            <PointsTab />
+          </FeatureGate>
+        )}
       </SectionNav>
     </div>
   )

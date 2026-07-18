@@ -15,6 +15,14 @@ const envSchema = z.object({
   // defina a chave e um remetente de domínio verificado no Resend.
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM: z.string().default('Kairoon <onboarding@resend.dev>'),
+  // Gateway de pagamento (Asaas). Sem default: a app deve falhar ao subir sem a
+  // chave assim que o módulo de pagamento entrar em uso (mesma lógica do
+  // JWT_SECRET). ASAAS_ENV escolhe a base URL (sandbox vs produção).
+  ASAAS_API_KEY: z.string().min(1, 'ASAAS_API_KEY é obrigatória'),
+  ASAAS_ENV: z.enum(['sandbox', 'production']).default('sandbox'),
+  // Token enviado pelo Asaas no header `asaas-access-token` de cada webhook
+  // (configurado no painel Asaas ao cadastrar a URL do webhook).
+  ASAAS_WEBHOOK_TOKEN: z.string().min(1, 'ASAAS_WEBHOOK_TOKEN é obrigatório'),
 })
 
 export const env = envSchema.parse(process.env)

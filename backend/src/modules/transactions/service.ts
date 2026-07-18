@@ -3,6 +3,7 @@ import { db } from '../../db'
 import { transactions } from '../../db/schema'
 import { endOfMonth, todayStr } from '../../lib/datetime'
 import { AppError } from '../../lib/errors'
+import { assertFeature } from '../../lib/plan'
 import type { CreateTransactionInput, ListTransactionsQuery } from './schemas'
 
 export async function listTransactions(establishmentId: string, query: ListTransactionsQuery) {
@@ -79,6 +80,7 @@ export async function listTransactions(establishmentId: string, query: ListTrans
 }
 
 export async function createTransaction(establishmentId: string, input: CreateTransactionInput) {
+  await assertFeature(establishmentId, 'financeiro')
   const [transaction] = await db
     .insert(transactions)
     .values({ ...input, establishmentId })

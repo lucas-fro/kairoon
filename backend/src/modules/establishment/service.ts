@@ -3,14 +3,13 @@ import { db } from '../../db'
 import { employees, establishments, timeBlocks, users, workingHours } from '../../db/schema'
 import { timeToMinutes } from '../../lib/datetime'
 import { AppError } from '../../lib/errors'
+import { getEffectivePlan } from '../../lib/plan'
+import { planFeatureMap, planTier } from '../../lib/plans'
 import type {
   CreateTimeBlockInput,
   UpdateEstablishmentInput,
   UpdateWorkingHoursInput,
 } from './schemas'
-
-// Limite de profissionais temporariamente elevado (fase de testes)
-const PLAN_LIMITS = { employees: 99, establishments: 1 }
 
 function isUniqueViolation(err: unknown): boolean {
   const error = err as { code?: string; cause?: { code?: string } }
@@ -134,11 +133,8 @@ export async function updateWorkingHours(
 }
 
 export async function getPlan(establishmentId: string) {
-  const establishment = await db.query.establishments.findFirst({
-    columns: { plan: true },
-    where: eq(establishments.id, establishmentId),
-  })
-  if (!establishment) throw new AppError('Estabelecimento não encontrado', 404)
+  const plan = await getEffectivePlan(establishmentId)
+  const tier = planTier(plan)
 
   const [row] = await db
     .select({ count: sql<string>`count(*)` })
@@ -146,8 +142,9 @@ export async function getPlan(establishmentId: string) {
     .where(eq(employees.establishmentId, establishmentId))
 
   return {
-    plan: establishment.plan,
-    limits: PLAN_LIMITS,
+    plan,
+    limits: { employees: tier.employees, establishments: 1 },
+    features: planFeatureMap(plan),
     usage: { employees: Number(row?.count ?? 0) },
   }
 }

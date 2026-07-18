@@ -5,7 +5,7 @@ import { appointments, couponRedemptions, coupons, services } from '../../db/sch
 import { todayStr } from '../../lib/datetime'
 import { AppError } from '../../lib/errors'
 import { lockCoupon } from '../../lib/locks'
-import { MARKETING_REQUIRES_PRO, assertPaidPlan } from '../../lib/plan'
+import { assertFeature } from '../../lib/plan'
 import type {
   CreateCouponInput,
   ListCouponsQuery,
@@ -381,7 +381,7 @@ export async function listClientCoupons(establishmentId: string, clientId: strin
 }
 
 export async function createCoupon(establishmentId: string, input: CreateCouponInput) {
-  if (MARKETING_REQUIRES_PRO) await assertPaidPlan(establishmentId)
+  await assertFeature(establishmentId, 'cupons')
 
   const isCampaign = input.source === 'campaign'
   const isFreeService = input.discountType === 'free_service'
@@ -428,7 +428,7 @@ export async function updateCoupon(
   id: string,
   input: UpdateCouponInput,
 ) {
-  if (MARKETING_REQUIRES_PRO) await assertPaidPlan(establishmentId)
+  await assertFeature(establishmentId, 'cupons')
 
   const existing = await db.query.coupons.findFirst({
     where: and(eq(coupons.id, id), eq(coupons.establishmentId, establishmentId)),

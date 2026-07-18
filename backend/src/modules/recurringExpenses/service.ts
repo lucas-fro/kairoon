@@ -3,6 +3,7 @@ import { db } from '../../db'
 import { commissionEntries, employees, recurringExpenses, transactions } from '../../db/schema'
 import { todayStr } from '../../lib/datetime'
 import { AppError } from '../../lib/errors'
+import { assertFeature } from '../../lib/plan'
 import type { CreateRecurringExpenseInput, UpdateRecurringExpenseInput } from './schemas'
 
 const recurringExpenseColumns = {
@@ -66,6 +67,7 @@ export async function createRecurringExpense(
   establishmentId: string,
   input: CreateRecurringExpenseInput,
 ) {
+  await assertFeature(establishmentId, 'financeiro')
   const [created] = await db
     .insert(recurringExpenses)
     .values({

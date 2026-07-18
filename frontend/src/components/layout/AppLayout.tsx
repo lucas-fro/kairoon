@@ -5,20 +5,26 @@ import {
   Calendar,
   Gift,
   LayoutDashboard,
+  Lock,
   Settings,
   Users,
   Wallet,
   X,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { HeaderSlotProvider } from '../../contexts/HeaderSlotContext'
+import { usePlan } from '../../hooks/usePlan'
 import { cn } from '../../lib/format'
+import type { PlanFeatureKey } from '../../types/api'
 import { KairoonMark } from '../brand/Logo'
 import { PendingBookingsListener } from '../realtime/PendingBookingsListener'
 import { AppHeader } from './AppHeader'
 
-const NAV_GROUPS = [
+type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean; feature?: PlanFeatureKey }
+
+const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: 'Principal',
     items: [
@@ -30,10 +36,10 @@ const NAV_GROUPS = [
     label: 'Gestão',
     items: [
       { to: '/app/clientes', label: 'Clientes', icon: Users },
-      { to: '/app/fidelidade', label: 'Fidelidade', icon: Gift },
-      { to: '/app/estoque', label: 'Estoque', icon: Boxes },
-      { to: '/app/financeiro', label: 'Financeiro', icon: Wallet },
-      { to: '/app/relatorios', label: 'Relatórios', icon: BarChart3 },
+      { to: '/app/fidelidade', label: 'Fidelidade', icon: Gift, feature: 'fidelidade' },
+      { to: '/app/estoque', label: 'Estoque', icon: Boxes, feature: 'estoque' },
+      { to: '/app/financeiro', label: 'Financeiro', icon: Wallet, feature: 'financeiro' },
+      { to: '/app/relatorios', label: 'Relatórios', icon: BarChart3, feature: 'relatorios' },
     ],
   },
   {
@@ -44,6 +50,7 @@ const NAV_GROUPS = [
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { establishment } = useAuth()
+  const { data: plan } = usePlan()
 
   return (
     <div className="flex h-full flex-col p-4">
@@ -82,8 +89,11 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                       {isActive && (
                         <span className="absolute -left-4 h-5 w-[3px] rounded-r bg-secondary" />
                       )}
-                      <item.icon className="h-[18px] w-[18px]" strokeWidth={1.9} />
-                      {item.label}
+                      <item.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.9} />
+                      <span className="flex-1 truncate">{item.label}</span>
+                      {item.feature && plan && !plan.features[item.feature] && (
+                        <Lock className="h-3.5 w-3.5 shrink-0 text-white/40" />
+                      )}
                     </>
                   )}
                 </NavLink>

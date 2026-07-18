@@ -2,6 +2,7 @@ import { and, asc, eq } from 'drizzle-orm'
 import { db } from '../../db'
 import { products } from '../../db/schema'
 import { AppError } from '../../lib/errors'
+import { assertFeature } from '../../lib/plan'
 import type { CreateProductInput, UpdateProductInput } from './schemas'
 
 export async function listProducts(establishmentId: string) {
@@ -12,6 +13,7 @@ export async function listProducts(establishmentId: string) {
 }
 
 export async function createProduct(establishmentId: string, input: CreateProductInput) {
+  await assertFeature(establishmentId, 'estoque')
   const [product] = await db
     .insert(products)
     .values({ ...input, establishmentId })

@@ -538,10 +538,60 @@ export interface BusyHourCell {
   count: number
 }
 
+export type PlanFeatureKey =
+  | 'personalizacao'
+  | 'estoque'
+  | 'fidelidade'
+  | 'financeiro'
+  | 'relatorios'
+  | 'relatorios_avancados'
+  | 'cupons'
+
 export interface PlanInfo {
   plan: string
   limits: { employees: number; establishments: number }
+  features: Record<PlanFeatureKey, boolean>
   usage: { employees: number }
+}
+
+export type PlanSlug = 'basico' | 'essencial'
+export type BillingCycle = 'monthly' | 'yearly'
+
+export interface PlanCatalogEntry {
+  name: string
+  monthlyCents: number
+  yearlyCents: number
+}
+
+export type PlanCatalog = Record<PlanSlug, PlanCatalogEntry>
+
+export type SubscriptionStatus = 'pending' | 'active' | 'past_due' | 'canceled'
+
+export interface Subscription {
+  id: string
+  establishmentId: string
+  planSlug: string
+  billingCycle: BillingCycle
+  status: SubscriptionStatus
+  currentPeriodEnd: string | null
+  graceUntil: string | null
+  canceledAt: string | null
+  createdAt: string
+}
+
+export interface PaymentRecord {
+  id: string
+  status: 'pending' | 'confirmed' | 'received' | 'overdue' | 'refunded' | 'failed'
+  amountCents: number
+  dueDate: string
+  paidAt: string | null
+  invoiceUrl: string | null
+  createdAt: string
+}
+
+export interface SubscriptionDetails {
+  subscription: Subscription | null
+  payments: PaymentRecord[]
 }
 
 export interface AuthResponse {

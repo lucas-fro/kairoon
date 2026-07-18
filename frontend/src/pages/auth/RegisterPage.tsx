@@ -19,7 +19,7 @@ import {
   X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { checkSlugAvailability } from '../../api/auth'
 import { ApiError } from '../../api/client'
 import { KairoonLogotype } from '../../components/brand/Logo'
@@ -194,6 +194,18 @@ function OptionCard({
 export function RegisterPage() {
   const { isAuthenticated, register } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+  // Destino pós-cadastro: o `from` guardado no state (quando veio de uma rota
+  // protegida) tem prioridade; senão, se veio de um card de plano da LP
+  // (?plan=&cycle=), leva direto pro checkout daquele plano.
+  const stateFrom = (location.state as { from?: string } | null)?.from
+  const planParam = searchParams.get('plan')
+  const checkoutFrom =
+    planParam === 'basico' || planParam === 'essencial'
+      ? `/checkout?plan=${planParam}&cycle=${searchParams.get('cycle') === 'yearly' ? 'yearly' : 'monthly'}`
+      : undefined
+  const from = stateFrom ?? checkoutFrom
 
   const [step, setStep] = useState(1)
 
@@ -251,7 +263,7 @@ export function RegisterPage() {
     }
   }, [slug])
 
-  if (isAuthenticated) return <Navigate to="/app" replace />
+  if (isAuthenticated) return <Navigate to={from ?? '/app'} replace />
 
   const passwordError = password && password.length < 6 ? 'A senha precisa ter pelo menos 6 caracteres' : undefined
   const confirmError = confirmPassword && confirmPassword !== password ? 'As senhas não coincidem' : undefined
@@ -322,7 +334,7 @@ export function RegisterPage() {
         },
         quiz,
       })
-      navigate('/app')
+      navigate(from ?? '/app')
     } catch (err) {
       setIsSubmitting(false)
       if (err instanceof ApiError && err.status === 409) {
@@ -731,7 +743,8 @@ export function RegisterPage() {
             <p className="mt-5 text-center text-sm text-ink-secondary">
               Já tem conta?{' '}
               <Link
-                to="/login"
+                to={{ pathname: '/login', search: location.search }}
+                state={location.state}
                 className="font-medium text-primary transition-colors duration-150 hover:text-primary-hover hover:underline"
               >
                 Entrar

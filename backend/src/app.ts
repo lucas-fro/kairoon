@@ -14,6 +14,7 @@ import { dashboardRoutes } from './modules/dashboard/routes'
 import { employeesRoutes } from './modules/employees/routes'
 import { establishmentRoutes } from './modules/establishment/routes'
 import { loyaltyRoutes } from './modules/loyalty/routes'
+import { paymentsRoutes } from './modules/payments/routes'
 import { pointsRoutes } from './modules/points/routes'
 import { productsRoutes } from './modules/products/routes'
 import { publicRoutes } from './modules/public/routes'
@@ -25,7 +26,10 @@ import { transactionsRoutes } from './modules/transactions/routes'
 import { waitlistRoutes } from './modules/waitlist/routes'
 
 export async function buildApp() {
-  const app = Fastify({ logger: true })
+  // trustProxy: o backend roda atrás do nginx do frontend (X-Forwarded-For /
+  // X-Real-IP) — sem isso, request.ip sempre traz o IP interno do container,
+  // o que quebra o remoteIp exigido pelo antifraude do Asaas.
+  const app = Fastify({ logger: true, trustProxy: true })
 
   // O error handler precisa ser definido ANTES dos registers: cada plugin de
   // rotas (await register) snapshota o handler vigente no momento do registro.
@@ -77,6 +81,7 @@ export async function buildApp() {
   await app.register(couponsRoutes, { prefix: '/coupons' })
   await app.register(loyaltyRoutes, { prefix: '/loyalty' })
   await app.register(pointsRoutes, { prefix: '/points' })
+  await app.register(paymentsRoutes, { prefix: '/payments' })
   await app.register(publicRoutes, { prefix: '/public' })
   await app.register(realtimeRoutes, { prefix: '/realtime' })
 

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { BarChart3, RefreshCw } from 'lucide-react'
+import { BarChart3, Lock, RefreshCw, Sparkles } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import {
   Bar,
   BarChart,
@@ -32,6 +33,7 @@ import {
 import { Button } from '../../components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { useFeature } from '../../hooks/usePlan'
 import { Input } from '../../components/ui/Input'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Skeleton } from '../../components/ui/Skeleton'
@@ -341,6 +343,30 @@ function ChartScroll({
   )
 }
 
+/** Placeholder de card de relatório avançado (bloqueado fora do plano Essencial). */
+function ReportLock() {
+  const navigate = useNavigate()
+  return (
+    <div className="flex h-[240px] flex-col items-center justify-center gap-2.5 px-4 text-center">
+      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary-light">
+        <Lock className="h-5 w-5 text-primary" />
+      </span>
+      <p className="text-xs font-medium uppercase tracking-wide text-secondary">Plano Essencial</p>
+      <p className="max-w-xs text-sm text-ink-secondary">
+        Este relatório está disponível no plano Essencial.
+      </p>
+      <Button
+        size="sm"
+        variant="outline"
+        leftIcon={<Sparkles className="h-4 w-4" />}
+        onClick={() => navigate('/app/configuracoes?tab=plano')}
+      >
+        Fazer upgrade
+      </Button>
+    </div>
+  )
+}
+
 /** Barra horizontal genérica com valores em reais (serviços, clientes, colaboradores). Preenche a altura do pai (flex-1 min-h-0). */
 function RevenueBarChart({ data }: { data: RevenueRow[] }) {
   return (
@@ -497,6 +523,8 @@ function BusyHoursChart({ cells }: { cells: BusyHourCell[] }) {
 
 export function ReportsPage() {
   const today = todayStr()
+  // Relatórios avançados só no Essencial; no Básico eles aparecem bloqueados.
+  const advanced = useFeature('relatorios_avancados').allowed
   const [from, setFrom] = useState(() => addDays(todayStr(), -29))
   const [to, setTo] = useState(() => todayStr())
 
@@ -532,25 +560,25 @@ export function ReportsPage() {
   const occupancyQuery = useQuery({
     queryKey: ['reports', 'occupancy', { from, to }],
     queryFn: () => getOccupancyReport({ from, to }),
-    enabled: rangeValid,
+    enabled: rangeValid && advanced,
   })
 
   const paymentMethodsQuery = useQuery({
     queryKey: ['reports', 'payment-methods', { from, to }],
     queryFn: () => getPaymentMethodsReport({ from, to }),
-    enabled: rangeValid,
+    enabled: rangeValid && advanced,
   })
 
   const topClientsQuery = useQuery({
     queryKey: ['reports', 'top-clients', { from, to }],
     queryFn: () => getTopClientsReport({ from, to }),
-    enabled: rangeValid,
+    enabled: rangeValid && advanced,
   })
 
   const revenueByEmployeeQuery = useQuery({
     queryKey: ['reports', 'revenue-by-employee', { from, to }],
     queryFn: () => getRevenueByEmployeeReport({ from, to }),
-    enabled: rangeValid,
+    enabled: rangeValid && advanced,
   })
 
   const newClientsQuery = useQuery({
@@ -568,7 +596,7 @@ export function ReportsPage() {
   const busyHoursQuery = useQuery({
     queryKey: ['reports', 'busy-hours', { from, to }],
     queryFn: () => getBusyHoursReport({ from, to }),
-    enabled: rangeValid,
+    enabled: rangeValid && advanced,
   })
 
   /** Sequência completa de períodos (dias/meses) com buracos preenchidos com zero */
@@ -720,8 +748,10 @@ export function ReportsPage() {
     empty: boolean
     emptyDescription: string
     height?: number
+    locked?: boolean
     children: React.ReactNode
   }) {
+    if (options.locked) return <ReportLock />
     if (options.query.isPending) return <ChartSkeleton height={options.height} />
     if (options.query.isError)
       return <ChartError error={options.query.error} onRetry={() => options.query.refetch()} />
@@ -872,6 +902,7 @@ export function ReportsPage() {
             <CardContent>
               {renderChart({
                 query: paymentMethodsQuery,
+                locked: !advanced,
                 empty: paymentMethodsEmpty,
                 emptyDescription: 'Nenhum pagamento confirmado no intervalo selecionado.',
                 children: (
@@ -1039,6 +1070,7 @@ export function ReportsPage() {
             <CardContent>
               {renderChart({
                 query: topClientsQuery,
+                locked: !advanced,
                 empty: topClientsEmpty,
                 emptyDescription: 'Nenhum faturamento por cliente no intervalo selecionado.',
                 children: (
@@ -1058,6 +1090,7 @@ export function ReportsPage() {
             <CardContent>
               {renderChart({
                 query: revenueByEmployeeQuery,
+                locked: !advanced,
                 empty: employeeRevenueEmpty,
                 emptyDescription: 'Nenhuma receita por colaborador no intervalo selecionado.',
                 children: (
@@ -1148,6 +1181,7 @@ export function ReportsPage() {
             <CardContent>
               {renderChart({
                 query: busyHoursQuery,
+                locked: !advanced,
                 empty: busyHoursEmpty,
                 emptyDescription: 'Nenhum agendamento no intervalo selecionado.',
                 height: 280,
@@ -1168,6 +1202,7 @@ export function ReportsPage() {
             <CardContent>
               {renderChart({
                 query: occupancyQuery,
+                locked: !advanced,
                 empty: occupancyEmpty,
                 emptyDescription: 'Nenhum horário disponível ou agendado no intervalo selecionado.',
                 children: (
