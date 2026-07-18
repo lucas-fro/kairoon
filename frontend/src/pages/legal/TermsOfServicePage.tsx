@@ -73,11 +73,12 @@ export function TermsOfServicePage() {
         políticas da Asaas aplicáveis ao processamento da transação.
       </p>
       <p>
-        <strong>5.3 Cobrança recorrente e renovação automática.</strong> As assinaturas são cobradas
-        de forma recorrente e automática no ciclo escolhido (mensal ou anual), no cartão de crédito
-        informado, até que sejam canceladas. Ao contratar, você autoriza expressamente essas
-        cobranças recorrentes. A cobrança ocorre no ato da contratação e, depois, a cada renovação
-        do ciclo.
+        <strong>5.3 Teste grátis e cobrança recorrente.</strong> Novas assinaturas incluem um
+        período de teste grátis de 14 dias: você tem acesso imediato ao plano e a primeira cobrança
+        só ocorre ao fim desse período. Se cancelar antes do fim do teste, nada é cobrado. Após o
+        teste, a assinatura passa a ser cobrada de forma recorrente e automática no ciclo escolhido
+        (mensal ou anual), no cartão informado, até que seja cancelada. Ao contratar, você autoriza
+        expressamente essas cobranças recorrentes.
       </p>
       <p>
         <strong>5.4 Dados do cartão.</strong> Os dados do cartão são coletados no checkout apenas

@@ -2,7 +2,7 @@ import { timingSafeEqual } from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
 import { env } from '../../env'
 import { PLANS } from '../../lib/plans'
-import { changePlanSchema, subscribeSchema, webhookSchema } from './schemas'
+import { subscribeSchema, webhookSchema } from './schemas'
 import * as paymentsService from './service'
 
 /** Comparação em tempo constante — evita timing attack no token do webhook. */
@@ -41,11 +41,6 @@ export async function paymentsRoutes(app: FastifyInstance) {
 
   app.post('/cancel', { preHandler: [app.authenticate] }, async (request) => {
     return paymentsService.cancel(request.user.establishmentId)
-  })
-
-  app.post('/change-plan', { preHandler: [app.authenticate] }, async (request) => {
-    const input = changePlanSchema.parse(request.body)
-    return paymentsService.changePlan(request.user.establishmentId, input.planSlug, input.billingCycle)
   })
 
   // Público (o Asaas não manda JWT) — autenticado pelo header próprio abaixo.

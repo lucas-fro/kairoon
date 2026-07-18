@@ -5,22 +5,17 @@ import {
   cancelAsaasSubscription,
   createCreditCardSubscription,
   findOrCreateCustomer,
-  updateAsaasSubscription,
 } from '../../lib/asaasClient'
 import { AppError } from '../../lib/errors'
 import { sendPaymentReceiptEmail } from '../../lib/mailer'
-import {
-  PLANS,
-  addBillingCycle,
-  centsToReais,
-  getPlanCycleCents,
-  type BillingCycle,
-  type PlanSlug,
-} from '../../lib/plans'
+import { PLANS, addBillingCycle, centsToReais, getPlanCycleCents, type PlanSlug } from '../../lib/plans'
 import type { SubscribeInput, WebhookInput } from './schemas'
 
 /** Dias de tolerância após um PAYMENT_OVERDUE antes do downgrade pro free. */
 const GRACE_DAYS = 5
+
+/** Dias de teste grátis antes da primeira cobrança de uma assinatura nova. */
+const TRIAL_DAYS = 14
 
 function isUniqueViolation(err: unknown): boolean {
   const error = err as { code?: string; cause?: { code?: string } }
@@ -43,19 +38,22 @@ export async function getSubscription(establishmentId: string) {
 }
 
 /**
- * Cria a assinatura no Asaas (cobrando o cartão de imediato) e grava o
- * registro local como 'pending' — a confirmação de fato vem do webhook
- * PAYMENT_CONFIRMED, nunca da resposta síncrona da criação (a resposta do
- * Asaas reflete a criação da assinatura, não necessariamente a aprovação
- * da primeira cobrança).
+ * Cria (ou troca) a assinatura no Asaas e libera o plano na hora.
+ *
+ * - Assinatura NOVA: ganha 14 dias grátis (a primeira cobrança é agendada pro
+ *   fim do trial) e o plano já fica ativo durante o teste.
+ * - TROCA de plano (já existe assinatura não cancelada): cria a nova assinatura,
+ *   cancela a anterior no Asaas e passa a cobrar o novo plano. Como o cartão é
+ *   coletado de novo no checkout, não dependemos de tokenização.
+ *
+ * O acesso é liberado de imediato; o webhook PAYMENT_CONFIRMED só mantém o
+ * `currentPeriodEnd` em dia e PAYMENT_OVERDUE cuida da inadimplência.
  */
 export async function subscribe(establishmentId: string, remoteIp: string, input: SubscribeInput) {
   const existing = await db.query.subscriptions.findFirst({
     where: eq(subscriptions.establishmentId, establishmentId),
   })
-  if (existing && existing.status !== 'canceled') {
-    throw new AppError('Este estabelecimento já possui uma assinatura', 409)
-  }
+  const isChange = !!existing && existing.status !== 'canceled'
 
   const customer = await findOrCreateCustomer({
     name: input.holder.name,
@@ -66,7 +64,12 @@ export async function subscribe(establishmentId: string, remoteIp: string, input
 
   const cycle = input.billingCycle === 'yearly' ? 'YEARLY' : 'MONTHLY'
   const value = centsToReais(getPlanCycleCents(input.planSlug, input.billingCycle))
-  const nextDueDate = new Date().toISOString().slice(0, 10)
+
+  // Nova assinatura começa com trial (1ª cobrança em TRIAL_DAYS dias). Troca de
+  // plano cobra o novo valor já no próximo ciclo, sem novo trial.
+  const firstDue = new Date()
+  if (!isChange) firstDue.setDate(firstDue.getDate() + TRIAL_DAYS)
+  const nextDueDate = firstDue.toISOString().slice(0, 10)
 
   const asaasSubscription = await createCreditCardSubscription({
     customer: customer.id,
@@ -78,14 +81,27 @@ export async function subscribe(establishmentId: string, remoteIp: string, input
     remoteIp,
   })
 
+  // Criou a nova com sucesso: se era troca, cancela a anterior no Asaas pra
+  // parar de cobrar o plano antigo (best-effort — não falha a troca por isso).
+  if (isChange && existing) {
+    try {
+      await cancelAsaasSubscription(existing.asaasSubscriptionId)
+    } catch (err) {
+      console.error('[payments] falha ao cancelar assinatura anterior na troca:', err)
+    }
+  }
+
   const values = {
     establishmentId,
     planSlug: input.planSlug,
     billingCycle: input.billingCycle,
-    status: 'pending' as const,
+    status: 'active' as const,
     asaasCustomerId: customer.id,
     asaasSubscriptionId: asaasSubscription.id,
-    currentPeriodEnd: new Date(asaasSubscription.nextDueDate),
+    // Fim do período atual = data da 1ª cobrança que enviamos (fim do trial em
+    // assinatura nova, ou hoje na troca). Não usamos o nextDueDate devolvido
+    // pelo Asaas porque ele já vem avançado 1 ciclo além da 1ª cobrança.
+    currentPeriodEnd: new Date(nextDueDate),
     graceUntil: null,
     canceledAt: null,
     updatedAt: new Date(),
@@ -99,6 +115,13 @@ export async function subscribe(establishmentId: string, remoteIp: string, input
           .where(eq(subscriptions.id, existing.id))
           .returning()
       : await db.insert(subscriptions).values(values).returning()
+
+    // Libera o plano imediatamente (trial dá acesso na hora; troca aplica o novo).
+    await db
+      .update(establishments)
+      .set({ plan: input.planSlug })
+      .where(eq(establishments.id, establishmentId))
+
     return subscription
   } catch (err) {
     if (isUniqueViolation(err)) {
@@ -106,43 +129,6 @@ export async function subscribe(establishmentId: string, remoteIp: string, input
     }
     throw err
   }
-}
-
-/**
- * Troca de plano (upgrade/downgrade) de uma assinatura já ativa, sem pedir o
- * cartão de novo: atualiza valor/ciclo direto na mesma assinatura do Asaas,
- * que já mantém o cartão vinculado do lado dele. Só vale pra cobrança futura
- * (a do ciclo corrente, se já gerada, não muda).
- */
-export async function changePlan(
-  establishmentId: string,
-  planSlug: PlanSlug,
-  billingCycle: BillingCycle,
-) {
-  const subscription = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.establishmentId, establishmentId),
-  })
-  if (!subscription || subscription.status !== 'active') {
-    throw new AppError('Nenhuma assinatura ativa encontrada', 404)
-  }
-  if (subscription.planSlug === planSlug && subscription.billingCycle === billingCycle) {
-    throw new AppError('Você já está neste plano', 400)
-  }
-
-  const cycle = billingCycle === 'yearly' ? 'YEARLY' : 'MONTHLY'
-  const value = centsToReais(getPlanCycleCents(planSlug, billingCycle))
-
-  await updateAsaasSubscription(subscription.asaasSubscriptionId, { value, cycle })
-
-  const [updated] = await db
-    .update(subscriptions)
-    .set({ planSlug, billingCycle, updatedAt: new Date() })
-    .where(eq(subscriptions.id, subscription.id))
-    .returning()
-
-  await db.update(establishments).set({ plan: planSlug }).where(eq(establishments.id, establishmentId))
-
-  return updated
 }
 
 export async function cancel(establishmentId: string) {
@@ -247,6 +233,22 @@ export async function handleWebhook(event: string, payment: WebhookInput['paymen
       .update(subscriptions)
       .set({ status: 'past_due', graceUntil, updatedAt: new Date() })
       .where(eq(subscriptions.id, subscription.id))
+  } else if (event === 'PAYMENT_REFUNDED' || event === 'PAYMENT_CHARGEBACK_REQUESTED') {
+    // Estorno ou chargeback: revoga o acesso na hora (assinatura cancelada,
+    // conta volta pro free) e para de cobrar no Asaas.
+    await db
+      .update(subscriptions)
+      .set({ status: 'canceled', canceledAt: new Date(), updatedAt: new Date() })
+      .where(eq(subscriptions.id, subscription.id))
+    await db
+      .update(establishments)
+      .set({ plan: 'free' })
+      .where(eq(establishments.id, subscription.establishmentId))
+    try {
+      await cancelAsaasSubscription(subscription.asaasSubscriptionId)
+    } catch (err) {
+      console.error('[payments] falha ao cancelar assinatura apos chargeback/estorno:', err)
+    }
   }
 }
 

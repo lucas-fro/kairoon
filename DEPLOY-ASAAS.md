@@ -4,35 +4,32 @@ Checklist para colocar a assinatura de planos pagos em produção. O código já
 está pronto e testado de ponta a ponta no sandbox (assinar, cobrar, confirmar
 por webhook, ativar plano, trocar de plano e cancelar).
 
-## Status atual (validado no sandbox)
+## Status atual (validado no sandbox, smoke + E2E)
 
-- [x] Checkout na UI cria a assinatura no Asaas (cartão tokenizado)
-- [x] Cobrança confirmada e webhook `PAYMENT_CONFIRMED` processado
-- [x] Plano ativado e comprovante por e-mail disparado
-- [x] Troca de plano sem pedir o cartão de novo
-- [x] Cancelamento (mantém acesso até o fim do período já pago)
-- [x] Typecheck limpo no backend e no frontend
+- [x] Registro pelo card de plano da LP leva ao checkout do plano certo
+- [x] 14 dias de teste grátis: acesso na hora, 1ª cobrança só após o trial
+- [x] Cobrança confirmada e webhook `PAYMENT_CONFIRMED` ativa o plano
+- [x] Comprovante de pagamento por e-mail
+- [x] Troca de plano pelo checkout (cancela a antiga, cria a nova)
+- [x] Cancelamento (mantém acesso até o fim do período)
+- [x] Chargeback/estorno rebaixa a conta pro free
+- [x] Gating por plano (Free/Básico/Essencial/Profissional) no backend e na UI
+- [x] Build de produção, migrations consistentes, typecheck limpo
 
-## 0. Decisões de negócio (resolver antes de cobrar de verdade)
+## 0. Decisões de negócio
 
-### a) "Grátis" x cobrança imediata
-A LP diz "Começar grátis" e "Teste grátis por 14 dias", mas o checkout cobra o
-cartão na hora (`nextDueDate = hoje`). Escolha uma:
+### a) Teste grátis de 14 dias (resolvido)
+Novas assinaturas têm 14 dias grátis: acesso imediato ao plano e primeira
+cobrança só ao fim do teste (`nextDueDate = hoje + 14`). Isso torna o "grátis"
+da LP honesto e reduz o risco de chargeback. Já implementado e testado.
 
-- [ ] Implementar trial real (primeira cobrança daqui a 14 dias, o Asaas
-      suporta via `nextDueDate` futuro), ou
-- [ ] Trocar o texto da LP para algo como "Assinar agora"
-
-### b) O que cada plano libera
-Hoje o único gate que muda por plano é o limite de profissionais. WhatsApp, Pix
-e página personalizada ainda não são bloqueados (`MARKETING_REQUIRES_PRO` está
-desligado em `backend/src/lib/plan.ts`).
-
-- [ ] Definir e implementar o que cada plano pago libera
+### b) O que cada plano libera (resolvido)
+O split Free/Básico/Essencial/Profissional está implementado (matriz única em
+`backend/src/lib/plans.ts`, aplicada no backend e refletida na UI).
 
 ### c) Preços
 Fixos em `backend/src/lib/plans.ts`: Básico R$99/mês (R$948/ano), Essencial
-R$249/mês (R$2388/ano).
+R$249/mês (R$2388/ano). Profissional é sob consulta (definido manualmente).
 
 - [ ] Confirmar que os valores estão corretos
 
@@ -70,7 +67,8 @@ confirmado do lado do Kairoon).
   (o nginx do frontend tira o `/api` e encaminha para o backend `/payments/webhook`)
 - Token: o mesmo valor de `ASAAS_WEBHOOK_TOKEN` (o Asaas envia no header
   `asaas-access-token` e o backend compara)
-- Eventos: `PAYMENT_CONFIRMED`, `PAYMENT_RECEIVED`, `PAYMENT_OVERDUE`
+- Eventos: `PAYMENT_CONFIRMED`, `PAYMENT_RECEIVED`, `PAYMENT_OVERDUE`,
+  `PAYMENT_REFUNDED`, `PAYMENT_CHARGEBACK_REQUESTED`
 
 - [ ] Webhook cadastrado e ativo
 

@@ -18,7 +18,7 @@ import {
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { getMe } from '../../api/auth'
 import { ApiError } from '../../api/client'
-import { getPlans, subscribe } from '../../api/payments'
+import { getPlans, getSubscription, subscribe } from '../../api/payments'
 import { KairoonLogotype } from '../../components/brand/Logo'
 import { BillingCycleToggle, getAnnualDiscountPercent } from '../../components/payments/BillingCycleToggle'
 import { Button } from '../../components/ui/Button'
@@ -27,9 +27,11 @@ import { Input } from '../../components/ui/Input'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { useToast } from '../../components/ui/Toast'
 import { useAuth } from '../../contexts/AuthContext'
+import { addDays, todayStr } from '../../lib/dates'
 import {
   formatBRL,
   formatCep,
+  formatDate,
   formatDocument,
   formatPhone,
   isValidCep,
@@ -42,6 +44,7 @@ import type { BillingCycle, PlanSlug } from '../../types/api'
 import { CheckoutSection } from './CheckoutSection'
 
 const EMAIL_REGEX = /^\S+@\S+\.\S+$/
+const TRIAL_DAYS = 14
 
 function formatCardNumber(value: string): string {
   return onlyDigits(value).slice(0, 19).replace(/(\d{4})(?=\d)/g, '$1 ')
@@ -70,6 +73,13 @@ export function CheckoutPage() {
   const plan = plansQuery.data?.[planSlug]
   const cycleCents = plan ? (billingCycle === 'yearly' ? plan.yearlyCents : plan.monthlyCents) : null
   const discountPercent = plan ? getAnnualDiscountPercent(plan.monthlyCents, plan.yearlyCents) : 0
+
+  // Assinatura nova ganha 14 dias grátis; troca de plano (já tem assinatura
+  // ativa) não ganha novo trial e é cobrada no próximo ciclo.
+  const subscriptionQuery = useQuery({ queryKey: ['payments', 'subscription'], queryFn: getSubscription })
+  const currentSub = subscriptionQuery.data?.subscription ?? null
+  const isChange = currentSub !== null && currentSub.status !== 'canceled'
+  const trialEndLabel = formatDate(addDays(todayStr(), TRIAL_DAYS))
 
   // Etapa 1 — cartão
   const [holderName, setHolderName] = useState('')
@@ -209,12 +219,13 @@ export function CheckoutPage() {
         },
       })
 
-      // Sincroniza o establishment no contexto — o plano em si só vira 'ativo'
-      // quando o webhook do Asaas confirmar a primeira cobrança.
+      // Sincroniza o establishment no contexto (o plano é liberado na hora).
       const me = await getMe()
       setEstablishment(me.establishment)
 
-      toast.success('Assinatura criada! Estamos confirmando o pagamento com a operadora do cartão.')
+      toast.success(
+        isChange ? 'Plano alterado com sucesso!' : 'Pronto! Seu teste grátis de 14 dias começou.',
+      )
       navigate('/app')
     } catch (err) {
       setIsSubmitting(false)
@@ -265,6 +276,12 @@ export function CheckoutPage() {
                           ? `Cobrado uma vez por ano · equivale a ${formatBRL(plan.yearlyCents / 12)}/mês`
                           : 'Cobrado mensalmente'}
                       </p>
+                      {!isChange && (
+                        <div className="mt-3 rounded-lg bg-secondary-light px-3 py-2.5 text-xs text-primary">
+                          <span className="font-semibold">14 dias grátis.</span> Primeira cobrança em{' '}
+                          {trialEndLabel}. Cancele antes e não paga nada.
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -285,7 +302,7 @@ export function CheckoutPage() {
                   isLoading={isSubmitting}
                   leftIcon={<Lock className="h-4 w-4" />}
                 >
-                  Assinar {plan ? `por ${formatBRL(cycleCents ?? 0)}` : ''}
+                  {isChange ? 'Trocar de plano' : 'Começar 14 dias grátis'}
                 </Button>
 
                 <div className="mt-3 flex items-center gap-3 rounded-lg bg-success-light px-4 py-3">

@@ -36,7 +36,3 @@ export function getSubscription() {
 export function cancelSubscription() {
   return api<{ ok: true }>('/payments/cancel', { method: 'POST' })
 }
-
-export function changePlan(payload: { planSlug: PlanSlug; billingCycle: BillingCycle }) {
-  return api<Subscription>('/payments/change-plan', { method: 'POST', body: payload })
-}
