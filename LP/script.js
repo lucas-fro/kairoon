@@ -130,7 +130,7 @@
   var plansToggle = document.getElementById('plansToggle');
   if (plansToggle) {
     var periodBtns = Array.prototype.slice.call(plansToggle.querySelectorAll('.plans-toggle-btn'));
-    var planCards = Array.prototype.slice.call(document.querySelectorAll('#planos .plan-card'));
+    var planCards = Array.prototype.slice.call(document.querySelectorAll('#planos .plans-table-plan'));
 
     function setPeriod(period) {
       plansToggle.setAttribute('data-active', period);
