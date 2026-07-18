@@ -26,11 +26,17 @@ const FEATURE_INFO: Record<PlanFeatureKey, { title: string; plan: string; descri
   relatorios: {
     title: 'Relatórios',
     plan: 'Básico',
-    description: 'Acompanhe faturamento, ocupação, serviços e clientes com relatórios completos.',
+    description: 'Acompanhe faturamento, novos clientes, serviços e status dos agendamentos.',
+  },
+  relatorios_avancados: {
+    title: 'Relatórios avançados',
+    plan: 'Essencial',
+    description:
+      'Ranking de clientes e da equipe, formas de pagamento, ocupação e horários de pico.',
   },
   financeiro: {
     title: 'Controle financeiro',
-    plan: 'Essencial',
+    plan: 'Básico',
     description: 'Gerencie fluxo de caixa, despesas recorrentes, comissões e formas de pagamento.',
   },
   cupons: {

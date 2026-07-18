@@ -20,8 +20,9 @@ export const PLAN_FEATURES = [
   'personalizacao', // página de agendamento personalizada (cor, banner, sem marca Kairoon)
   'estoque', // controle de estoque de produtos
   'fidelidade', // cartão de fidelidade e programa de pontos
-  'relatorios', // relatórios de desempenho
   'financeiro', // controle financeiro (fluxo de caixa, despesas)
+  'relatorios', // relatórios essenciais (faturamento, clientes, serviços, status)
+  'relatorios_avancados', // relatórios avançados (métodos, ranking de clientes/equipe, ocupação, pico)
   'cupons', // cupons e campanhas de marketing
 ] as const
 
@@ -42,12 +43,20 @@ export const PLAN_TIERS: Record<'free' | PlanSlug, PlanTier> = {
   basico: {
     rank: 1,
     employees: 5,
-    features: ['personalizacao', 'estoque', 'fidelidade', 'relatorios'],
+    features: ['personalizacao', 'estoque', 'fidelidade', 'financeiro', 'relatorios'],
   },
   essencial: {
     rank: 2,
     employees: UNLIMITED,
-    features: ['personalizacao', 'estoque', 'fidelidade', 'relatorios', 'financeiro', 'cupons'],
+    features: [
+      'personalizacao',
+      'estoque',
+      'fidelidade',
+      'financeiro',
+      'relatorios',
+      'relatorios_avancados',
+      'cupons',
+    ],
   },
 }
 

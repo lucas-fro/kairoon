@@ -542,8 +542,9 @@ export type PlanFeatureKey =
   | 'personalizacao'
   | 'estoque'
   | 'fidelidade'
-  | 'relatorios'
   | 'financeiro'
+  | 'relatorios'
+  | 'relatorios_avancados'
   | 'cupons'
 
 export interface PlanInfo {

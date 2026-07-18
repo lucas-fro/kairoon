@@ -40,9 +40,9 @@ const PRO_BENEFITS: { icon: LucideIcon; label: string }[] = [
   { icon: Users, label: 'Mais profissionais e comissões da equipe' },
   { icon: Palette, label: 'Página de agendamento personalizada' },
   { icon: Boxes, label: 'Controle de estoque' },
+  { icon: Wallet, label: 'Controle financeiro completo' },
   { icon: Gift, label: 'Fidelidade e programa de pontos' },
-  { icon: BarChart3, label: 'Relatórios completos' },
-  { icon: Wallet, label: 'Controle financeiro completo (Essencial)' },
+  { icon: BarChart3, label: 'Relatórios (avançados no Essencial)' },
   { icon: Ticket, label: 'Cupons e campanhas de marketing (Essencial)' },
 ]
 
