@@ -1182,9 +1182,6 @@ button {
 .plans-table-corner {
   width: 30%;
   background: #f7f9fc;
-  position: sticky;
-  left: 0;
-  z-index: 3;
 }
 
 /* As 3 colunas de plano formam um painel branco com cantos arredondados. */
@@ -1333,11 +1330,7 @@ tbody tr:not(:last-child) td.plan-col-featured {
 /* Linhas de benefício */
 
 .plans-table tbody th[scope='row'] {
-  position: sticky;
-  left: 0;
-  z-index: 2;
   background: #f7f9fc;
-  box-shadow: 7px 0 8px -6px rgba(15, 23, 42, 0.07);
   text-align: left;
   font-weight: 500;
   font-size: 0.88rem;
@@ -1405,6 +1398,83 @@ tbody tr:not(:last-child) td.plan-col-featured {
   line-height: 1.55;
   color: var(--color-ink-tertiary);
   text-align: center;
+}
+
+/* Tablets: ícones e linhas um pouco menores */
+@media (max-width: 900px) {
+  .pt-yes,
+  .pt-no {
+    width: 22px;
+    height: 22px;
+  }
+  .pt-yes svg,
+  .pt-no svg {
+    width: 12px;
+    height: 12px;
+  }
+  .plans-table tbody td,
+  .plans-table tbody th[scope='row'] {
+    padding-block: 12px;
+  }
+}
+
+/* Celulares: tabela compacta, coluna de rótulos estreita, ícones pequenos */
+@media (max-width: 560px) {
+  .plans-table-card {
+    min-width: 500px;
+  }
+  .plans-table-corner {
+    width: 124px;
+  }
+  .plans-table-plan {
+    min-width: 122px;
+    padding: 26px 8px 16px;
+  }
+  .plans-table tbody th[scope='row'] {
+    font-size: 0.76rem;
+    line-height: 1.3;
+    padding: 10px 8px 10px 2px;
+  }
+  .plans-table tbody td {
+    padding: 10px 6px;
+  }
+  .pt-yes,
+  .pt-no {
+    width: 20px;
+    height: 20px;
+  }
+  .pt-yes svg,
+  .pt-no svg {
+    width: 11px;
+    height: 11px;
+  }
+  .plan-name {
+    font-size: 1rem;
+  }
+  .plan-amount {
+    font-size: 1.65rem;
+  }
+  .plan-currency {
+    font-size: 0.85rem;
+    margin-top: 4px;
+  }
+  .plan-period {
+    font-size: 0.8rem;
+  }
+  .plan-billing,
+  .plan-annual-total {
+    font-size: 0.72rem;
+  }
+  .pt-value {
+    font-size: 0.78rem;
+  }
+  .plan-badge {
+    font-size: 0.64rem;
+    padding: 3px 10px;
+  }
+  .plans-fineprint {
+    font-size: 0.68rem;
+  }
 }
 
 /* ---------- depoimento ---------- */
