@@ -64,7 +64,8 @@ export async function establishmentRoutes(app: FastifyInstance) {
     return establishmentService.getPlan(request.user.establishmentId)
   })
 
-  app.delete('/', async (request, reply) => {
+  // Exclusão da própria conta (LGPD) continua liberada em somente-leitura.
+  app.delete('/', { config: { allowWhenReadOnly: true } }, async (request, reply) => {
     await establishmentService.deleteAccount(request.user.sub)
     return reply.status(204).send()
   })

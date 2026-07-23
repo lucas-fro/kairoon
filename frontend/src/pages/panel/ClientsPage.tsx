@@ -2,9 +2,13 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronRight, Plus, Search, Users } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ApiError } from '../../api/client'
 import { createClient, listClients } from '../../api/clients'
+import { BirthdaysView } from '../../components/clients/BirthdaysView'
+import { ClientAvatar } from '../../components/clients/ClientAvatar'
+import { LapsedView } from '../../components/clients/LapsedView'
+import { FeatureGate } from '../../components/plan/FeatureGate'
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { Dialog } from '../../components/ui/Dialog'
@@ -28,14 +32,6 @@ import {
   onlyDigits,
 } from '../../lib/format'
 import type { ClientListItem } from '../../types/api'
-
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return '?'
-  const first = parts[0].charAt(0)
-  const last = parts.length > 1 ? parts[parts.length - 1].charAt(0) : ''
-  return `${first}${last}`.toUpperCase()
-}
 
 const GENDER_OPTIONS: SelectMenuOption[] = [
   { value: '', label: 'Não informar' },
@@ -159,15 +155,8 @@ function NewClientDialog({ open, onClose }: NewClientDialogProps) {
   )
 }
 
-function ClientAvatar({ name }: { name: string }) {
-  return (
-    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-semibold text-primary">
-      {getInitials(name)}
-    </div>
-  )
-}
-
-export function ClientsPage() {
+/** Aba "Listagem": a lista/CRM de clientes (disponível em todos os planos). */
+function ClientsListView() {
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -355,4 +344,31 @@ export function ClientsPage() {
       <NewClientDialog open={dialogOpen} onClose={() => setDialogOpen(false)} />
     </div>
   )
+}
+
+/**
+ * Página Clientes: dropdown na sidebar troca a aba via `?tab=`. Listagem é aberta
+ * a todos; Aniversários e Sumidos são recursos do plano Essencial+ (FeatureGate).
+ */
+export function ClientsPage() {
+  const [searchParams] = useSearchParams()
+  const tab = searchParams.get('tab')
+
+  if (tab === 'aniversarios') {
+    return (
+      <FeatureGate feature="clientes_crm">
+        <BirthdaysView />
+      </FeatureGate>
+    )
+  }
+
+  if (tab === 'sumidos') {
+    return (
+      <FeatureGate feature="clientes_crm">
+        <LapsedView />
+      </FeatureGate>
+    )
+  }
+
+  return <ClientsListView />
 }

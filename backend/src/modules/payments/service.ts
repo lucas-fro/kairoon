@@ -5,17 +5,17 @@ import {
   cancelAsaasSubscription,
   createCreditCardSubscription,
   findOrCreateCustomer,
+  getAsaasSubscriptionCard,
+  updateAsaasSubscription,
 } from '../../lib/asaasClient'
 import { AppError } from '../../lib/errors'
 import { sendPaymentReceiptEmail } from '../../lib/mailer'
+import { TRIAL_DAYS } from '../../lib/plan'
 import { PLANS, addBillingCycle, centsToReais, getPlanCycleCents, type PlanSlug } from '../../lib/plans'
-import type { SubscribeInput, WebhookInput } from './schemas'
+import type { ChangePlanInput, SubscribeInput, WebhookInput } from './schemas'
 
 /** Dias de tolerância após um PAYMENT_OVERDUE antes do downgrade pro free. */
 const GRACE_DAYS = 5
-
-/** Dias de teste grátis antes da primeira cobrança de uma assinatura nova. */
-const TRIAL_DAYS = 14
 
 function isUniqueViolation(err: unknown): boolean {
   const error = err as { code?: string; cause?: { code?: string } }
@@ -65,10 +65,27 @@ export async function subscribe(establishmentId: string, remoteIp: string, input
   const cycle = input.billingCycle === 'yearly' ? 'YEARLY' : 'MONTHLY'
   const value = centsToReais(getPlanCycleCents(input.planSlug, input.billingCycle))
 
-  // Nova assinatura começa com trial (1ª cobrança em TRIAL_DAYS dias). Troca de
-  // plano cobra o novo valor já no próximo ciclo, sem novo trial.
-  const firstDue = new Date()
-  if (!isChange) firstDue.setDate(firstDue.getDate() + TRIAL_DAYS)
+  // Data da 1ª cobrança:
+  // - Troca de plano: cobra já no ciclo atual (hoje).
+  // - Assinatura nova durante o teste grátis: alinha ao fim do teste
+  //   (`trialEndsAt`) — reaproveita os dias que faltam, sem duplicar cortesia.
+  // - Teste já expirado: cobra no início (hoje) para reativar a conta.
+  // - Conta legada (sem teste): 14 dias de cortesia, como antes.
+  let firstDue: Date
+  if (isChange) {
+    firstDue = new Date()
+  } else {
+    const establishment = await db.query.establishments.findFirst({
+      columns: { trialEndsAt: true },
+      where: eq(establishments.id, establishmentId),
+    })
+    const now = new Date()
+    if (establishment?.trialEndsAt) {
+      firstDue = establishment.trialEndsAt > now ? establishment.trialEndsAt : now
+    } else {
+      firstDue = new Date(now.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000)
+    }
+  }
   const nextDueDate = firstDue.toISOString().slice(0, 10)
 
   const asaasSubscription = await createCreditCardSubscription({
@@ -149,6 +166,70 @@ export async function cancel(establishmentId: string) {
     .where(eq(subscriptions.id, subscription.id))
 
   return { ok: true as const }
+}
+
+/**
+ * Troca o plano/ciclo reaproveitando o cartão que o Asaas já mantém tokenizado
+ * na assinatura — sem pedir os dados do cartão de novo. Só rola quando já existe
+ * uma assinatura viva (não cancelada): atualizamos valor e ciclo na assinatura
+ * existente do Asaas e liberamos o novo plano na hora. O novo valor passa a
+ * valer nas próximas cobranças (a data da próxima cobrança não muda), então não
+ * há cobrança imediata pela diferença.
+ *
+ * Sem assinatura (ou cancelada) não dá pra reaproveitar cartão nenhum: o fluxo
+ * cai no checkout normal (subscribe), que coleta o cartão.
+ */
+export async function changePlan(establishmentId: string, input: ChangePlanInput) {
+  const subscription = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.establishmentId, establishmentId),
+  })
+  if (!subscription || subscription.status === 'canceled') {
+    throw new AppError('Nenhuma assinatura ativa para alterar. Faça uma nova assinatura.', 409)
+  }
+  if (subscription.planSlug === input.planSlug && subscription.billingCycle === input.billingCycle) {
+    throw new AppError('Você já está neste plano.', 422)
+  }
+
+  const cycle = input.billingCycle === 'yearly' ? 'YEARLY' : 'MONTHLY'
+  const value = centsToReais(getPlanCycleCents(input.planSlug, input.billingCycle))
+
+  await updateAsaasSubscription(subscription.asaasSubscriptionId, { value, cycle })
+
+  const [updated] = await db
+    .update(subscriptions)
+    .set({
+      planSlug: input.planSlug,
+      billingCycle: input.billingCycle,
+      updatedAt: new Date(),
+    })
+    .where(eq(subscriptions.id, subscription.id))
+    .returning()
+
+  // Libera o novo plano imediatamente (o gating lê establishments.plan).
+  await db
+    .update(establishments)
+    .set({ plan: input.planSlug })
+    .where(eq(establishments.id, establishmentId))
+
+  return updated
+}
+
+/**
+ * Cartão já cadastrado na assinatura ativa (últimos 4 + bandeira), só pra mostrar
+ * na confirmação de troca de plano. Best-effort: sem assinatura viva, ou se o
+ * Asaas falhar, devolve null e a UI cai num texto genérico.
+ */
+export async function getPaymentMethod(establishmentId: string) {
+  const subscription = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.establishmentId, establishmentId),
+  })
+  if (!subscription || subscription.status === 'canceled') return null
+  try {
+    return await getAsaasSubscriptionCard(subscription.asaasSubscriptionId)
+  } catch (err) {
+    console.error('[payments] falha ao buscar cartão da assinatura:', err)
+    return null
+  }
 }
 
 const PAYMENT_STATUS_MAP: Record<string, (typeof payments.$inferSelect)['status']> = {

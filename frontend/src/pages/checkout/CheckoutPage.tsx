@@ -27,6 +27,7 @@ import { Input } from '../../components/ui/Input'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { useToast } from '../../components/ui/Toast'
 import { useAuth } from '../../contexts/AuthContext'
+import { usePlan } from '../../hooks/usePlan'
 import { addDays, todayStr } from '../../lib/dates'
 import {
   formatBRL,
@@ -65,8 +66,10 @@ export function CheckoutPage() {
 
   const requestedPlan = searchParams.get('plan')
   const planSlug: PlanSlug = requestedPlan === 'basico' ? 'basico' : 'essencial'
+  // Anual é o padrão em toda exibição de planos; só cai em mensal se a URL
+  // pedir explicitamente (?cycle=monthly).
   const [billingCycle, setBillingCycle] = useState<BillingCycle>(
-    searchParams.get('cycle') === 'yearly' ? 'yearly' : 'monthly',
+    searchParams.get('cycle') === 'monthly' ? 'monthly' : 'yearly',
   )
 
   const plansQuery = useQuery({ queryKey: ['payments', 'plans'], queryFn: getPlans })
@@ -74,12 +77,24 @@ export function CheckoutPage() {
   const cycleCents = plan ? (billingCycle === 'yearly' ? plan.yearlyCents : plan.monthlyCents) : null
   const discountPercent = plan ? getAnnualDiscountPercent(plan.monthlyCents, plan.yearlyCents) : 0
 
-  // Assinatura nova ganha 14 dias grátis; troca de plano (já tem assinatura
-  // ativa) não ganha novo trial e é cobrada no próximo ciclo.
   const subscriptionQuery = useQuery({ queryKey: ['payments', 'subscription'], queryFn: getSubscription })
   const currentSub = subscriptionQuery.data?.subscription ?? null
   const isChange = currentSub !== null && currentSub.status !== 'canceled'
-  const trialEndLabel = formatDate(addDays(todayStr(), TRIAL_DAYS))
+
+  // Data real da 1ª cobrança — espelha o backend (payments/service.ts#subscribe):
+  // troca de plano e teste expirado cobram hoje; teste em andamento cobra no fim
+  // do teste (trialEndsAt, sem reiniciar os 14 dias); conta legada sem teste
+  // ganha 14 dias de cortesia. Evita prometer "14 dias grátis" pra quem não tem.
+  const accessQuery = usePlan()
+  const trialState = accessQuery.data?.state
+  const trialEndsAtIso = accessQuery.data?.trialEndsAt ?? null
+  const firstChargeDate =
+    isChange || trialState === 'trial_expired'
+      ? todayStr()
+      : trialState === 'trial' && trialEndsAtIso
+        ? trialEndsAtIso.slice(0, 10)
+        : addDays(todayStr(), TRIAL_DAYS)
+  const firstChargeLabel = formatDate(firstChargeDate)
 
   // Etapa 1 — cartão
   const [holderName, setHolderName] = useState('')
@@ -224,7 +239,13 @@ export function CheckoutPage() {
       setEstablishment(me.establishment)
 
       toast.success(
-        isChange ? 'Plano alterado com sucesso!' : 'Pronto! Seu teste grátis de 14 dias começou.',
+        isChange
+          ? 'Plano alterado com sucesso!'
+          : trialState === 'trial_expired'
+            ? 'Assinatura ativada! Seu acesso foi liberado.'
+            : trialState === 'trial'
+              ? `Assinatura confirmada! Primeira cobrança em ${firstChargeLabel}.`
+              : 'Pronto! Seu teste grátis de 14 dias começou.',
       )
       navigate('/app')
     } catch (err) {
@@ -278,8 +299,22 @@ export function CheckoutPage() {
                       </p>
                       {!isChange && (
                         <div className="mt-3 rounded-lg bg-secondary-light px-3 py-2.5 text-xs text-primary">
-                          <span className="font-semibold">14 dias grátis.</span> Primeira cobrança em{' '}
-                          {trialEndLabel}. Cancele antes e não paga nada.
+                          {trialState === 'trial_expired' ? (
+                            <>
+                              <span className="font-semibold">Cobrança imediata.</span> Sua assinatura
+                              libera o acesso na hora e a primeira cobrança acontece hoje.
+                            </>
+                          ) : trialState === 'trial' ? (
+                            <>
+                              <span className="font-semibold">Teste grátis até {firstChargeLabel}.</span> A
+                              primeira cobrança só acontece nessa data. Cancele antes e não paga nada.
+                            </>
+                          ) : (
+                            <>
+                              <span className="font-semibold">14 dias grátis.</span> Primeira cobrança em{' '}
+                              {firstChargeLabel}. Cancele antes e não paga nada.
+                            </>
+                          )}
                         </div>
                       )}
                     </>
@@ -302,7 +337,13 @@ export function CheckoutPage() {
                   isLoading={isSubmitting}
                   leftIcon={<Lock className="h-4 w-4" />}
                 >
-                  {isChange ? 'Trocar de plano' : 'Começar 14 dias grátis'}
+                  {isChange
+                    ? 'Trocar de plano'
+                    : trialState === 'trial_expired'
+                      ? 'Assinar agora'
+                      : trialState === 'trial'
+                        ? 'Assinar plano'
+                        : 'Começar 14 dias grátis'}
                 </Button>
 
                 <div className="mt-3 flex items-center gap-3 rounded-lg bg-success-light px-4 py-3">

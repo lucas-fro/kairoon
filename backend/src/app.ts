@@ -4,7 +4,22 @@ import Fastify from 'fastify'
 import { ZodError } from 'zod'
 import { env } from './env'
 import { AppError } from './lib/errors'
+import { getAccessState } from './lib/plan'
 import { authPlugin } from './plugins/auth'
+
+declare module 'fastify' {
+  interface FastifyContextConfig {
+    /**
+     * Rotas marcadas com isto continuam liberadas quando a conta está em
+     * somente-leitura (teste grátis expirado sem assinatura) — ex.: assinar,
+     * gerenciar/excluir a conta. Ver o hook `onRequest` abaixo.
+     */
+    allowWhenReadOnly?: boolean
+  }
+}
+
+/** Métodos que alteram estado — o gate de somente-leitura só age nestes. */
+const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 import { appointmentsRoutes } from './modules/appointments/routes'
 import { authRoutes } from './modules/auth/routes'
 import { clientsRoutes } from './modules/clients/routes'
@@ -43,7 +58,9 @@ export async function buildApp() {
       })
     }
     if (error instanceof AppError) {
-      return reply.status(error.statusCode).send({ message: error.message })
+      return reply
+        .status(error.statusCode)
+        .send({ message: error.message, ...(error.code ? { code: error.code } : {}) })
     }
     const fastifyError = error as { statusCode?: number; message?: string }
     if (
@@ -62,6 +79,32 @@ export async function buildApp() {
   // (hoje apenas nas rotas públicas sensíveis a abuso)
   await app.register(rateLimit, { global: false })
   await app.register(authPlugin)
+
+  // Gate global de somente-leitura: contas com o teste grátis expirado (e sem
+  // assinatura paga) podem LER tudo, mas não escrevem nada — exceto rotas
+  // marcadas com `config.allowWhenReadOnly` (assinar/gerenciar conta). É a
+  // garantia no servidor: a UI só reforça. Roda em onRequest (após o roteamento,
+  // então routeOptions já existe) e só toca requisições autenticadas de dono;
+  // públicas/não-autenticadas passam direto (o booking público é barrado dentro
+  // do próprio serviço).
+  app.addHook('onRequest', async (request) => {
+    if (!MUTATING_METHODS.has(request.method)) return
+    if (!request.routeOptions?.url) return
+    if (request.routeOptions.config?.allowWhenReadOnly) return
+    try {
+      await request.jwtVerify()
+    } catch {
+      return
+    }
+    const access = await getAccessState(request.user.establishmentId)
+    if (!access.canWrite) {
+      throw new AppError(
+        'Seu teste grátis terminou. Assine um plano para continuar editando.',
+        402,
+        'TRIAL_EXPIRED',
+      )
+    }
+  })
 
   app.get('/health', async () => ({ status: 'ok' }))
 

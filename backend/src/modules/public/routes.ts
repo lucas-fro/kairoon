@@ -13,11 +13,17 @@ export async function publicRoutes(app: FastifyInstance) {
     return publicService.getPublicEstablishment(slug)
   })
 
-  app.get('/:slug/availability', async (request) => {
-    const { slug } = slugParamSchema.parse(request.params)
-    const query = availabilityQuerySchema.parse(request.query)
-    return publicService.getAvailability(slug, query)
-  })
+  // Rate limit por IP: sem ele, dá para varrer todos os horários livres em
+  // massa (scraping) sem custo.
+  app.get(
+    '/:slug/availability',
+    { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    async (request) => {
+      const { slug } = slugParamSchema.parse(request.params)
+      const query = availabilityQuerySchema.parse(request.query)
+      return publicService.getAvailability(slug, query)
+    },
+  )
 
   // Rate limit agressivo: sem ele, este endpoint permite enumerar telefones
   // e descobrir nomes de clientes da base (PII) por força bruta.
@@ -31,10 +37,16 @@ export async function publicRoutes(app: FastifyInstance) {
     },
   )
 
-  app.post('/:slug/appointments', async (request, reply) => {
-    const { slug } = slugParamSchema.parse(request.params)
-    const input = createBookingSchema.parse(request.body)
-    const result = await publicService.createPublicBooking(slug, input)
-    return reply.status(201).send(result)
-  })
+  // Rate limit por IP: sem ele, dá para inundar a agenda/CRM de um
+  // estabelecimento com agendamentos e clientes falsos.
+  app.post(
+    '/:slug/appointments',
+    { config: { rateLimit: { max: 15, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const { slug } = slugParamSchema.parse(request.params)
+      const input = createBookingSchema.parse(request.body)
+      const result = await publicService.createPublicBooking(slug, input)
+      return reply.status(201).send(result)
+    },
+  )
 }

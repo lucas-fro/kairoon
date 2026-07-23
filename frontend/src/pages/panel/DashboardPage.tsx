@@ -29,6 +29,7 @@ import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { TrialBanner } from '../../components/plan/TrialBanner'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { Table, TBody, Td, Th, THead, Tr } from '../../components/ui/Table'
@@ -266,7 +267,10 @@ export function DashboardPage() {
   const today = todayStr()
 
   const header = (
-    <PageHeader title="Dashboard" />
+    <>
+      <TrialBanner />
+      <PageHeader title="Dashboard" />
+    </>
   )
 
   if (isPending) {

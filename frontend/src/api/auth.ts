@@ -7,7 +7,11 @@ export interface RegisterPayload {
   password: string
   cpf?: string
   phone?: string
-  establishment: {
+  /** Aceite dos Termos + Política (obrigatório; enviado na etapa 1). */
+  acceptedLegal: boolean
+  /** Opcional no fluxo novo: a conta nasce só com os dados pessoais (o negócio é
+   *  completado depois, com um link provisório). */
+  establishment?: {
     name: string
     slug: string
     businessType: string

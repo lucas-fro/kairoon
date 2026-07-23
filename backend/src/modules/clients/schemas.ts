@@ -34,8 +34,14 @@ export const listClientsQuerySchema = z.object({
   search: z.string().trim().optional(),
 })
 
+/** Filtro de "sumidos": mínimo de dias sem retornar (default aplicado no service). */
+export const lapsedQuerySchema = z.object({
+  minDays: z.coerce.number().int().min(1).max(3650).optional(),
+})
+
 export const idParamSchema = z.object({ id: z.string().uuid() })
 
 export type CreateClientInput = z.infer<typeof createClientSchema>
 export type UpdateClientInput = z.infer<typeof updateClientSchema>
 export type ListClientsQuery = z.infer<typeof listClientsQuerySchema>
+export type LapsedQuery = z.infer<typeof lapsedQuerySchema>

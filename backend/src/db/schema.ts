@@ -89,6 +89,8 @@ export const users = pgTable('users', {
   // Tentativas erradas do código atual: o código é queimado após o limite, para
   // travar força bruta do código de 6 dígitos independentemente do IP de origem.
   passwordResetAttempts: integer('password_reset_attempts').notNull().default(0),
+  // Momento do aceite dos Termos de Uso + Política de Privacidade no cadastro.
+  termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -145,6 +147,11 @@ export const establishments = pgTable('establishments', {
     }),
   quiz: jsonb('quiz').$type<Record<string, string>>(),
   plan: text('plan').notNull().default('free'),
+  // Fim do teste grátis (sem cartão) concedido no cadastro. Null = conta legada
+  // (anterior ao trial): tratada como 'free' gravável. Enquanto now < trialEndsAt
+  // o acesso efetivo é o plano de teste; depois, sem assinatura paga, a conta
+  // fica somente-leitura (ver lib/plan.ts#getAccessState).
+  trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

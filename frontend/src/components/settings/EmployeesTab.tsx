@@ -1224,9 +1224,13 @@ export function EmployeesTab() {
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
             <Sparkles className="h-6 w-6 text-primary" />
           </div>
-          <h2 className="mt-4 font-display text-lg font-semibold text-ink">Recurso do plano Pro</h2>
+          <h2 className="mt-4 font-display text-lg font-semibold text-ink">
+            Limite de profissionais atingido
+          </h2>
           <p className="mt-1 text-sm text-ink-secondary">
-            O plano Free permite 1 profissional. Faça upgrade para adicionar toda a sua equipe.
+            Seu plano atual permite {planQuery.data?.limits.employees ?? 1}{' '}
+            {(planQuery.data?.limits.employees ?? 1) === 1 ? 'profissional' : 'profissionais'}. Faça
+            upgrade para adicionar toda a sua equipe e muito mais.
           </p>
         </div>
         <ul className="mt-6 space-y-2">
@@ -1241,7 +1245,7 @@ export function EmployeesTab() {
           <Button variant="outline" onClick={() => setUpgradeOpen(false)}>
             Agora não
           </Button>
-          <Button onClick={() => navigate('/app/configuracoes?tab=plano')}>Conhecer planos</Button>
+          <Button onClick={() => navigate('/app/configuracoes?tab=plano')}>Fazer upgrade</Button>
         </DialogActions>
       </Dialog>
 

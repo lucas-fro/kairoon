@@ -1,7 +1,7 @@
 import { useEffect, useReducer } from 'react'
 import type { CSSProperties } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, SearchX } from 'lucide-react'
+import { AlertCircle, CalendarOff, SearchX } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { ApiError } from '../../api/client'
 import { readableTextColor } from '../../lib/color'
@@ -197,6 +197,47 @@ export function PublicBookingPage() {
 
   const { establishment, services, employees, workingHours, branding } = data
   const socialLinks = buildSocialLinks(establishment.socials)
+
+  // Dono com o teste grátis expirado (somente-leitura): a página não aceita
+  // novos agendamentos. O bloqueio real é no backend (createPublicBooking); aqui
+  // é só a UX — evita levar o cliente a um fluxo que terminaria em erro.
+  if (!establishment.acceptingBookings) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-6 text-center">
+        <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-surface shadow-card">
+          <CalendarOff className="h-7 w-7 text-ink-tertiary" />
+        </div>
+        <h1 className="font-display text-xl font-semibold text-ink">Agendamentos indisponíveis</h1>
+        <p className="max-w-xs text-sm text-ink-secondary">
+          {establishment.name} não está aceitando novos agendamentos online no momento. Se precisar,
+          entre em contato diretamente.
+        </p>
+        {socialLinks.length > 0 && (
+          <div className="mt-1 flex flex-wrap items-center justify-center gap-3">
+            {socialLinks.map((social) => (
+              <a
+                key={social.name}
+                href={social.url}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={social.label ? `${social.name} ${social.label}` : social.name}
+                className={cn(
+                  'inline-flex h-10 items-center justify-center rounded-lg border border-line bg-surface transition-colors duration-150 hover:border-secondary hover:bg-surface-hover',
+                  social.label ? 'gap-2 px-3' : 'w-10',
+                )}
+              >
+                <img src={social.icon} alt="" className="h-5 w-5" />
+                {social.label && (
+                  <span className="text-sm font-medium text-ink-secondary">{social.label}</span>
+                )}
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   const hasEmployeeStep = employees.length > 1
   const soleEmployee = employees.length === 1 ? employees[0] : null
 

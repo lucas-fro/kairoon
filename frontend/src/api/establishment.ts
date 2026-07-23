@@ -25,6 +25,7 @@ export function updateEstablishment(data: {
   bannerImageUrl?: string
   footerMessage?: string
   businessType?: string
+  quiz?: Record<string, string>
 }) {
   return api<Establishment>('/establishment', { method: 'PUT', body: data })
 }

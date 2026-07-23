@@ -3,8 +3,8 @@ import { db } from '../../db'
 import { employees, establishments, timeBlocks, users, workingHours } from '../../db/schema'
 import { timeToMinutes } from '../../lib/datetime'
 import { AppError } from '../../lib/errors'
-import { getEffectivePlan } from '../../lib/plan'
-import { planFeatureMap, planTier } from '../../lib/plans'
+import { getAccessState, getEffectivePlan } from '../../lib/plan'
+import { planFeatureMap, planHasFeature, planTier } from '../../lib/plans'
 import type {
   CreateTimeBlockInput,
   UpdateEstablishmentInput,
@@ -31,16 +31,13 @@ export async function updateEstablishment(
   const hasChanges = Object.values(input).some((value) => value !== undefined)
   if (!hasChanges) throw new AppError('Nenhum dado para atualizar', 400)
 
-  // Gate de escrita (defesa em profundidade): personalização visual só vale no
-  // plano pago. A aplicação real é na leitura (getPublicEstablishment); aqui
-  // apenas ignoramos silenciosamente para não persistir dados de plano grátis.
-  const current = await db.query.establishments.findFirst({
-    columns: { plan: true },
-    where: eq(establishments.id, establishmentId),
-  })
-  if (!current) throw new AppError('Estabelecimento não encontrado', 404)
+  // Gate de escrita (defesa em profundidade): personalização visual só vale em
+  // quem tem a feature `personalizacao` no plano EFETIVO (inclui o teste grátis).
+  // A aplicação real é na leitura (getPublicEstablishment); aqui apenas
+  // ignoramos silenciosamente para não persistir dados sem direito.
   const data = { ...input }
-  if (current.plan === 'free') {
+  const plan = await getEffectivePlan(establishmentId)
+  if (!planHasFeature(plan, 'personalizacao')) {
     delete data.themeColor
     delete data.bannerImageUrl
     delete data.footerMessage
@@ -133,8 +130,8 @@ export async function updateWorkingHours(
 }
 
 export async function getPlan(establishmentId: string) {
-  const plan = await getEffectivePlan(establishmentId)
-  const tier = planTier(plan)
+  const access = await getAccessState(establishmentId)
+  const tier = planTier(access.plan)
 
   const [row] = await db
     .select({ count: sql<string>`count(*)` })
@@ -142,9 +139,14 @@ export async function getPlan(establishmentId: string) {
     .where(eq(employees.establishmentId, establishmentId))
 
   return {
-    plan,
+    plan: access.plan,
+    // Estado de acesso para a UI (banners de teste + modo somente-leitura).
+    state: access.state,
+    canWrite: access.canWrite,
+    trialEndsAt: access.trialEndsAt ? access.trialEndsAt.toISOString() : null,
+    trialDaysLeft: access.trialDaysLeft,
     limits: { employees: tier.employees, establishments: 1 },
-    features: planFeatureMap(plan),
+    features: planFeatureMap(access.plan),
     usage: { employees: Number(row?.count ?? 0) },
   }
 }

@@ -1,30 +1,66 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   BarChart3,
   Boxes,
+  Cake,
   Calendar,
+  ChevronDown,
+  Clock,
+  Coins,
+  Crown,
   Gift,
   LayoutDashboard,
+  List,
   Lock,
+  Megaphone,
+  Palette,
+  Scissors,
   Settings,
+  Stamp,
+  Store,
+  Ticket,
+  UserCog,
   Users,
+  UserX,
   Wallet,
   X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { HeaderSlotProvider } from '../../contexts/HeaderSlotContext'
 import { usePlan } from '../../hooks/usePlan'
 import { cn } from '../../lib/format'
 import type { PlanFeatureKey } from '../../types/api'
 import { KairoonMark } from '../brand/Logo'
+import { TrialBanner } from '../plan/TrialBanner'
+import { TrialExpiredListener } from '../plan/TrialExpiredListener'
 import { PendingBookingsListener } from '../realtime/PendingBookingsListener'
 import { AppHeader } from './AppHeader'
 
-type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean; feature?: PlanFeatureKey }
+/** Item de navegação simples (link direto). */
+type NavLeaf = { to: string; label: string; icon: LucideIcon; end?: boolean; feature?: PlanFeatureKey }
 
-const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+/** Sub-opção de um dropdown — navega para `${parent.to}?tab=${tab}`. */
+type NavSubItem = { tab: string; label: string; icon: LucideIcon; feature?: PlanFeatureKey }
+
+/** Item de navegação com sub-opções (dropdown que expande na própria sidebar). */
+type NavParent = {
+  to: string
+  label: string
+  icon: LucideIcon
+  feature?: PlanFeatureKey
+  defaultTab: string
+  children: NavSubItem[]
+}
+
+type NavEntry = NavLeaf | NavParent
+
+function isParent(entry: NavEntry): entry is NavParent {
+  return 'children' in entry
+}
+
+const NAV_GROUPS: { label: string; items: NavEntry[] }[] = [
   {
     label: 'Principal',
     items: [
@@ -35,8 +71,30 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: 'Gestão',
     items: [
-      { to: '/app/clientes', label: 'Clientes', icon: Users },
-      { to: '/app/fidelidade', label: 'Fidelidade', icon: Gift, feature: 'fidelidade' },
+      {
+        to: '/app/clientes',
+        label: 'Clientes',
+        icon: Users,
+        defaultTab: 'listagem',
+        children: [
+          { tab: 'listagem', label: 'Listagem', icon: List },
+          { tab: 'aniversarios', label: 'Aniversários', icon: Cake, feature: 'clientes_crm' },
+          { tab: 'sumidos', label: 'Sumidos', icon: UserX, feature: 'clientes_crm' },
+        ],
+      },
+      {
+        to: '/app/fidelidade',
+        label: 'Fidelidade',
+        icon: Gift,
+        feature: 'fidelidade',
+        defaultTab: 'cartao',
+        children: [
+          { tab: 'cupons', label: 'Cupons', icon: Ticket, feature: 'cupons' },
+          { tab: 'campanhas', label: 'Campanhas', icon: Megaphone, feature: 'cupons' },
+          { tab: 'cartao', label: 'Cartão fidelidade', icon: Stamp, feature: 'fidelidade' },
+          { tab: 'pontos', label: 'Pontos', icon: Coins, feature: 'fidelidade' },
+        ],
+      },
       { to: '/app/estoque', label: 'Estoque', icon: Boxes, feature: 'estoque' },
       { to: '/app/financeiro', label: 'Financeiro', icon: Wallet, feature: 'financeiro' },
       { to: '/app/relatorios', label: 'Relatórios', icon: BarChart3, feature: 'relatorios' },
@@ -44,13 +102,164 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   },
   {
     label: 'Sistema',
-    items: [{ to: '/app/configuracoes', label: 'Configurações', icon: Settings }],
+    items: [
+      {
+        to: '/app/configuracoes',
+        label: 'Configurações',
+        icon: Settings,
+        defaultTab: 'estabelecimento',
+        children: [
+          { tab: 'estabelecimento', label: 'Estabelecimento', icon: Store },
+          { tab: 'servicos', label: 'Serviços', icon: Scissors },
+          { tab: 'funcionarios', label: 'Colaboradores', icon: Users },
+          { tab: 'funcionamento', label: 'Expediente', icon: Clock },
+          { tab: 'aparencia', label: 'Aparência', icon: Palette },
+          { tab: 'plano', label: 'Plano', icon: Crown },
+          { tab: 'conta', label: 'Conta', icon: UserCog },
+        ],
+      },
+    ],
   },
 ]
+
+/** Recurso trancado pelo plano atual (mostra o cadeado). */
+type FeatureLocked = (feature?: PlanFeatureKey) => boolean
+
+function LeafNav({
+  item,
+  featureLocked,
+  onNavigate,
+}: {
+  item: NavLeaf
+  featureLocked: FeatureLocked
+  onNavigate?: () => void
+}) {
+  return (
+    <NavLink
+      to={item.to}
+      end={item.end}
+      onClick={onNavigate}
+      className={({ isActive }) =>
+        cn(
+          'relative flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors duration-150',
+          isActive ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white',
+        )
+      }
+    >
+      {({ isActive }) => (
+        <>
+          {isActive && <span className="absolute -left-4 h-5 w-[3px] rounded-r bg-secondary" />}
+          <item.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.9} />
+          <span className="flex-1 truncate">{item.label}</span>
+          {featureLocked(item.feature) && <Lock className="h-3.5 w-3.5 shrink-0 text-white/40" />}
+        </>
+      )}
+    </NavLink>
+  )
+}
+
+function ParentNav({
+  item,
+  featureLocked,
+  open,
+  sectionActive,
+  currentTab,
+  onToggle,
+  onNavigate,
+}: {
+  item: NavParent
+  featureLocked: FeatureLocked
+  open: boolean
+  sectionActive: boolean
+  currentTab: string | null
+  onToggle: () => void
+  onNavigate?: () => void
+}) {
+  // Aba efetiva quando esta seção está ativa (usada para destacar a sub-opção).
+  const activeTab = currentTab && item.children.some((c) => c.tab === currentTab) ? currentTab : item.defaultTab
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className={cn(
+          'flex h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors duration-150',
+          // Seção ativa recebe um realce sutil; a sub-opção ativa é o destaque forte.
+          sectionActive ? 'bg-white/5 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white',
+        )}
+      >
+        <item.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.9} />
+        <span className="flex-1 truncate text-left">{item.label}</span>
+        {featureLocked(item.feature) && <Lock className="h-3.5 w-3.5 shrink-0 text-white/40" />}
+        <ChevronDown
+          className={cn(
+            'h-4 w-4 shrink-0 text-white/50 transition-transform duration-200',
+            open && 'rotate-180',
+          )}
+          strokeWidth={2}
+        />
+      </button>
+
+      {/* Expansão suave (grid-rows 0fr→1fr anima a altura sem valor fixo). */}
+      <div
+        className={cn(
+          'grid transition-all duration-200 ease-out',
+          open ? 'grid-rows-[1fr] opacity-100' : 'pointer-events-none grid-rows-[0fr] opacity-0',
+        )}
+        aria-hidden={!open}
+      >
+        <div className="overflow-hidden">
+          <div className="ml-[21px] mt-0.5 space-y-0.5 border-l border-white/10 pl-3">
+            {item.children.map((sub) => {
+              const isActive = sectionActive && activeTab === sub.tab
+              return (
+                <Link
+                  key={sub.tab}
+                  to={`${item.to}?tab=${sub.tab}`}
+                  onClick={onNavigate}
+                  tabIndex={open ? undefined : -1}
+                  className={cn(
+                    'flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-colors duration-150',
+                    isActive
+                      ? 'bg-white/10 font-medium text-white'
+                      : 'text-white/60 hover:bg-white/5 hover:text-white',
+                  )}
+                >
+                  <sub.icon className="h-4 w-4 shrink-0" strokeWidth={1.9} />
+                  <span className="flex-1 truncate">{sub.label}</span>
+                  {featureLocked(sub.feature) && <Lock className="h-3 w-3 shrink-0 text-white/40" />}
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { establishment } = useAuth()
   const { data: plan } = usePlan()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+
+  const featureLocked: FeatureLocked = (feature) => !!feature && !!plan && !plan.features[feature]
+
+  // Parent (dropdown) da rota atual — mantém a seção aberta ao navegar/deep-link.
+  const activeParentTo =
+    NAV_GROUPS.flatMap((group) => group.items).find(
+      (item): item is NavParent => isParent(item) && location.pathname.startsWith(item.to),
+    )?.to ?? null
+
+  const [openTo, setOpenTo] = useState<string | null>(activeParentTo)
+  useEffect(() => {
+    if (activeParentTo) setOpenTo(activeParentTo)
+  }, [activeParentTo])
+
+  const currentTab = searchParams.get('tab')
 
   return (
     <div className="flex h-full flex-col p-4">
@@ -69,39 +278,29 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <div key={group.label}>
             <p className="mb-1.5 px-3 text-xs font-medium text-white/40">{group.label}</p>
             <div className="space-y-0.5">
-              {group.items.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  onClick={onNavigate}
-                  className={({ isActive }) =>
-                    cn(
-                      'relative flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors duration-150',
-                      isActive
-                        ? 'bg-white/10 text-white'
-                        : 'text-white/70 hover:bg-white/10 hover:text-white',
-                    )
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      {isActive && (
-                        <span className="absolute -left-4 h-5 w-[3px] rounded-r bg-secondary" />
-                      )}
-                      <item.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.9} />
-                      <span className="flex-1 truncate">{item.label}</span>
-                      {item.feature && plan && !plan.features[item.feature] && (
-                        <Lock className="h-3.5 w-3.5 shrink-0 text-white/40" />
-                      )}
-                    </>
-                  )}
-                </NavLink>
-              ))}
+              {group.items.map((item) =>
+                isParent(item) ? (
+                  <ParentNav
+                    key={item.to}
+                    item={item}
+                    featureLocked={featureLocked}
+                    open={openTo === item.to}
+                    sectionActive={location.pathname.startsWith(item.to)}
+                    currentTab={currentTab}
+                    onToggle={() => setOpenTo((prev) => (prev === item.to ? null : item.to))}
+                    onNavigate={onNavigate}
+                  />
+                ) : (
+                  <LeafNav key={item.to} item={item} featureLocked={featureLocked} onNavigate={onNavigate} />
+                ),
+              )}
             </div>
           </div>
         ))}
       </nav>
+
+      {/* Rodapé: banner do teste grátis (some fora do teste). */}
+      <TrialBanner variant="sidebar" />
     </div>
   )
 }
@@ -162,6 +361,9 @@ export function AppLayout() {
 
       {/* Popup em tempo real de agendamentos pendentes do link público */}
       <PendingBookingsListener />
+
+      {/* Convite de upgrade quando uma escrita é bloqueada (teste expirado). */}
+      <TrialExpiredListener />
     </div>
   )
 }

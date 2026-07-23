@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { BarChart3, Lock, RefreshCw, Sparkles } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { BarChart3, RefreshCw } from 'lucide-react'
 import {
   Bar,
   BarChart,
@@ -30,6 +29,7 @@ import {
   getTopClientsReport,
   getTopServices,
 } from '../../api/reports'
+import { UpgradePrompt } from '../../components/plan/UpgradePrompt'
 import { Button } from '../../components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -345,24 +345,9 @@ function ChartScroll({
 
 /** Placeholder de card de relatório avançado (bloqueado fora do plano Essencial). */
 function ReportLock() {
-  const navigate = useNavigate()
   return (
-    <div className="flex h-[240px] flex-col items-center justify-center gap-2.5 px-4 text-center">
-      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary-light">
-        <Lock className="h-5 w-5 text-primary" />
-      </span>
-      <p className="text-xs font-medium uppercase tracking-wide text-secondary">Plano Essencial</p>
-      <p className="max-w-xs text-sm text-ink-secondary">
-        Este relatório está disponível no plano Essencial.
-      </p>
-      <Button
-        size="sm"
-        variant="outline"
-        leftIcon={<Sparkles className="h-4 w-4" />}
-        onClick={() => navigate('/app/configuracoes?tab=plano')}
-      >
-        Fazer upgrade
-      </Button>
+    <div className="flex h-[240px] items-center justify-center">
+      <UpgradePrompt plan="Essencial" compact />
     </div>
   )
 }

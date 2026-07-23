@@ -4,6 +4,7 @@ import {
   BarChart3,
   Boxes,
   Check,
+  CreditCard,
   Crown,
   Gift,
   Palette,
@@ -15,8 +16,17 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { getMe } from '../../api/auth'
+import { ApiError } from '../../api/client'
 import { getPlan } from '../../api/establishment'
-import { cancelSubscription, getPlans, getSubscription } from '../../api/payments'
+import {
+  cancelSubscription,
+  changePlan,
+  getPaymentMethod,
+  getPlans,
+  getSubscription,
+} from '../../api/payments'
+import { useAuth } from '../../contexts/AuthContext'
 import { formatBRL, formatDate } from '../../lib/format'
 import type { BillingCycle, PlanSlug } from '../../types/api'
 import { BillingCycleToggle, getAnnualDiscountPercent } from '../payments/BillingCycleToggle'
@@ -60,14 +70,27 @@ function toIsoDate(value: string): string {
 export function PlanTab() {
   const [upgradeOpen, setUpgradeOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
-  const [selectedCycle, setSelectedCycle] = useState<BillingCycle>('monthly')
+  // Plano escolhido no diálogo aguardando confirmação da troca (tokenizada).
+  const [confirmPlan, setConfirmPlan] = useState<PlanSlug | null>(null)
+  const [selectedCycle, setSelectedCycle] = useState<BillingCycle>('yearly')
   const navigate = useNavigate()
   const toast = useToast()
   const queryClient = useQueryClient()
+  const { setEstablishment } = useAuth()
 
   const planQuery = useQuery({ queryKey: ['plan'], queryFn: getPlan })
   const subscriptionQuery = useQuery({ queryKey: ['payments', 'subscription'], queryFn: getSubscription })
-  const plansQuery = useQuery({ queryKey: ['payments', 'plans'], queryFn: getPlans, enabled: upgradeOpen })
+  const plansQuery = useQuery({
+    queryKey: ['payments', 'plans'],
+    queryFn: getPlans,
+    enabled: upgradeOpen || confirmPlan !== null,
+  })
+  // Cartão cadastrado — buscado só quando o usuário abre a confirmação da troca.
+  const paymentMethodQuery = useQuery({
+    queryKey: ['payments', 'payment-method'],
+    queryFn: getPaymentMethod,
+    enabled: confirmPlan !== null,
+  })
 
   const cancelMutation = useMutation({
     mutationFn: cancelSubscription,
@@ -80,16 +103,73 @@ export function PlanTab() {
     onError: () => toast.error('Não foi possível cancelar a assinatura. Tente novamente.'),
   })
 
-  const planName = planQuery.data?.plan ?? 'free'
-  const planLabel = `Plano ${planName.charAt(0).toUpperCase()}${planName.slice(1)}`
+  const changeMutation = useMutation({
+    mutationFn: changePlan,
+    onSuccess: async () => {
+      toast.success('Plano alterado com sucesso!')
+      setConfirmPlan(null)
+      setUpgradeOpen(false)
+      // Sincroniza o plano no contexto (gating da UI) e recarrega os caches.
+      try {
+        const me = await getMe()
+        setEstablishment(me.establishment)
+      } catch {
+        // Ignora: as invalidações abaixo recarregam o plano de qualquer forma.
+      }
+      queryClient.invalidateQueries({ queryKey: ['payments', 'subscription'] })
+      queryClient.invalidateQueries({ queryKey: ['plan'] })
+    },
+    onError: (err) =>
+      toast.error(err instanceof ApiError ? err.message : 'Não foi possível alterar o plano. Tente novamente.'),
+  })
+
+  const access = planQuery.data
+  const trialState = access?.state
+  const trialDaysLeft = access?.trialDaysLeft ?? 0
+  const planName = access?.plan ?? 'free'
+  // Durante o teste o plano efetivo é 'essencial'; rotulamos como teste para não
+  // dar a impressão de que já é uma assinatura paga.
+  const planLabel =
+    trialState === 'trial'
+      ? 'Teste grátis'
+      : trialState === 'trial_expired'
+        ? 'Teste encerrado'
+        : `Plano ${planName.charAt(0).toUpperCase()}${planName.slice(1)}`
 
   const subscription = subscriptionQuery.data?.subscription ?? null
   const hasSubscriptionRecord = subscription !== null
   const canCancel = subscription !== null && subscription.status !== 'canceled'
+  // Assinatura viva = cartão tokenizado no Asaas: dá pra trocar de plano sem
+  // pedir o cartão de novo. Sem ela (free/cancelada), cai no checkout.
+  const hasActiveSub = subscription !== null && subscription.status !== 'canceled'
 
   function handlePickPlan(planSlug: PlanSlug) {
+    if (hasActiveSub) {
+      // Troca tokenizada: confirma e reaproveita o cartão já cadastrado.
+      setUpgradeOpen(false)
+      setConfirmPlan(planSlug)
+      return
+    }
     navigate(`/checkout?plan=${planSlug}&cycle=${selectedCycle}`)
   }
+
+  function closeConfirm() {
+    if (changeMutation.isPending) return
+    setConfirmPlan(null)
+    setUpgradeOpen(true)
+  }
+
+  const confirmInfo = confirmPlan ? plansQuery.data?.[confirmPlan] : undefined
+  const confirmPriceCents = confirmInfo
+    ? selectedCycle === 'yearly'
+      ? confirmInfo.yearlyCents
+      : confirmInfo.monthlyCents
+    : 0
+  const savedCard = paymentMethodQuery.data ?? null
+  const nextChargeLabel =
+    subscription?.currentPeriodEnd && subscription.status !== 'canceled'
+      ? formatDate(toIsoDate(subscription.currentPeriodEnd))
+      : null
 
   return (
     <Card>
@@ -133,6 +213,22 @@ export function PlanTab() {
             </span>
           )}
         </div>
+
+        {(trialState === 'trial' || trialState === 'trial_expired') && (
+          <div
+            className={`mt-3 rounded-lg px-4 py-3 text-sm ${
+              trialState === 'trial_expired'
+                ? 'bg-error-light text-error-dark'
+                : 'bg-secondary-light text-ink-secondary'
+            }`}
+          >
+            {trialState === 'trial'
+              ? `Teste grátis com tudo desbloqueado — faltam ${trialDaysLeft} ${
+                  trialDaysLeft === 1 ? 'dia' : 'dias'
+                }. Assine para não perder o acesso.`
+              : 'Seu teste grátis acabou. A conta está em somente-leitura até você assinar um plano.'}
+          </div>
+        )}
 
         {hasSubscriptionRecord && subscription && (
           <div className="mt-3 rounded-lg bg-background px-4 py-3 text-sm text-ink-secondary">
@@ -203,14 +299,24 @@ export function PlanTab() {
               ][]
             ).map(([slug, info]) => {
               const priceCents = selectedCycle === 'yearly' ? info.yearlyCents : info.monthlyCents
+              const isCurrent =
+                hasActiveSub && subscription?.planSlug === slug && subscription?.billingCycle === selectedCycle
               return (
                 <button
                   key={slug}
                   type="button"
+                  disabled={isCurrent}
                   onClick={() => handlePickPlan(slug)}
-                  className="flex w-full items-center justify-between rounded-lg border border-line px-4 py-3 text-left transition-colors duration-150 hover:border-secondary hover:bg-secondary-light"
+                  className="flex w-full items-center justify-between rounded-lg border border-line px-4 py-3 text-left transition-colors duration-150 enabled:hover:border-secondary enabled:hover:bg-secondary-light disabled:cursor-default disabled:opacity-60"
                 >
-                  <span className="font-medium text-ink">{info.name}</span>
+                  <span className="flex items-center gap-2 font-medium text-ink">
+                    {info.name}
+                    {isCurrent && (
+                      <span className="rounded-full bg-background px-2 py-0.5 text-[11px] font-medium text-ink-secondary">
+                        Plano atual
+                      </span>
+                    )}
+                  </span>
                   <span className="text-right">
                     <span className="block text-sm font-medium text-primary">
                       {formatBRL(priceCents)}
@@ -230,6 +336,66 @@ export function PlanTab() {
         <DialogActions className="mt-6">
           <Button type="button" variant="outline" onClick={() => setUpgradeOpen(false)}>
             Fechar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={confirmPlan !== null}
+        onClose={closeConfirm}
+        title="Confirmar troca de plano"
+        description="A cobrança reaproveita o cartão já cadastrado — você não precisa digitar os dados de novo."
+        maxWidth="max-w-md"
+      >
+        <div className="space-y-3">
+          <div className="flex items-center justify-between rounded-lg border border-line px-4 py-3">
+            <span className="font-medium text-ink">Plano {confirmInfo?.name ?? ''}</span>
+            <span className="text-right">
+              <span className="block text-sm font-semibold text-primary">
+                {formatBRL(confirmPriceCents)}
+                {selectedCycle === 'monthly' ? '/mês' : '/ano'}
+              </span>
+              {selectedCycle === 'yearly' && confirmInfo && (
+                <span className="block text-xs text-ink-tertiary">
+                  equivale a {formatBRL(confirmInfo.yearlyCents / 12)}/mês
+                </span>
+              )}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 rounded-lg bg-background px-4 py-3 text-sm text-ink-secondary">
+            <CreditCard className="h-4 w-4 shrink-0 text-primary" />
+            {paymentMethodQuery.isPending ? (
+              <span>Carregando cartão cadastrado…</span>
+            ) : savedCard ? (
+              <span>
+                Cobrança no cartão {savedCard.brand ? `${savedCard.brand} ` : ''}•••• {savedCard.last4}
+              </span>
+            ) : (
+              <span>Cobrança no cartão já cadastrado na sua assinatura</span>
+            )}
+          </div>
+
+          <p className="text-sm text-ink-secondary">
+            O acesso ao plano {confirmInfo?.name ?? ''} é liberado na hora.{' '}
+            {nextChargeLabel
+              ? `O novo valor passa a valer a partir da próxima cobrança, em ${nextChargeLabel} — nada é cobrado agora.`
+              : 'O novo valor passa a valer a partir da próxima cobrança — nada é cobrado agora.'}
+          </p>
+        </div>
+
+        <DialogActions className="mt-6">
+          <Button type="button" variant="outline" onClick={closeConfirm} disabled={changeMutation.isPending}>
+            Voltar
+          </Button>
+          <Button
+            type="button"
+            onClick={() =>
+              confirmPlan && changeMutation.mutate({ planSlug: confirmPlan, billingCycle: selectedCycle })
+            }
+            isLoading={changeMutation.isPending}
+          >
+            Confirmar troca
           </Button>
         </DialogActions>
       </Dialog>

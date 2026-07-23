@@ -195,6 +195,31 @@ export interface ClientListItem {
   totalSpentCents: number
 }
 
+export interface BirthdayClient {
+  id: string
+  name: string
+  phone: string
+  birthDate: string
+  appointmentsCount: number
+  lastVisit: string | null
+  /** Dias até o próximo aniversário (0 = hoje). */
+  daysUntil: number
+  isToday: boolean
+  /** Idade que completa no próximo aniversário. */
+  turningAge: number
+}
+
+export interface LapsedClient {
+  id: string
+  name: string
+  phone: string
+  appointmentsCount: number
+  lastVisit: string
+  /** Dias desde a última visita. */
+  daysSince: number
+  totalSpentCents: number
+}
+
 export interface ClientHistoryItem {
   id: string
   date: string
@@ -546,9 +571,21 @@ export type PlanFeatureKey =
   | 'relatorios'
   | 'relatorios_avancados'
   | 'cupons'
+  | 'clientes_crm'
+
+/** Estado de acesso da conta (ver backend lib/plan.ts#getAccessState). */
+export type AccessState = 'paid' | 'trial' | 'trial_expired' | 'free'
 
 export interface PlanInfo {
   plan: string
+  /** Estado de acesso — usado nos banners de teste e no modo somente-leitura. */
+  state: AccessState
+  /** false quando o teste grátis acabou sem assinatura: conta em somente-leitura. */
+  canWrite: boolean
+  /** ISO do fim do teste grátis (null fora do teste). */
+  trialEndsAt: string | null
+  /** Dias inteiros restantes do teste (null fora do teste). */
+  trialDaysLeft: number | null
   limits: { employees: number; establishments: number }
   features: Record<PlanFeatureKey, boolean>
   usage: { employees: number }
@@ -621,6 +658,8 @@ export interface PublicEstablishment {
     phone: string | null
     businessType: string
     socials: Socials | null
+    /** false quando o dono está com o teste grátis expirado (não recebe agendamentos). */
+    acceptingBookings: boolean
   }
   branding: PublicBranding
   services: {

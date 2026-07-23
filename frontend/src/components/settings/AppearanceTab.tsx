@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
 import { Lock, Save } from 'lucide-react'
 import { ApiError } from '../../api/client'
 import { updateEstablishment } from '../../api/establishment'
 import { useAuth } from '../../contexts/AuthContext'
+import { usePlan } from '../../hooks/usePlan'
 import { BrandBanner } from '../booking/BrandBanner'
 import { KairoonMark } from '../brand/Logo'
+import { UpgradePrompt } from '../plan/UpgradePrompt'
 import type { Establishment } from '../../types/api'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
@@ -24,10 +25,14 @@ interface AppearanceTabProps {
 
 export function AppearanceTab({ establishment }: AppearanceTabProps) {
   const { setEstablishment } = useAuth()
-  const navigate = useNavigate()
   const toast = useToast()
 
-  const isPaid = establishment.plan !== 'free'
+  // Personalização segue o plano EFETIVO (getPlan) — cobre o teste grátis, cuja
+  // coluna `plan` é 'free' mas o acesso é Essencial. Enquanto o plano carrega (ou
+  // se a query falhar) cai na coluna crua como fallback otimista, evitando piscar
+  // "bloqueado" para quem já tem acesso.
+  const { data: plan } = usePlan()
+  const hasPersonalizacao = plan ? plan.features.personalizacao : establishment.plan !== 'free'
 
   const [themeColor, setThemeColor] = useState(
     HEX_REGEX.test(establishment.themeColor) ? establishment.themeColor : SYSTEM_PRIMARY,
@@ -62,17 +67,17 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
 
   // O preview reflete exatamente o que o visitante vê hoje: grátis usa a cor do
   // sistema + marca Kairoon; pago aplica cor/banner/mensagem escolhidos.
-  const previewColor = isPaid ? themeColor : SYSTEM_PRIMARY
-  const previewBanner = isPaid ? bannerImageUrl.trim() || null : null
+  const previewColor = hasPersonalizacao ? themeColor : SYSTEM_PRIMARY
+  const previewBanner = hasPersonalizacao ? bannerImageUrl.trim() || null : null
 
   return (
     <Card>
       <CardHeader className="flex-wrap">
         <CardTitle>Aparência do link público</CardTitle>
-        {!isPaid && (
+        {!hasPersonalizacao && (
           <Badge tone="brand">
             <Lock className="h-3 w-3" />
-            Disponível no plano Pro
+            Disponível no plano Básico
           </Badge>
         )}
       </CardHeader>
@@ -94,7 +99,7 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
             </p>
           )}
           <div className="mt-3 text-center text-xs text-ink-tertiary">
-            {isPaid ? (
+            {hasPersonalizacao ? (
               footerMessage.trim() ? (
                 <span className="text-ink-secondary">{footerMessage.trim()}</span>
               ) : (
@@ -139,7 +144,7 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
             <input
               type="color"
               value={themeColor}
-              disabled={!isPaid}
+              disabled={!hasPersonalizacao}
               onChange={(e) => setThemeColor(e.target.value)}
               className="h-10 w-14 cursor-pointer rounded-lg border border-line bg-surface p-1 disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="Cor da marca"
@@ -147,7 +152,7 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
             <input
               type="text"
               value={themeColor}
-              disabled={!isPaid}
+              disabled={!hasPersonalizacao}
               onChange={(e) => {
                 const value = e.target.value
                 if (HEX_REGEX.test(value)) setThemeColor(value)
@@ -168,7 +173,7 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
           onChange={(e) => setBannerImageUrl(e.target.value)}
           placeholder="https://exemplo.com/banner.jpg"
           hint="Opcional. Sem imagem, o banner usa a cor da marca."
-          disabled={!isPaid}
+          disabled={!hasPersonalizacao}
         />
         <Input
           label="Mensagem de rodapé"
@@ -176,10 +181,10 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
           onChange={(e) => setFooterMessage(e.target.value)}
           placeholder="Ex.: Barbearia do Zé desde 2010"
           hint="Substitui a marca “Agendamento feito pela Kairoon”."
-          disabled={!isPaid}
+          disabled={!hasPersonalizacao}
         />
 
-        {isPaid ? (
+        {hasPersonalizacao ? (
           <div className="flex justify-end">
             <Button
               onClick={() => mutation.mutate()}
@@ -190,18 +195,7 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
             </Button>
           </div>
         ) : (
-          <div className="flex flex-col items-start gap-3 rounded-lg border border-line bg-background p-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-ink-secondary">
-              Personalize as cores, o banner e a mensagem da sua página fazendo upgrade para o
-              plano Pro.
-            </p>
-            <Button
-              className="shrink-0"
-              onClick={() => navigate('/app/configuracoes?tab=plano')}
-            >
-              Conhecer planos
-            </Button>
-          </div>
+          <UpgradePrompt plan="Básico" compact />
         )}
       </CardContent>
     </Card>

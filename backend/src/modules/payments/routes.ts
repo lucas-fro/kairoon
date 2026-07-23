@@ -2,7 +2,7 @@ import { timingSafeEqual } from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
 import { env } from '../../env'
 import { PLANS } from '../../lib/plans'
-import { subscribeSchema, webhookSchema } from './schemas'
+import { changePlanSchema, subscribeSchema, webhookSchema } from './schemas'
 import * as paymentsService from './service'
 
 /** Comparação em tempo constante — evita timing attack no token do webhook. */
@@ -22,7 +22,8 @@ export async function paymentsRoutes(app: FastifyInstance) {
     '/subscribe',
     {
       preHandler: [app.authenticate],
-      config: { rateLimit: { max: 5, timeWindow: '10 minutes' } },
+      // allowWhenReadOnly: assinar é justamente como o dono sai do somente-leitura.
+      config: { rateLimit: { max: 5, timeWindow: '10 minutes' }, allowWhenReadOnly: true },
     },
     async (request, reply) => {
       const input = subscribeSchema.parse(request.body)
@@ -39,9 +40,32 @@ export async function paymentsRoutes(app: FastifyInstance) {
     return paymentsService.getSubscription(request.user.establishmentId)
   })
 
-  app.post('/cancel', { preHandler: [app.authenticate] }, async (request) => {
-    return paymentsService.cancel(request.user.establishmentId)
+  // Troca de plano reaproveitando o cartão já tokenizado no Asaas (sem coletar
+  // cartão de novo). Rate limit modesto: não coleta cartão, mas mexe em cobrança.
+  app.post(
+    '/change-plan',
+    {
+      preHandler: [app.authenticate],
+      config: { rateLimit: { max: 10, timeWindow: '10 minutes' }, allowWhenReadOnly: true },
+    },
+    async (request) => {
+      const input = changePlanSchema.parse(request.body)
+      return paymentsService.changePlan(request.user.establishmentId, input)
+    },
+  )
+
+  // Cartão cadastrado (últimos 4 + bandeira) pra confirmação da troca de plano.
+  app.get('/payment-method', { preHandler: [app.authenticate] }, async (request) => {
+    return paymentsService.getPaymentMethod(request.user.establishmentId)
   })
+
+  app.post(
+    '/cancel',
+    { preHandler: [app.authenticate], config: { allowWhenReadOnly: true } },
+    async (request) => {
+      return paymentsService.cancel(request.user.establishmentId)
+    },
+  )
 
   // Público (o Asaas não manda JWT) — autenticado pelo header próprio abaixo.
   app.post(

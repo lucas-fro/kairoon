@@ -66,8 +66,16 @@ export const registerSchema = z.object({
     cep: emptyToNull(
       z.string().refine((value) => digitsOnly(value).length === 8, 'CEP inválido (8 dígitos)'),
     ),
-  }),
+  // Opcional: no fluxo novo a conta é criada só com os dados pessoais (o negócio
+  // é preenchido depois, com um link provisório). Quando ausente, o backend
+  // sintetiza nome/link/tipo provisórios (ver service.registerOwner).
+  }).optional(),
   quiz: z.record(z.string()).optional(),
+  // Aceite dos Termos de Uso + Política de Privacidade (obrigatório no cadastro,
+  // registrado com timestamp em users.termsAcceptedAt).
+  acceptedLegal: z.boolean().refine((value) => value === true, {
+    message: 'É necessário aceitar os Termos de Uso e a Política de Privacidade',
+  }),
 })
 
 export const loginSchema = z.object({

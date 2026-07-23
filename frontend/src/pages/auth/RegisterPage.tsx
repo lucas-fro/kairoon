@@ -20,8 +20,8 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { checkSlugAvailability } from '../../api/auth'
 import { ApiError } from '../../api/client'
+import { checkSlugAvailability, updateEstablishment, updateSlug } from '../../api/establishment'
 import { KairoonLogotype } from '../../components/brand/Logo'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
@@ -192,7 +192,7 @@ function OptionCard({
 }
 
 export function RegisterPage() {
-  const { isAuthenticated, register } = useAuth()
+  const { isAuthenticated, register, setEstablishment } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
@@ -203,13 +203,16 @@ export function RegisterPage() {
   const planParam = searchParams.get('plan')
   const checkoutFrom =
     planParam === 'basico' || planParam === 'essencial'
-      ? `/checkout?plan=${planParam}&cycle=${searchParams.get('cycle') === 'yearly' ? 'yearly' : 'monthly'}`
+      ? `/checkout?plan=${planParam}&cycle=${searchParams.get('cycle') === 'monthly' ? 'monthly' : 'yearly'}`
       : undefined
   const from = stateFrom ?? checkoutFrom
 
   const [step, setStep] = useState(1)
+  // A conta é criada ao concluir a etapa 1; a partir daí o usuário já está
+  // logado mas segue no wizard — este flag impede o guard de abortar o fluxo.
+  const [onboarding, setOnboarding] = useState(false)
 
-  // Etapa 1 — conta (identidade + login do dono)
+  // Etapa 1 — conta (identidade + login do dono) + aceite legal
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [emailApiError, setEmailApiError] = useState<string | null>(null)
@@ -231,10 +234,11 @@ export function RegisterPage() {
   const [bizWhatsapp, setBizWhatsapp] = useState('')
   const [bizEmail, setBizEmail] = useState('')
 
-  // Etapa 3 — quiz (opcional) + aceite legal (obrigatório)
+  // Aceite dos Termos + Política (etapa 1, obrigatório para criar a conta)
+  const [acceptedLegal, setAcceptedLegal] = useState(false)
+
+  // Etapa 3 — quiz (opcional)
   const [quiz, setQuiz] = useState<Record<string, string>>({})
-  const [acceptedTerms, setAcceptedTerms] = useState(false)
-  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false)
 
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -263,7 +267,9 @@ export function RegisterPage() {
     }
   }, [slug])
 
-  if (isAuthenticated) return <Navigate to={from ?? '/app'} replace />
+  // Já logado e fora do onboarding recém-criado → vai pro destino. Durante o
+  // wizard (onboarding) não redireciona, mesmo já autenticado após a etapa 1.
+  if (isAuthenticated && !onboarding) return <Navigate to={from ?? '/app'} replace />
 
   const passwordError = password && password.length < 6 ? 'A senha precisa ter pelo menos 6 caracteres' : undefined
   const confirmError = confirmPassword && confirmPassword !== password ? 'As senhas não coincidem' : undefined
@@ -286,7 +292,8 @@ export function RegisterPage() {
     EMAIL_REGEX.test(email.trim()) &&
     (personalPhone === '' || isValidPhone(personalPhone)) &&
     password.length >= 6 &&
-    confirmPassword === password
+    confirmPassword === password &&
+    acceptedLegal
 
   const contactValid =
     sameContact || ((bizWhatsapp === '' || isValidPhone(bizWhatsapp)) && (bizEmail === '' || EMAIL_REGEX.test(bizEmail.trim())))
@@ -294,8 +301,8 @@ export function RegisterPage() {
   const step2Valid =
     businessName.trim().length >= 2 && businessType !== null && slugUsable && contactValid
 
-  // Quiz é opcional, mas o aceite dos termos e da política é obrigatório para concluir.
-  const step3Valid = acceptedTerms && acceptedPrivacy
+  // Quiz é opcional — a etapa final sempre pode concluir.
+  const step3Valid = true
   const currentStepValid = step === 1 ? step1Valid : step === 2 ? step2Valid : step3Valid
 
   function handleBusinessNameChange(value: string) {
@@ -312,46 +319,80 @@ export function RegisterPage() {
     setSlugApiError(null)
   }
 
-  async function handleRegister() {
-    if (!businessType) return
+  // Etapa 1 — cria a conta (já loga e inicia o teste grátis de 14 dias). A partir
+  // daqui o usuário segue autenticado dentro do wizard (ver flag `onboarding`).
+  async function handleCreateAccount() {
     setSubmitError(null)
+    setEmailApiError(null)
     setIsSubmitting(true)
-    // Contato público: reaproveita o pessoal ou usa o informado especificamente.
-    const contactWhatsapp = sameContact ? onlyDigits(personalPhone) : onlyDigits(bizWhatsapp)
-    const contactEmail = sameContact ? email.trim() : bizEmail.trim()
+    setOnboarding(true)
     try {
       await register({
         name: name.trim(),
         email: email.trim(),
         password,
         ...(personalPhone ? { phone: personalPhone } : {}),
-        establishment: {
-          name: businessName.trim(),
-          slug,
-          businessType,
-          ...(contactEmail ? { email: contactEmail } : {}),
-          ...(contactWhatsapp ? { socials: { whatsapp: contactWhatsapp } } : {}),
-        },
-        quiz,
+        acceptedLegal: true,
       })
-      navigate(from ?? '/app')
+      setIsSubmitting(false)
+      setStep(2)
+    } catch (err) {
+      setIsSubmitting(false)
+      // Falhou: desfaz o flag (a conta não foi criada) para o guard e o link
+      // "Entrar" voltarem ao normal na etapa 1.
+      setOnboarding(false)
+      if (err instanceof ApiError && err.status === 409) {
+        setEmailApiError(err.message)
+        return
+      }
+      setSubmitError(err instanceof ApiError ? err.message : 'Erro inesperado')
+    }
+  }
+
+  // Etapa 2 — grava o negócio (nome/tipo/contato) e o link público escolhido
+  // (a conta nasceu com um link provisório).
+  async function handleSaveBusiness() {
+    setSubmitError(null)
+    setIsSubmitting(true)
+    // Contato público: reaproveita o pessoal ou usa o informado especificamente.
+    const contactWhatsapp = sameContact ? onlyDigits(personalPhone) : onlyDigits(bizWhatsapp)
+    const contactEmail = sameContact ? email.trim() : bizEmail.trim()
+    try {
+      const updated = await updateEstablishment({
+        name: businessName.trim(),
+        ...(businessType ? { businessType } : {}),
+        ...(contactEmail ? { email: contactEmail } : {}),
+        ...(contactWhatsapp ? { socials: { whatsapp: contactWhatsapp } } : {}),
+      })
+      setEstablishment(updated)
+      const withSlug = await updateSlug(slug)
+      setEstablishment(withSlug)
+      setIsSubmitting(false)
+      setStep(3)
     } catch (err) {
       setIsSubmitting(false)
       if (err instanceof ApiError && err.status === 409) {
-        const message = err.message.toLowerCase()
-        const issueKeys = Object.keys(err.issues ?? {}).join(' ').toLowerCase()
-        if (message.includes('slug') || message.includes('link') || issueKeys.includes('slug')) {
-          setSlugApiError(err.message)
-          setSlugStatus('taken')
-          setStep(2)
-          return
-        }
-        if (message.includes('mail') || issueKeys.includes('email')) {
-          setEmailApiError(err.message)
-          setStep(1)
-          return
-        }
+        setSlugApiError(err.message)
+        setSlugStatus('taken')
+        return
       }
+      setSubmitError(err instanceof ApiError ? err.message : 'Erro inesperado')
+    }
+  }
+
+  // Etapa 3 — salva o quiz (opcional) e entra no app (ou no checkout, se veio de
+  // um card de plano da LP).
+  async function handleFinish() {
+    setSubmitError(null)
+    setIsSubmitting(true)
+    try {
+      if (Object.keys(quiz).length > 0) {
+        const updated = await updateEstablishment({ quiz })
+        setEstablishment(updated)
+      }
+      navigate(from ?? '/app')
+    } catch (err) {
+      setIsSubmitting(false)
       setSubmitError(err instanceof ApiError ? err.message : 'Erro inesperado')
     }
   }
@@ -359,11 +400,9 @@ export function RegisterPage() {
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
     if (!currentStepValid || isSubmitting) return
-    if (step < TOTAL_STEPS) {
-      setStep(step + 1)
-      return
-    }
-    void handleRegister()
+    if (step === 1) return void handleCreateAccount()
+    if (step === 2) return void handleSaveBusiness()
+    void handleFinish()
   }
 
   const { title, subtitle } = STEP_TITLES[step]
@@ -495,6 +534,36 @@ export function RegisterPage() {
                         error={confirmError}
                       />
                     </div>
+
+                    <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-line bg-background/60 p-3">
+                      <input
+                        type="checkbox"
+                        checked={acceptedLegal}
+                        onChange={(e) => setAcceptedLegal(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 shrink-0 rounded border-line text-primary focus:ring-2 focus:ring-secondary-light"
+                      />
+                      <span className="text-[13px] leading-snug text-ink-secondary">
+                        Li e concordo com a{' '}
+                        <a
+                          href="/politica-de-privacidade"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium text-primary hover:underline"
+                        >
+                          Política de Privacidade
+                        </a>{' '}
+                        e os{' '}
+                        <a
+                          href="/termos-de-uso"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium text-primary hover:underline"
+                        >
+                          Termos de Uso
+                        </a>
+                        .
+                      </span>
+                    </label>
                   </div>
                 )}
 
@@ -662,53 +731,11 @@ export function RegisterPage() {
                       </div>
                     ))}
 
-                    <div className="space-y-2.5 rounded-lg border border-line bg-background/60 p-3">
-                      <label className="flex cursor-pointer items-start gap-2.5">
-                        <input
-                          type="checkbox"
-                          checked={acceptedTerms}
-                          onChange={(e) => setAcceptedTerms(e.target.checked)}
-                          className="mt-0.5 h-4 w-4 shrink-0 rounded border-line text-primary focus:ring-2 focus:ring-secondary-light"
-                        />
-                        <span className="text-[13px] leading-snug text-ink-secondary">
-                          Li e aceito os{' '}
-                          <a
-                            href="/termos-de-uso"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-medium text-primary hover:underline"
-                          >
-                            Termos de Uso
-                          </a>
-                          .
-                        </span>
-                      </label>
-                      <label className="flex cursor-pointer items-start gap-2.5">
-                        <input
-                          type="checkbox"
-                          checked={acceptedPrivacy}
-                          onChange={(e) => setAcceptedPrivacy(e.target.checked)}
-                          className="mt-0.5 h-4 w-4 shrink-0 rounded border-line text-primary focus:ring-2 focus:ring-secondary-light"
-                        />
-                        <span className="text-[13px] leading-snug text-ink-secondary">
-                          Li e aceito a{' '}
-                          <a
-                            href="/politica-de-privacidade"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-medium text-primary hover:underline"
-                          >
-                            Política de Privacidade
-                          </a>
-                          .
-                        </span>
-                      </label>
-                    </div>
                   </div>
                 )}
               </div>
 
-              {submitError && step === TOTAL_STEPS && (
+              {submitError && (
                 <div className="mt-4 flex items-start gap-2 rounded-lg bg-error-light px-3 py-2.5 text-sm text-error-dark">
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>{submitError}</span>
@@ -716,7 +743,8 @@ export function RegisterPage() {
               )}
 
               <div className="mt-5 flex items-center gap-3">
-                {step > 1 && (
+                {/* Sem "Voltar" na etapa 2: a conta já foi criada na etapa 1. */}
+                {step > 2 && (
                   <Button
                     type="button"
                     variant="outline"
@@ -740,16 +768,18 @@ export function RegisterPage() {
               </div>
             </form>
 
-            <p className="mt-5 text-center text-sm text-ink-secondary">
-              Já tem conta?{' '}
-              <Link
-                to={{ pathname: '/login', search: location.search }}
-                state={location.state}
-                className="font-medium text-primary transition-colors duration-150 hover:text-primary-hover hover:underline"
-              >
-                Entrar
-              </Link>
-            </p>
+            {!onboarding && (
+              <p className="mt-5 text-center text-sm text-ink-secondary">
+                Já tem conta?{' '}
+                <Link
+                  to={{ pathname: '/login', search: location.search }}
+                  state={location.state}
+                  className="font-medium text-primary transition-colors duration-150 hover:text-primary-hover hover:underline"
+                >
+                  Entrar
+                </Link>
+              </p>
+            )}
           </div>
         </div>
       </div>

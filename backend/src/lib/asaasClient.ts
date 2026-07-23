@@ -138,3 +138,20 @@ export async function updateAsaasSubscription(
     body: JSON.stringify({ value: input.value, cycle: input.cycle }),
   })
 }
+
+/**
+ * Últimos 4 dígitos + bandeira do cartão tokenizado na assinatura. Serve só pra
+ * exibir na confirmação de troca de plano ("a cobrança vai no cartão •••• 8829")
+ * — o dado sensível do cartão nunca volta pra cá. Devolve null se o Asaas não
+ * trouxer o bloco de cartão (ex.: assinatura sem cartão vinculado).
+ */
+export async function getAsaasSubscriptionCard(
+  asaasSubscriptionId: string,
+): Promise<{ last4: string; brand: string } | null> {
+  const subscription = await asaasFetch<{
+    creditCard?: { creditCardNumber?: string; creditCardBrand?: string }
+  }>(`/subscriptions/${asaasSubscriptionId}`)
+  const card = subscription.creditCard
+  if (!card?.creditCardNumber) return null
+  return { last4: card.creditCardNumber, brand: card.creditCardBrand ?? '' }
+}

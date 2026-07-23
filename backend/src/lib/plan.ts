@@ -4,28 +4,45 @@ import { establishments, subscriptions } from '../db/schema'
 import { AppError } from './errors'
 import { minPlanNameForFeature, planHasFeature, type PlanFeature } from './plans'
 
+/** Dias de teste grátis (sem cartão) concedidos no cadastro. */
+export const TRIAL_DAYS = 14
+
+/** Plano efetivo durante o teste grátis: tudo liberado. */
+export const TRIAL_PLAN = 'essencial'
+
+export type AccessState = 'paid' | 'trial' | 'trial_expired' | 'free'
+
+export interface AccountAccess {
+  /** Plano efetivo para gating de features/limites (leitura). */
+  plan: string
+  /** Pode criar/editar? false quando o teste acabou e não há assinatura paga. */
+  canWrite: boolean
+  state: AccessState
+  trialEndsAt: Date | null
+  /** Dias inteiros restantes do teste (arredondado pra cima); null fora do teste. */
+  trialDaysLeft: number | null
+}
+
+/** Subconjunto do estabelecimento necessário para avaliar acesso. */
+type EstablishmentAccessRow = { id: string; plan: string; trialEndsAt: Date | null }
+
 /**
- * Reavaliação "preguiçosa" (sem cron) do plano efetivo: `establishments.plan`
- * é a fonte da verdade lida pelo resto do código, mas ela só se atualiza
- * quando alguém chama esta função — nos pontos em que o atraso ou o
- * cancelamento já deveriam ter expirado, faz o downgrade aqui mesmo antes de
- * responder. Assim os call-sites de gating continuam lendo só a coluna.
+ * Avalia SÓ o plano pago vindo de assinatura (mesma lógica/efeitos colaterais de
+ * antes): devolve o plano pago ativo ou 'free'. Faz o downgrade preguiçoso quando
+ * a assinatura venceu (tolerância estourada) ou foi cancelada e o período já
+ * acabou — mantendo os call-sites lendo só a coluna `plan`.
  */
-export async function getEffectivePlan(establishmentId: string): Promise<string> {
-  const establishment = await db.query.establishments.findFirst({
-    columns: { plan: true },
-    where: eq(establishments.id, establishmentId),
-  })
-  if (!establishment) throw new AppError('Estabelecimento não encontrado', 404)
-  if (establishment.plan === 'free') return 'free'
+async function evaluatePaidPlan(est: EstablishmentAccessRow): Promise<string> {
+  if (est.plan === 'free') return 'free'
 
   const subscription = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.establishmentId, establishmentId),
+    where: eq(subscriptions.establishmentId, est.id),
   })
-  if (!subscription) return establishment.plan
+  if (!subscription) return est.plan
 
   const now = new Date()
-  const graceExpired = subscription.status === 'past_due' && !!subscription.graceUntil && subscription.graceUntil < now
+  const graceExpired =
+    subscription.status === 'past_due' && !!subscription.graceUntil && subscription.graceUntil < now
   const canceledPeriodEnded =
     subscription.status === 'canceled' &&
     !!subscription.currentPeriodEnd &&
@@ -33,7 +50,7 @@ export async function getEffectivePlan(establishmentId: string): Promise<string>
 
   if (graceExpired || canceledPeriodEnded) {
     await db.transaction(async (tx) => {
-      await tx.update(establishments).set({ plan: 'free' }).where(eq(establishments.id, establishmentId))
+      await tx.update(establishments).set({ plan: 'free' }).where(eq(establishments.id, est.id))
       if (graceExpired) {
         await tx
           .update(subscriptions)
@@ -44,7 +61,74 @@ export async function getEffectivePlan(establishmentId: string): Promise<string>
     return 'free'
   }
 
-  return establishment.plan
+  return est.plan
+}
+
+/** Dias inteiros (arredondado pra cima) entre agora e uma data futura. */
+function daysUntil(date: Date): number {
+  return Math.max(0, Math.ceil((date.getTime() - Date.now()) / 86_400_000))
+}
+
+/**
+ * Estado de acesso da conta — fonte ÚNICA da verdade do plano efetivo E da
+ * permissão de escrita. Ordem de prioridade:
+ *   1. Assinatura paga ativa → plano pago, gravável.
+ *   2. Teste grátis em andamento → plano de teste (essencial), gravável.
+ *   3. Teste grátis expirado (sem assinatura) → somente-leitura. O plano efetivo
+ *      segue alto SÓ para leitura (ver dados/relatórios); a escrita é barrada
+ *      globalmente pelo hook em app.ts.
+ *   4. Conta legada (sem teste, trialEndsAt null) → 'free' gravável (como antes).
+ *
+ * `preloaded` evita uma query extra quando o chamador já carregou o
+ * estabelecimento (ex.: página pública).
+ */
+export async function getAccessState(
+  establishmentId: string,
+  preloaded?: EstablishmentAccessRow,
+): Promise<AccountAccess> {
+  const est =
+    preloaded ??
+    (await db.query.establishments.findFirst({
+      columns: { id: true, plan: true, trialEndsAt: true },
+      where: eq(establishments.id, establishmentId),
+    }))
+  if (!est) throw new AppError('Estabelecimento não encontrado', 404)
+
+  const paidPlan = await evaluatePaidPlan(est)
+  if (paidPlan !== 'free') {
+    return { plan: paidPlan, canWrite: true, state: 'paid', trialEndsAt: est.trialEndsAt, trialDaysLeft: null }
+  }
+
+  if (est.trialEndsAt === null) {
+    return { plan: 'free', canWrite: true, state: 'free', trialEndsAt: null, trialDaysLeft: null }
+  }
+
+  if (Date.now() < est.trialEndsAt.getTime()) {
+    return {
+      plan: TRIAL_PLAN,
+      canWrite: true,
+      state: 'trial',
+      trialEndsAt: est.trialEndsAt,
+      trialDaysLeft: daysUntil(est.trialEndsAt),
+    }
+  }
+
+  return {
+    plan: TRIAL_PLAN,
+    canWrite: false,
+    state: 'trial_expired',
+    trialEndsAt: est.trialEndsAt,
+    trialDaysLeft: 0,
+  }
+}
+
+/**
+ * Reavaliação "preguiçosa" (sem cron) do plano efetivo — a coluna
+ * `establishments.plan` continua sendo lida pelo resto do código; aqui só
+ * resolvemos o plano efetivo (delegando ao motor de acesso).
+ */
+export async function getEffectivePlan(establishmentId: string): Promise<string> {
+  return (await getAccessState(establishmentId)).plan
 }
 
 export async function assertPaidPlan(establishmentId: string) {

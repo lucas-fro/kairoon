@@ -19,6 +19,7 @@ import {
 import { AppError } from '../../lib/errors'
 import { publish } from '../../lib/events'
 import { lockEmployeeDay } from '../../lib/locks'
+import { getAccessState } from '../../lib/plan'
 import { computeAvailableSlots, isValidPhone, normalizePhone, timesOverlap } from '../../lib/slots'
 import type { AvailabilityQuery, CreateBookingInput } from './schemas'
 
@@ -88,10 +89,12 @@ export async function getPublicEstablishment(slug: string) {
   const priceById = new Map(allServices.map((s) => [s.id, s.priceCents]))
   const activeServices = allServices.filter((s) => s.active)
 
-  // Branding efetivo: o gate de plano é resolvido aqui (no servidor), o front
-  // apenas renderiza. Plano grátis usa a cor do sistema e a marca Kairoon;
-  // plano pago aplica cor/banner/mensagem próprios.
-  const isPaid = establishment.plan !== 'free'
+  // Branding efetivo: o gate é resolvido aqui (no servidor), o front só
+  // renderiza. Cor/banner/mensagem próprios valem enquanto a conta paga OU está
+  // no teste grátis; free e teste expirado voltam pra cor do sistema + marca
+  // Kairoon. Teste expirado sem assinatura → página não aceita agendamentos.
+  const access = await getAccessState(establishment.id, establishment)
+  const isPaid = access.state === 'paid' || access.state === 'trial'
   const branding = {
     brandColor: isPaid ? establishment.themeColor : SYSTEM_PRIMARY,
     bannerImageUrl: isPaid ? establishment.bannerImageUrl : null,
@@ -110,6 +113,8 @@ export async function getPublicEstablishment(slug: string) {
       phone: establishment.phone,
       businessType: establishment.businessType,
       socials: establishment.socials,
+      // false quando o dono está com o teste grátis expirado (somente-leitura).
+      acceptingBookings: access.state !== 'trial_expired',
     },
     branding,
     services: activeServices.map((s) => {
@@ -202,6 +207,15 @@ export async function getAvailability(slug: string, query: AvailabilityQuery) {
 
 export async function createPublicBooking(slug: string, input: CreateBookingInput) {
   const establishment = await findEstablishmentBySlug(slug)
+
+  // Booking público é uma escrita SEM JWT — por isso o gate de somente-leitura
+  // (hook global em app.ts) não a alcança e precisamos barrar aqui: dono com o
+  // teste grátis expirado (e sem assinatura) não recebe novos agendamentos.
+  const access = await getAccessState(establishment.id, establishment)
+  if (access.state === 'trial_expired') {
+    throw new AppError('Este estabelecimento não está aceitando agendamentos no momento.', 403)
+  }
+
   const service = await findActiveService(establishment.id, input.serviceId)
   const employee = await resolveEmployee(establishment.id, input.employeeId)
 

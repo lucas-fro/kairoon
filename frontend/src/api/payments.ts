@@ -33,6 +33,28 @@ export function getSubscription() {
   return api<SubscriptionDetails>('/payments/subscription')
 }
 
+export interface ChangePlanPayload {
+  planSlug: PlanSlug
+  billingCycle: BillingCycle
+}
+
+/** Troca de plano reaproveitando o cartão já tokenizado no Asaas (sem checkout). */
+export function changePlan(payload: ChangePlanPayload) {
+  return api<Subscription>('/payments/change-plan', { method: 'POST', body: payload })
+}
+
+export interface PaymentMethod {
+  /** Últimos 4 dígitos do cartão cadastrado. */
+  last4: string
+  /** Bandeira do cartão (ex.: "MASTERCARD"); pode vir vazia. */
+  brand: string
+}
+
+/** Cartão cadastrado na assinatura ativa (null se não houver ou o gateway falhar). */
+export function getPaymentMethod() {
+  return api<PaymentMethod | null>('/payments/payment-method')
+}
+
 export function cancelSubscription() {
   return api<{ ok: true }>('/payments/cancel', { method: 'POST' })
 }

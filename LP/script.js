@@ -180,5 +180,9 @@
         setPeriod(btn.getAttribute('data-period'));
       });
     });
+
+    // Estado inicial derivado do data-active (anual por padrão) — garante que
+    // preços, rótulos e CTAs já saem consistentes sem depender de clique.
+    setPeriod(plansToggle.getAttribute('data-active') || 'annual');
   }
 })();

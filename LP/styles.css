@@ -1683,18 +1683,14 @@ tbody tr:not(:last-child) td.plan-col-featured {
 }
 
 .testimonial-card .testimonial-avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   flex: 0 0 auto;
   width: 46px;
   height: 46px;
   border-radius: 50%;
+  object-fit: cover;
+  /* Gradiente serve de fundo enquanto a foto carrega. */
   background: linear-gradient(140deg, var(--color-secondary-light), var(--color-accent));
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.9rem;
-  color: var(--color-primary);
 }
 
 .testimonial-card .testimonial-author div {

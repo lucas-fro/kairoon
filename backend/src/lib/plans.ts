@@ -24,6 +24,7 @@ export const PLAN_FEATURES = [
   'relatorios', // relatórios essenciais (faturamento, clientes, serviços, status)
   'relatorios_avancados', // relatórios avançados (métodos, ranking de clientes/equipe, ocupação, pico)
   'cupons', // cupons e campanhas de marketing
+  'clientes_crm', // insights de clientes: aniversariantes e clientes sumidos (reativação)
 ] as const
 
 export type PlanFeature = (typeof PLAN_FEATURES)[number]
@@ -46,6 +47,7 @@ const ALL_FEATURES: PlanFeature[] = [
   'relatorios',
   'relatorios_avancados',
   'cupons',
+  'clientes_crm',
 ]
 
 export const PLAN_TIERS: Record<'free' | PlanSlug | 'profissional', PlanTier> = {

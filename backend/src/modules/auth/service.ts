@@ -1,11 +1,29 @@
-import { randomInt } from 'node:crypto'
+import { randomBytes, randomInt } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { and, eq, ne } from 'drizzle-orm'
 import { db } from '../../db'
 import { employees, establishments, users, workingHours } from '../../db/schema'
 import { AppError } from '../../lib/errors'
 import { sendPasswordResetEmail, sendWelcomeEmail } from '../../lib/mailer'
+import { TRIAL_DAYS } from '../../lib/plan'
 import type { LoginInput, RegisterInput, UpdateProfileInput } from './schemas'
+
+/** Nome da constraint violada quando o erro é 23505 (unique); null caso contrário. */
+function uniqueViolationConstraint(err: unknown): string | null {
+  const e = err as {
+    code?: string
+    constraint?: string
+    cause?: { code?: string; constraint?: string }
+  }
+  const code = e.code ?? e.cause?.code
+  if (code !== '23505') return null
+  return e.constraint ?? e.cause?.constraint ?? ''
+}
+
+/** Link público provisório de alta entropia até o dono escolher o próprio. */
+function provisionalSlug(): string {
+  return `negocio-${randomBytes(4).toString('hex')}`
+}
 
 /** Código de redefinição de senha válido por 5 minutos. */
 const RESET_CODE_TTL_MS = 5 * 60 * 1000
@@ -49,64 +67,116 @@ export async function isSlugAvailable(slug: string) {
   return { available: !existing }
 }
 
+/**
+ * Cria o dono + estabelecimento e inicia o teste grátis (sem cartão).
+ *
+ * No fluxo novo, `input.establishment` é OMITIDO (a conta nasce só com os dados
+ * pessoais e um link público provisório autogerado; o dono completa o negócio
+ * nas etapas seguintes). Se vier preenchido (fluxo completo/legado), usamos como
+ * está. `trialEndsAt = agora + TRIAL_DAYS` e `termsAcceptedAt = agora` são
+ * setados no servidor — nunca vêm do cliente.
+ */
 export async function registerOwner(input: RegisterInput) {
   const email = input.email.toLowerCase().trim()
 
   const existingUser = await db.query.users.findFirst({ where: eq(users.email, email) })
   if (existingUser) throw new AppError('Já existe uma conta com este e-mail', 409)
 
-  const existingSlug = await db.query.establishments.findFirst({
-    where: eq(establishments.slug, input.establishment.slug),
-  })
-  if (existingSlug) throw new AppError('Este link já está em uso, escolha outro', 409)
+  const business = input.establishment
+  if (business) {
+    const existingSlug = await db.query.establishments.findFirst({
+      where: eq(establishments.slug, business.slug),
+    })
+    if (existingSlug) throw new AppError('Este link já está em uso, escolha outro', 409)
+  }
 
   const passwordHash = await bcrypt.hash(input.password, 10)
+  const now = new Date()
+  const trialEndsAt = new Date(now.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000)
+  const businessName = business ? business.name.trim() : 'Meu negócio'
+  const welcomeMessage = business
+    ? `Bem-vindo(a)! Agende seu horário na ${businessName} em poucos cliques.`
+    : 'Bem-vindo(a)! Agende seu horário em poucos cliques.'
 
-  const result = await db.transaction(async (tx) => {
-    const [user] = await tx
-      .insert(users)
-      .values({ name: input.name.trim(), email, passwordHash, cpf: input.cpf, phone: input.phone })
-      .returning()
+  // Slug provisório é aleatório (colisão astronômica), mas retentamos o insert
+  // inteiro em 23505 por robustez. Com negócio informado, o slug é fixo (1 try).
+  const maxAttempts = business ? 1 : 5
+  let lastError: unknown
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const slug = business ? business.slug : provisionalSlug()
+    try {
+      const result = await db.transaction(async (tx) => {
+        const [user] = await tx
+          .insert(users)
+          .values({
+            name: input.name.trim(),
+            email,
+            passwordHash,
+            cpf: input.cpf,
+            phone: input.phone,
+            termsAcceptedAt: now,
+          })
+          .returning()
 
-    const [establishment] = await tx
-      .insert(establishments)
-      .values({
-        ownerId: user.id,
-        name: input.establishment.name.trim(),
-        slug: input.establishment.slug,
-        businessType: input.establishment.businessType,
-        phone: input.establishment.phone,
-        email: input.establishment.email,
-        socials: input.establishment.socials,
-        document: input.establishment.document,
-        address: input.establishment.address,
-        addressNumber: input.establishment.addressNumber,
-        neighborhood: input.establishment.neighborhood,
-        city: input.establishment.city,
-        state: input.establishment.state,
-        cep: input.establishment.cep,
-        quiz: input.quiz,
-        welcomeMessage: `Bem-vindo(a)! Agende seu horário na ${input.establishment.name.trim()} em poucos cliques.`,
+        const [establishment] = await tx
+          .insert(establishments)
+          .values({
+            ownerId: user.id,
+            name: businessName,
+            slug,
+            businessType: business?.businessType ?? 'outro',
+            phone: business?.phone,
+            email: business?.email,
+            socials: business?.socials,
+            document: business?.document,
+            address: business?.address,
+            addressNumber: business?.addressNumber,
+            neighborhood: business?.neighborhood,
+            city: business?.city,
+            state: business?.state,
+            cep: business?.cep,
+            quiz: input.quiz,
+            welcomeMessage,
+            trialEndsAt,
+          })
+          .returning()
+
+        await tx.insert(workingHours).values(
+          DEFAULT_WORKING_HOURS.map((wh) => ({ ...wh, establishmentId: establishment.id })),
+        )
+
+        // O primeiro (e único, no início) profissional é o próprio dono.
+        await tx.insert(employees).values({ establishmentId: establishment.id, name: input.name.trim() })
+
+        return { user: sanitizeUser(user), establishment }
       })
-      .returning()
 
-    await tx.insert(workingHours).values(
-      DEFAULT_WORKING_HOURS.map((wh) => ({ ...wh, establishmentId: establishment.id })),
-    )
+      // E-mail de boas-vindas: fire-and-forget — nunca trava nem falha o cadastro.
+      // Sem negócio informado (fluxo em etapas), não cita o nome placeholder.
+      void sendWelcomeEmail(
+        result.user.email,
+        result.user.name,
+        business ? result.establishment.name : null,
+      ).catch((err) => console.error('[auth] falha ao enviar e-mail de boas-vindas:', err))
 
-    // Freemium: o primeiro (e único) profissional é o próprio dono
-    await tx.insert(employees).values({ establishmentId: establishment.id, name: input.name.trim() })
+      return result
+    } catch (err) {
+      const constraint = uniqueViolationConstraint(err)
+      if (constraint === null) throw err
+      // E-mail em corrida (passou no pré-check e colidiu no insert): 409 claro.
+      if (constraint.includes('email')) {
+        throw new AppError('Já existe uma conta com este e-mail', 409)
+      }
+      // Colisão de slug: provisório tenta outro; informado pede outro link.
+      if (!business) {
+        lastError = err
+        continue
+      }
+      throw new AppError('Este link já está em uso, escolha outro', 409)
+    }
+  }
 
-    return { user: sanitizeUser(user), establishment }
-  })
-
-  // E-mail de boas-vindas: fire-and-forget — nunca deve travar o cadastro nem
-  // falhar por causa do envio (ex.: e-mail indisponível).
-  void sendWelcomeEmail(result.user.email, result.user.name, result.establishment.name).catch(
-    (err) => console.error('[auth] falha ao enviar e-mail de boas-vindas:', err),
-  )
-
-  return result
+  throw lastError ?? new AppError('Não foi possível criar a conta. Tente novamente.', 500)
 }
 
 export async function authenticateOwner(input: LoginInput) {

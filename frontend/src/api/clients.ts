@@ -1,9 +1,24 @@
-import type { Client, ClientDetail, ClientListItem } from '../types/api'
+import type {
+  BirthdayClient,
+  Client,
+  ClientDetail,
+  ClientListItem,
+  LapsedClient,
+} from '../types/api'
 import { api } from './client'
 
 export function listClients(search?: string) {
   const query = search ? `?search=${encodeURIComponent(search)}` : ''
   return api<ClientListItem[]>(`/clients${query}`)
+}
+
+export function listBirthdays() {
+  return api<BirthdayClient[]>('/clients/birthdays')
+}
+
+export function listLapsed(minDays?: number) {
+  const query = minDays !== undefined ? `?minDays=${minDays}` : ''
+  return api<LapsedClient[]>(`/clients/lapsed${query}`)
 }
 
 export function getClient(id: string) {

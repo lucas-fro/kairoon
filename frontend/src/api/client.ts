@@ -7,6 +7,8 @@ export class ApiError extends Error {
     message: string,
     public readonly status: number,
     public readonly issues?: Record<string, string[]>,
+    /** Código estável vindo do backend (ex.: 'TRIAL_EXPIRED'). */
+    public readonly code?: string,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -60,7 +62,12 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
       clearToken()
       window.dispatchEvent(new Event('auth:logout'))
     }
-    throw new ApiError(data?.message ?? 'Erro inesperado', response.status, data?.issues)
+    // Teste grátis expirado: conta em somente-leitura. NÃO desloga (diferente do
+    // 401) — só avisa a UI para mostrar o convite de upgrade.
+    if (response.status === 402 && data?.code === 'TRIAL_EXPIRED') {
+      window.dispatchEvent(new Event('trial:expired'))
+    }
+    throw new ApiError(data?.message ?? 'Erro inesperado', response.status, data?.issues, data?.code)
   }
 
   return data as T

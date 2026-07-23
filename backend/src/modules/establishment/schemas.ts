@@ -59,6 +59,8 @@ export const updateEstablishmentSchema = z.object({
       }),
     })
     .optional(),
+  // Respostas do quiz de onboarding (persistidas após o cadastro, na etapa final).
+  quiz: z.record(z.string()).optional(),
 })
 
 export const updateSlugSchema = z.object({

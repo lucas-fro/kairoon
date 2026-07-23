@@ -23,7 +23,7 @@ export function LoginPage() {
   const planParam = searchParams.get('plan')
   const checkoutFrom =
     planParam === 'basico' || planParam === 'essencial'
-      ? `/checkout?plan=${planParam}&cycle=${searchParams.get('cycle') === 'yearly' ? 'yearly' : 'monthly'}`
+      ? `/checkout?plan=${planParam}&cycle=${searchParams.get('cycle') === 'monthly' ? 'monthly' : 'yearly'}`
       : undefined
   const from = stateFrom ?? checkoutFrom
 
