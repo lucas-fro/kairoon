@@ -4,7 +4,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, CalendarOff, SearchX } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { ApiError } from '../../api/client'
-import { readableTextColor } from '../../lib/color'
 import { cn } from '../../lib/format'
 import { paletteToVars, resolvePalette } from '../../lib/palettes'
 import { getPublicEstablishment } from '../../api/public'
@@ -411,15 +410,8 @@ export function PublicBookingPage() {
                 className="h-9 w-9 shrink-0 rounded-xl object-cover"
               />
             ) : (
-              <div
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-display text-sm font-semibold"
-                style={{
-                  backgroundColor: branding.brandColor,
-                  color: readableTextColor(branding.brandColor),
-                }}
-              >
-                {establishment.name.charAt(0).toUpperCase()}
-              </div>
+              // Sem logo do estabelecimento: usa a marca da Kairoon.
+              <img src="/logo.svg" alt="Kairoon" className="h-8 w-auto shrink-0" />
             )}
             <p className="min-w-0 truncate font-display text-sm font-semibold text-ink">
               {establishment.name}
@@ -437,10 +429,12 @@ export function PublicBookingPage() {
       <main
         key={state.step}
         className={cn(
-          'step-enter flex w-full min-h-0 flex-1 flex-col',
+          'flex w-full min-h-0 flex-1 flex-col',
           // Welcome ocupa 100% da viewport (banner full-bleed); as demais na coluna
-          // estreita centralizada.
-          isWelcome ? 'max-w-none' : 'mx-auto max-w-md',
+          // estreita centralizada. No welcome NÃO usamos o `step-enter` (translateX
+          // de 12px piscaria uma barra de rolagem horizontal na largura total); o
+          // overflow-x-clip é seguro extra contra qualquer transbordo.
+          isWelcome ? 'max-w-none overflow-x-clip' : 'step-enter mx-auto max-w-md',
           // Nos passos "bare" o banner de marca precisa encostar nas laterais e no
           // topo; o padding horizontal fica por conta de cada etapa internamente.
           !isBareStep && 'px-4',

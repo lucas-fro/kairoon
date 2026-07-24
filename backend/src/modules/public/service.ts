@@ -124,8 +124,9 @@ export async function getPublicEstablishment(slug: string) {
       logoUrl: establishment.logoUrl,
       themeColor: establishment.themeColor,
       welcomeMessage: establishment.welcomeMessage,
-      phone: establishment.phone,
       businessType: establishment.businessType,
+      // phone NÃO é exposto aqui: o link público não usa e vazaria o número
+      // mesmo com o WhatsApp oculto (o handle do WhatsApp costuma ser o phone).
       socials,
       // false quando o dono está com o teste grátis expirado (somente-leitura).
       acceptingBookings: access.state !== 'trial_expired',

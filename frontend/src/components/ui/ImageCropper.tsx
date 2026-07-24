@@ -46,6 +46,8 @@ function clamp(value: number, min: number, max: number): number {
 /**
  * Decodifica o arquivo já com a orientação do EXIF aplicada (fotos de celular não
  * ficam deitadas). Cai para ImageBitmap sem opção e, por fim, para HTMLImageElement.
+ * Os caminhos de fallback (Safari muito antigo, sem createImageBitmap) podem não
+ * honrar o EXIF; o caminho principal cobre todos os navegadores atuais.
  */
 async function loadImage(file: File): Promise<Loaded> {
   if (typeof createImageBitmap === 'function') {
@@ -260,10 +262,19 @@ export const ImageCropper = forwardRef<ImageCropperHandle, ImageCropperProps>(fu
     if (pointers.current.size < 2) pinchPrev.current = null
   }
 
-  function handleWheel(e: React.WheelEvent) {
-    // Zoom suave pela roda do mouse (trackpad inclusive).
-    applyZoom(zoomRef.current * (e.deltaY < 0 ? 1.08 : 1 / 1.08))
-  }
+  // Zoom pela roda/trackpad. Listener nativo NÃO-passivo: o onWheel do React é
+  // passivo, então preventDefault ali seria ignorado e a rolagem/zoom vazaria
+  // para o diálogo e para o zoom do navegador (ctrl+scroll).
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas || !loaded) return
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      applyZoom(zoomRef.current * (e.deltaY < 0 ? 1.08 : 1 / 1.08))
+    }
+    canvas.addEventListener('wheel', onWheel, { passive: false })
+    return () => canvas.removeEventListener('wheel', onWheel)
+  }, [loaded, applyZoom])
 
   useImperativeHandle(
     ref,
@@ -319,7 +330,6 @@ export const ImageCropper = forwardRef<ImageCropperHandle, ImageCropperProps>(fu
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
-            onWheel={handleWheel}
             style={{ width: frameW, height: frameH, touchAction: 'none' }}
             className={cn(
               'cursor-grab touch-none select-none rounded-xl bg-background active:cursor-grabbing',

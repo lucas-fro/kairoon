@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { Check, Lock, Save } from 'lucide-react'
+import { Check, Lock, Pencil, Save } from 'lucide-react'
 import { ApiError } from '../../api/client'
 import { updateEstablishment } from '../../api/establishment'
 import { uploadImage } from '../../api/uploads'
@@ -18,14 +18,13 @@ import {
   paletteStyle,
 } from '../../lib/palettes'
 import type { Palette } from '../../lib/palettes'
-import { BrandBanner } from '../booking/BrandBanner'
 import { KairoonMark } from '../brand/Logo'
 import { UpgradePrompt } from '../plan/UpgradePrompt'
 import type { Establishment } from '../../types/api'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
-import { ImageEditField } from '../ui/ImageEditField'
+import { ImageEditDialog } from '../ui/ImageEditDialog'
 import { Input } from '../ui/Input'
 import { Switch } from '../ui/Switch'
 import { Textarea } from '../ui/Textarea'
@@ -120,6 +119,8 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
   const [welcomeMessage, setWelcomeMessage] = useState(establishment.welcomeMessage ?? '')
   const [showInstagram, setShowInstagram] = useState(establishment.showInstagram)
   const [showWhatsapp, setShowWhatsapp] = useState(establishment.showWhatsapp)
+  // Qual imagem está com o editor (lápis) aberto.
+  const [editing, setEditing] = useState<'logo' | 'banner' | null>(null)
 
   const hasInstagram = Boolean(establishment.socials?.instagram)
   const hasWhatsapp = Boolean(establishment.socials?.whatsapp)
@@ -259,15 +260,57 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
           </div>
         </div>
 
-        {/* Preview do link público */}
+        {/* Preview do link público (editável): o lápis no canto do banner e do
+            logo abre o editor de recorte/zoom/posição. */}
         <div className="rounded-xl border border-line-divider bg-background p-4">
           <p className="mb-2 text-xs font-medium text-ink-tertiary">Prévia do link público</p>
-          <BrandBanner
-            brandColor={previewColor}
-            bannerImageUrl={previewBanner}
-            logoUrl={logoUrl || null}
-            name={establishment.name}
-          />
+          <div className="relative w-full pb-14">
+            {/* Banner */}
+            <div
+              className="relative h-32 w-full overflow-hidden rounded-2xl"
+              style={{ backgroundColor: previewColor }}
+            >
+              {previewBanner && (
+                <img src={previewBanner} alt="" className="h-full w-full object-cover" />
+              )}
+              {hasPersonalizacao && (
+                <button
+                  type="button"
+                  onClick={() => setEditing('banner')}
+                  aria-label="Editar banner"
+                  className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-surface/95 text-ink-secondary shadow-card ring-1 ring-line transition-colors hover:text-ink"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Logo transpassando a borda inferior do banner */}
+            <div className="absolute left-1/2 top-32 h-24 w-24 -translate-x-1/2 -translate-y-1/2">
+              <div className="h-full w-full overflow-hidden rounded-full border-4 border-surface bg-surface shadow-card">
+                {logoUrl ? (
+                  <img
+                    src={logoUrl}
+                    alt={establishment.name}
+                    className="h-full w-full rounded-full object-cover"
+                  />
+                ) : (
+                  // Sem logo do estabelecimento: usa a marca da Kairoon.
+                  <div className="flex h-full w-full items-center justify-center rounded-full bg-surface">
+                    <img src="/logo.svg" alt="Kairoon" className="h-9 w-auto" />
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditing('logo')}
+                aria-label="Editar logo"
+                className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-surface text-ink-secondary shadow-card ring-1 ring-line transition-colors hover:text-ink"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
           <p className="text-center font-display text-lg font-semibold text-ink">
             {establishment.name}
           </p>
@@ -300,9 +343,11 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
           hint="Aparece no topo do seu link público."
         />
 
-        {/* Logo e banner: prévia + lápis abrem o editor (recorte/zoom/posição) */}
-        <ImageEditField
-          label="Logo do estabelecimento (opcional)"
+        {/* Editores de logo e banner (abertos pelos lápis na prévia acima) */}
+        <ImageEditDialog
+          open={editing === 'logo'}
+          onClose={() => setEditing(null)}
+          label="Logo do estabelecimento"
           hint="PNG, JPG ou WEBP. Aparece no link público."
           value={logoUrl || null}
           name={establishment.name}
@@ -321,13 +366,14 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
             toast.success('Logo removido')
           }}
         />
-        <ImageEditField
+        <ImageEditDialog
+          open={editing === 'banner'}
+          onClose={() => setEditing(null)}
           label="Imagem do banner"
           hint="PNG, JPG ou WEBP. Sem imagem, o banner usa a cor da paleta."
           value={bannerImageUrl || null}
           name={establishment.name}
           shape="banner"
-          disabled={!hasPersonalizacao}
           onSave={async (file) => {
             const { url } = await uploadImage('banner', file, bannerImageUrl || null)
             setBannerImageUrl(url)

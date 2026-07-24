@@ -664,7 +664,6 @@ export interface PublicEstablishment {
     logoUrl: string | null
     themeColor: string
     welcomeMessage: string | null
-    phone: string | null
     businessType: string
     socials: Socials | null
     /** false quando o dono está com o teste grátis expirado (não recebe agendamentos). */

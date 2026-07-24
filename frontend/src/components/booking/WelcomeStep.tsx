@@ -76,11 +76,9 @@ export function WelcomeStep({
               className="h-full w-full rounded-full object-cover"
             />
           ) : (
-            <div
-              className="flex h-full w-full items-center justify-center rounded-full font-display text-4xl font-semibold lg:text-5xl"
-              style={{ backgroundColor: branding.brandColor, color: fg }}
-            >
-              {establishment.name.charAt(0).toUpperCase() || '?'}
+            // Sem logo do estabelecimento: usa a marca da Kairoon.
+            <div className="flex h-full w-full items-center justify-center rounded-full bg-surface">
+              <img src="/logo.svg" alt="Kairoon" className="h-12 w-auto lg:h-14" />
             </div>
           )}
         </div>
@@ -103,7 +101,7 @@ export function WelcomeStep({
           style={{ backgroundColor: branding.brandColor }}
           aria-hidden="true"
         />
-        <p className="mt-3 max-w-md text-balance text-sm text-ink-secondary lg:text-base">
+        <p className="mt-3 max-w-md text-balance break-words text-sm text-ink-secondary lg:text-base">
           {welcomeMessage}
         </p>
 
@@ -139,8 +137,10 @@ export function WelcomeStep({
                     className="group flex w-full items-center justify-between gap-4 py-4 text-left transition-colors duration-150 hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/40"
                   >
                     <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <h3 className="text-[15px] font-medium text-ink">{service.name}</h3>
+                      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                        <h3 className="min-w-0 break-words text-[15px] font-medium text-ink">
+                          {service.name}
+                        </h3>
                         {service.isPackage && (
                           <Badge tone="brand">
                             <Package className="h-3 w-3" /> Pacote

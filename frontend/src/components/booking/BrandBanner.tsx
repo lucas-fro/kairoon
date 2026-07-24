@@ -1,5 +1,3 @@
-import { KairoonMark } from '../brand/Logo'
-import { readableTextColor } from '../../lib/color'
 import { cn } from '../../lib/format'
 
 interface BrandBannerProps {
@@ -25,8 +23,6 @@ export function BrandBanner({
   className,
   rounded = true,
 }: BrandBannerProps) {
-  const fg = readableTextColor(brandColor)
-
   return (
     <div className={cn('relative w-full pb-14', className)}>
       <div
@@ -43,11 +39,9 @@ export function BrandBanner({
         {logoUrl ? (
           <img src={logoUrl} alt={name} className="h-full w-full rounded-full object-cover" />
         ) : (
-          <div
-            className="flex h-full w-full items-center justify-center rounded-full"
-            style={{ backgroundColor: brandColor, color: fg }}
-          >
-            <KairoonMark className="h-9 w-auto" />
+          // Sem logo do estabelecimento: usa a marca da Kairoon.
+          <div className="flex h-full w-full items-center justify-center rounded-full bg-surface">
+            <img src="/logo.svg" alt="Kairoon" className="h-9 w-auto" />
           </div>
         )}
       </div>
