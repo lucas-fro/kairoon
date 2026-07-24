@@ -3,11 +3,19 @@ import type { ChangeEvent } from 'react'
 import { ImagePlus, Trash2, Upload } from 'lucide-react'
 import { ApiError } from '../../api/client'
 import { cn } from '../../lib/format'
+import { downscaleImageForUpload } from '../../lib/imageResize'
 import { Button } from './Button'
 import { useToast } from './Toast'
 
 const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp']
-const MAX_BYTES = 5 * 1024 * 1024
+/** Teto do que sobe pro backend (bate com o limite do servidor). */
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+/**
+ * Teto do arquivo ORIGINAL escolhido (antes do resize no cliente). Serve só para
+ * não decodificar um arquivo absurdo num celular fraco; fotos normais passam bem
+ * abaixo disso e são encolhidas antes de subir.
+ */
+const MAX_ORIGINAL_BYTES = 30 * 1024 * 1024
 
 interface ImageUploadFieldProps {
   label: string
@@ -53,13 +61,20 @@ export function ImageUploadField({
       toast.error('Envie uma imagem PNG, JPG ou WEBP.')
       return
     }
-    if (file.size > MAX_BYTES) {
-      toast.error('Imagem muito grande (máximo 5 MB).')
+    if (file.size > MAX_ORIGINAL_BYTES) {
+      toast.error('Imagem muito grande. Escolha uma até 30 MB.')
       return
     }
     setBusy(true)
     try {
-      await onUpload(file)
+      // Encolhe no navegador antes de enviar (menos dado trafegado). Best-effort:
+      // se o navegador não suportar, segue com o original e o backend redimensiona.
+      const prepared = await downscaleImageForUpload(file)
+      if (prepared.size > MAX_UPLOAD_BYTES) {
+        toast.error('Imagem muito grande. Tente uma com menos resolução (máximo 5 MB).')
+        return
+      }
+      await onUpload(prepared)
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Não foi possível enviar a imagem.')
     } finally {
