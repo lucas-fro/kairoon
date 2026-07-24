@@ -10,7 +10,6 @@ import {
   Loader2,
   Lock,
   Mail,
-  Phone,
   Scissors,
   Smartphone,
   Sparkles,
@@ -228,12 +227,6 @@ export function RegisterPage() {
   const [slugApiError, setSlugApiError] = useState<string | null>(null)
   const [slugStatus, setSlugStatus] = useState<SlugStatus>('idle')
 
-  // Contato do estabelecimento (o que o cliente vê). Por padrão reaproveita o
-  // contato pessoal do dono, evitando digitar o mesmo telefone/e-mail duas vezes.
-  const [sameContact, setSameContact] = useState(true)
-  const [bizWhatsapp, setBizWhatsapp] = useState('')
-  const [bizEmail, setBizEmail] = useState('')
-
   // Aceite dos Termos + Política (etapa 1, obrigatório para criar a conta)
   const [acceptedLegal, setAcceptedLegal] = useState(false)
 
@@ -277,8 +270,6 @@ export function RegisterPage() {
   const slugFormatError =
     slug && !SLUG_REGEX.test(slug) ? 'Use apenas letras minúsculas, números e hífens' : undefined
   const personalPhoneError = personalPhone && !isValidPhone(personalPhone) ? 'Telefone incompleto' : undefined
-  const bizWhatsappError = bizWhatsapp && !isValidPhone(bizWhatsapp) ? 'Telefone incompleto' : undefined
-  const bizEmailError = bizEmail && !EMAIL_REGEX.test(bizEmail.trim()) ? 'Informe um e-mail válido' : undefined
 
   const slugHasError = Boolean(slugApiError || slugFormatError) || slugStatus === 'taken'
   const slugIsAvailable = slugStatus === 'available'
@@ -295,11 +286,7 @@ export function RegisterPage() {
     confirmPassword === password &&
     acceptedLegal
 
-  const contactValid =
-    sameContact || ((bizWhatsapp === '' || isValidPhone(bizWhatsapp)) && (bizEmail === '' || EMAIL_REGEX.test(bizEmail.trim())))
-
-  const step2Valid =
-    businessName.trim().length >= 2 && businessType !== null && slugUsable && contactValid
+  const step2Valid = businessName.trim().length >= 2 && businessType !== null && slugUsable
 
   // Quiz é opcional: a etapa final sempre pode concluir.
   const step3Valid = true
@@ -354,9 +341,10 @@ export function RegisterPage() {
   async function handleSaveBusiness() {
     setSubmitError(null)
     setIsSubmitting(true)
-    // Contato público: reaproveita o pessoal ou usa o informado especificamente.
-    const contactWhatsapp = sameContact ? onlyDigits(personalPhone) : onlyDigits(bizWhatsapp)
-    const contactEmail = sameContact ? email.trim() : bizEmail.trim()
+    // Contato público reaproveita o e-mail/telefone informados na etapa 1: um só
+    // de cada, sem pedir os mesmos dados duas vezes.
+    const contactWhatsapp = onlyDigits(personalPhone)
+    const contactEmail = email.trim()
     try {
       const updated = await updateEstablishment({
         name: businessName.trim(),
@@ -659,51 +647,6 @@ export function RegisterPage() {
                         <p className="mt-1 text-xs text-ink-tertiary">
                           Seus clientes vão agendar por este link.
                         </p>
-                      )}
-                    </div>
-
-                    {/* Contato do estabelecimento (o que o cliente vê no link público) */}
-                    <div className="rounded-lg border border-line bg-background/60 p-3">
-                      <label className="flex cursor-pointer items-start gap-2.5">
-                        <input
-                          type="checkbox"
-                          checked={sameContact}
-                          onChange={(e) => setSameContact(e.target.checked)}
-                          className="mt-0.5 h-4 w-4 shrink-0 rounded border-line text-primary focus:ring-2 focus:ring-secondary-light"
-                        />
-                        <span className="text-[13px] leading-snug text-ink-secondary">
-                          Usar meu telefone e e-mail como contato do estabelecimento
-                          <span className="mt-0.5 block text-xs text-ink-tertiary">
-                            É o contato que seus clientes veem na página de agendamento. Você pode
-                            alterar depois nas configurações.
-                          </span>
-                        </span>
-                      </label>
-
-                      {!sameContact && (
-                        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          <Input
-                            label="WhatsApp do estabelecimento"
-                            type="tel"
-                            inputMode="tel"
-                            placeholder="(11) 98765-4321"
-                            leftIcon={<Phone className="h-4 w-4" />}
-                            value={bizWhatsapp}
-                            onChange={(e) => setBizWhatsapp(formatPhone(e.target.value))}
-                            error={bizWhatsappError}
-                            hint="Opcional"
-                          />
-                          <Input
-                            label="E-mail do estabelecimento"
-                            type="email"
-                            placeholder="contato@exemplo.com"
-                            leftIcon={<Mail className="h-4 w-4" />}
-                            value={bizEmail}
-                            onChange={(e) => setBizEmail(e.target.value)}
-                            error={bizEmailError}
-                            hint="Opcional"
-                          />
-                        </div>
                       )}
                     </div>
                   </div>
