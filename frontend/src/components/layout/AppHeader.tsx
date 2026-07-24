@@ -2,6 +2,7 @@ import { Menu } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useHeaderSlotContent } from '../../contexts/HeaderSlotContext'
 import { KairoonMark } from '../brand/Logo'
+import { UpgradeBanner } from '../plan/UpgradeBanner'
 import { AccountMenu } from './AccountMenu'
 import { NotificationsBell } from './NotificationsBell'
 
@@ -39,7 +40,8 @@ export function AppHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
           )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-2">
+          <UpgradeBanner variant="header" />
           <NotificationsBell />
           <AccountMenu />
         </div>

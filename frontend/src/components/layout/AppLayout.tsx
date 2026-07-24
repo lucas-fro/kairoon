@@ -35,6 +35,7 @@ import { cn } from '../../lib/format'
 import type { PlanFeatureKey } from '../../types/api'
 import { KairoonMark } from '../brand/Logo'
 import { TrialBanner } from '../plan/TrialBanner'
+import { UpgradeBanner } from '../plan/UpgradeBanner'
 import { TrialExpiredListener } from '../plan/TrialExpiredListener'
 import { PendingBookingsListener } from '../realtime/PendingBookingsListener'
 import { PaletteThemeApplier } from '../theme/PaletteThemeApplier'
@@ -245,7 +246,15 @@ function ParentNav({
   )
 }
 
-function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarContent({
+  onNavigate,
+  mobile,
+}: {
+  onNavigate?: () => void
+  /** Instância do drawer mobile: mostra a chamada de upgrade (no desktop ela já
+   *  aparece no header, ao lado do sino). */
+  mobile?: boolean
+}) {
   const { establishment } = useAuth()
   const { data: plan } = usePlan()
   const location = useLocation()
@@ -304,8 +313,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         ))}
       </nav>
 
-      {/* Rodapé: banner do teste grátis (some fora do teste). */}
+      {/* Rodapé: banner do teste grátis (some fora do teste) e, só no mobile
+          (o desktop já mostra a chamada no header), a chamada de upgrade. */}
       <TrialBanner variant="sidebar" />
+      {mobile && <UpgradeBanner variant="sidebar" />}
     </div>
   )
 }
@@ -350,7 +361,7 @@ export function AppLayout() {
           >
             <X className="h-5 w-5" />
           </button>
-          <SidebarContent onNavigate={() => setMobileOpen(false)} />
+          <SidebarContent onNavigate={() => setMobileOpen(false)} mobile />
         </aside>
       </div>
 
