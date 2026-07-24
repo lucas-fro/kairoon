@@ -66,40 +66,33 @@ export async function bunnyPut(
 
 /**
  * Apaga um arquivo a partir da sua URL pública. Best-effort e ESCOPADO ao tenant:
- * só apaga se o caminho estiver dentro de `requiredPrefix` (ex.: `logos/<estId>/`),
- * o que impede um `replaces` forjado de apagar imagem de outro estabelecimento
- * (IDOR) ou de varrer um diretório inteiro. Também rejeita barra final e path
- * traversal ('..', inclusive percent-encoded). Nunca propaga erro: a limpeza do
- * arquivo antigo não deve derrubar o upload novo, que já deu certo.
+ * como o storage é plano (sem pastas), a posse é verificada pelo sufixo do nome
+ * (`...-<establishmentId>.<ext>`). Isso impede um `replaces` forjado de apagar
+ * imagem de outro estabelecimento (IDOR). Também exige arquivo na raiz (sem
+ * subpasta) e rejeita path traversal ('..', inclusive percent-encoded). Nunca
+ * propaga erro: a limpeza do arquivo antigo não deve derrubar o upload novo.
  */
 export async function bunnyDeleteByUrl(
   url: string | null | undefined,
-  requiredPrefix: string,
+  establishmentId: string,
 ): Promise<void> {
-  if (!url || !isBunnyConfigured()) return
+  if (!url || !isBunnyConfigured() || !establishmentId) return
   const base = normalizedCdnBase()
   if (!base || !url.startsWith(`${base}/`)) return
   const path = url.slice(base.length + 1)
 
-  // O arquivo tem que ser do próprio tenant e ser um único nome (sem subpasta,
-  // sem barra final, sem traversal). Nossos caminhos reais são
-  // `${prefix}${uuid}.${ext}`, então só eles passam.
-  if (!requiredPrefix || !path.startsWith(requiredPrefix)) return
-  const filename = path.slice(requiredPrefix.length)
+  // Arquivo na raiz (sem subpasta/traversal) e do próprio tenant (nome termina
+  // em `-<establishmentId>.<ext>`). Nossos nomes reais passam; forjados, não.
+  if (!path || path.includes('/')) return
   let decoded: string
   try {
-    decoded = decodeURIComponent(filename)
+    decoded = decodeURIComponent(path)
   } catch {
     return
   }
-  if (
-    !filename ||
-    filename.includes('/') ||
-    decoded.includes('/') ||
-    decoded.includes('..')
-  ) {
-    return
-  }
+  if (decoded.includes('/') || decoded.includes('..')) return
+  const nameWithoutExt = decoded.replace(/\.[^.]+$/, '')
+  if (!nameWithoutExt.endsWith(`-${establishmentId}`)) return
 
   try {
     await fetch(storageUrl(path), {

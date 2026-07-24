@@ -1,6 +1,8 @@
-import { randomUUID } from 'node:crypto'
+import { eq } from 'drizzle-orm'
 import type { MultipartFile } from '@fastify/multipart'
 import type { FastifyRequest } from 'fastify'
+import { db } from '../db'
+import { establishments } from '../db/schema'
 import { AppError } from './errors'
 import { bunnyDeleteByUrl, bunnyPut } from './bunnyStorage'
 
@@ -9,11 +11,22 @@ export const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
 export type UploadKind = 'logo' | 'banner' | 'photo'
 
-/** Pasta na Storage Zone por tipo de imagem. */
-const FOLDERS: Record<UploadKind, string> = {
-  logo: 'logos',
-  banner: 'banners',
-  photo: 'photos',
+/** Rótulo do tipo usado no nome do arquivo (foto de profissional = "perfil"). */
+const KIND_LABELS: Record<UploadKind, string> = {
+  logo: 'logo',
+  banner: 'banner',
+  photo: 'perfil',
+}
+
+/** Deixa o slug seguro para nome de arquivo (só a-z 0-9 e hífen, curto). */
+function fileNameSlug(slug: string | null | undefined): string {
+  const clean = (slug ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+  return clean || 'estabelecimento'
 }
 
 interface ValidatedImage {
@@ -81,10 +94,12 @@ export async function readImageUpload(request: FastifyRequest): Promise<Validate
 }
 
 /**
- * Sobe a imagem para a Bunny e devolve a URL pública. O nome do arquivo é
- * único (randomUUID) para o CDN nunca servir uma versão em cache antiga, e o
- * caminho é namespaced por estabelecimento. Quando `replaces` aponta para um
- * arquivo nosso, ele é apagado depois (best-effort) para não acumular órfãos.
+ * Sobe a imagem para a Bunny (estrutura PLANA, sem pastas) e devolve a URL
+ * pública. Nome: `<slug>-<tipo>-<timestamp>-<establishmentId>.<ext>`. O timestamp
+ * garante nome único (o CDN nunca serve cache antigo) e o establishmentId no
+ * final marca o dono, o que permite apagar o arquivo antigo só do próprio tenant
+ * (ver bunnyDeleteByUrl). Quando `replaces` aponta para um arquivo nosso do mesmo
+ * tenant, ele é apagado depois (best-effort) para não acumular órfãos.
  */
 export async function storeImage(opts: {
   establishmentId: string
@@ -92,11 +107,13 @@ export async function storeImage(opts: {
   image: ValidatedImage
   replaces?: string | null
 }): Promise<string> {
-  // Prefixo do tenant: usado tanto no caminho novo quanto para escopar a exclusão
-  // do arquivo antigo (só apaga o que é do próprio estabelecimento).
-  const tenantPrefix = `${FOLDERS[opts.kind]}/${opts.establishmentId}/`
-  const path = `${tenantPrefix}${randomUUID()}.${opts.image.ext}`
-  const url = await bunnyPut(path, opts.image.buffer, opts.image.contentType)
-  if (opts.replaces) await bunnyDeleteByUrl(opts.replaces, tenantPrefix)
+  const est = await db.query.establishments.findFirst({
+    columns: { slug: true },
+    where: eq(establishments.id, opts.establishmentId),
+  })
+  const slug = fileNameSlug(est?.slug)
+  const filename = `${slug}-${KIND_LABELS[opts.kind]}-${Date.now()}-${opts.establishmentId}.${opts.image.ext}`
+  const url = await bunnyPut(filename, opts.image.buffer, opts.image.contentType)
+  if (opts.replaces) await bunnyDeleteByUrl(opts.replaces, opts.establishmentId)
   return url
 }
