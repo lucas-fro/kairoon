@@ -644,7 +644,7 @@ export interface AuthResponse {
 export interface PublicBranding {
   /** Cor de marca efetiva (sistema no grátis, personalizada no pago) */
   brandColor: string
-  /** Paleta efetiva (null no grátis/legado) — tematiza o link público inteiro */
+  /** Paleta efetiva (null no grátis/legado). Tematiza o link público inteiro */
   palette: string | null
   bannerImageUrl: string | null
   /** true no plano grátis: mostra "Agendamento feito pela Kairoon" */

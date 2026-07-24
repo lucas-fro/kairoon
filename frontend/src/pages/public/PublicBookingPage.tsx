@@ -368,7 +368,7 @@ export function PublicBookingPage() {
 
   // Paleta efetiva do link: além do `--brand` (banner/CTA de boas-vindas), injeta
   // as vars da marca (primary/secondary/accent) para tematizar o wizard inteiro
-  // — calendário, horários, preços, botão de confirmar. Legado (palette null)
+  // (calendário, horários, preços, botão de confirmar). Legado (palette null)
   // mantém só o `--brand`, deixando o resto nos defaults do sistema.
   const palette = resolvePalette(branding.palette, branding.brandColor)
   const brandStyle = {

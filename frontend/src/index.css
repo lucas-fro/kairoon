@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /*
- * Paleta padrão (navy do Kairoon) como canais "r g b" — consumidos pelos tokens
+ * Paleta padrão (navy do Kairoon) como canais "r g b", consumidos pelos tokens
  * `primary`/`secondary`/`accent` no tailwind.config.ts. A paleta escolhida pelo
  * estabelecimento sobrescreve estas variáveis em runtime (ver src/lib/palettes.ts:
  * painel → document.documentElement; link público → wrapper da página).

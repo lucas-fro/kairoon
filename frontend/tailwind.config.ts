@@ -9,7 +9,7 @@ import type { Config } from 'tailwindcss'
  * `primary`, `secondary` e `accent` são o "brand accent" e vêm de CSS custom
  * properties (canais "r g b" em src/index.css :root), então trocam em runtime
  * pela paleta escolhida (ver src/lib/palettes.ts). As demais cores (fundo,
- * cards, tinta, estados) são neutras e fixas — mantêm tudo legível em qualquer
+ * cards, tinta, estados) são neutras e fixas: mantêm tudo legível em qualquer
  * paleta. O formato `rgb(var(--x) / <alpha-value>)` preserva os modificadores
  * de opacidade do Tailwind (ex.: bg-primary/10).
  */

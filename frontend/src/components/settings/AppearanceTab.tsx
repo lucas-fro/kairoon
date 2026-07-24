@@ -31,7 +31,7 @@ import { useToast } from '../ui/Toast'
 const SYSTEM_PRIMARY = '#1E2F5E'
 const HEX_REGEX = /^#[0-9a-fA-F]{6}$/
 // Cores "de sistema" (navy atual + default legado do banco): não contam como
-// escolha personalizada — caem na paleta Padrão em vez de "Personalizada".
+// escolha personalizada. Caem na paleta Padrão em vez de "Personalizada".
 const SYSTEM_DEFAULT_COLORS = new Set(['#1e2f5e', '#0f4c5c'])
 
 interface AppearanceTabProps {
@@ -171,7 +171,7 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
         )}
       </CardHeader>
       <CardContent className="space-y-5">
-        {/* Paleta de cores — aplica ao painel (sistema) e ao link público */}
+        {/* Paleta de cores: aplica ao painel (sistema) e ao link público */}
         <div className="space-y-3">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3">
             <span className="text-[13px] font-medium text-ink-secondary">Paleta de cores</span>
@@ -217,7 +217,7 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
             </button>
           </div>
 
-          {/* Seletor de cor livre — só quando "Personalizada" está ativa */}
+          {/* Seletor de cor livre: só quando "Personalizada" está ativa */}
           {isCustom && (
             <div className="flex items-center gap-3">
               <input
@@ -244,7 +244,7 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
           )}
         </div>
 
-        {/* Preview do sistema — reflete a paleta selecionada (tokens escopados) */}
+        {/* Preview do sistema: reflete a paleta selecionada (tokens escopados) */}
         <div
           className="rounded-xl border border-line-divider bg-background p-4"
           style={paletteStyle(previewPalette)}

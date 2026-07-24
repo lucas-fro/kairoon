@@ -29,7 +29,7 @@ export function PaletteThemeApplier() {
         }
       }
     } catch {
-      /* localStorage indisponível — ignora */
+      /* localStorage indisponível, ignora */
     }
     return () => applyPaletteVars(document.documentElement, null)
   }, [])

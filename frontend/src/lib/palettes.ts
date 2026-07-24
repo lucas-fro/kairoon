@@ -11,7 +11,7 @@ import { darken, hexToChannels, hexToRgb, lighten } from './color'
  *
  * Regra de contraste: a cor `primary` de toda paleta é escura o suficiente para
  * texto branco (a sidebar e os botões primários usam `text-white`). As demais
- * cores da chrome (fundo, cards, tinta) continuam neutras e fixas — só o
+ * cores da chrome (fundo, cards, tinta) continuam neutras e fixas: só o
  * "brand accent" muda, mantendo tudo legível em qualquer paleta.
  */
 export interface Palette {
@@ -54,7 +54,7 @@ function scale(
 }
 
 export const PALETTES: Palette[] = [
-  // Padrão — navy original do Kairoon (idêntico aos tokens de sempre).
+  // Padrão: navy original do Kairoon (idêntico aos tokens de sempre).
   {
     key: DEFAULT_PALETTE_KEY,
     label: 'Padrão',
