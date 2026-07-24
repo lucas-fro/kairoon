@@ -23,6 +23,16 @@ const envSchema = z.object({
   // Token enviado pelo Asaas no header `asaas-access-token` de cada webhook
   // (configurado no painel Asaas ao cadastrar a URL do webhook).
   ASAAS_WEBHOOK_TOKEN: z.string().min(1, 'ASAAS_WEBHOOK_TOKEN é obrigatório'),
+  // Bunny.net Storage: upload de logos, banners e fotos de perfil. Todas
+  // opcionais: sem elas a app sobe normalmente e o endpoint de upload responde
+  // 503 (o resto do sistema segue aceitando URLs de imagem coladas à mão).
+  // ENDPOINT é o host da Storage Zone (Frankfurt/DE = storage.bunnycdn.com),
+  // ZONE o nome da zona, PASSWORD a AccessKey de leitura+escrita (só no backend)
+  // e CDN_URL o hostname da Pull Zone que serve os arquivos publicamente.
+  BUNNY_STORAGE_ENDPOINT: z.string().optional(),
+  BUNNY_STORAGE_ZONE: z.string().optional(),
+  BUNNY_STORAGE_PASSWORD: z.string().optional(),
+  BUNNY_CDN_URL: z.string().optional(),
 })
 
 export const env = envSchema.parse(process.env)

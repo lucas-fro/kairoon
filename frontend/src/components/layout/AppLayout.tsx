@@ -269,13 +269,29 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col p-4">
       <div className="flex h-14 items-center gap-3 px-2">
-        <KairoonMark className="h-8 w-auto shrink-0 text-white" />
-        <div className="min-w-0">
-          <p className="font-display text-[17px] font-bold leading-tight text-white">Kairoon</p>
-          <p className="truncate text-xs text-white">
-            {establishment?.name ?? 'Agendamentos'}
-          </p>
-        </div>
+        {establishment?.logoUrl ? (
+          // Logo do estabelecimento (upload): vira a marca do painel.
+          <>
+            <img
+              src={establishment.logoUrl}
+              alt={establishment.name}
+              className="h-9 w-9 shrink-0 rounded-lg object-cover"
+            />
+            <p className="min-w-0 truncate font-display text-[17px] font-bold leading-tight text-white">
+              {establishment.name}
+            </p>
+          </>
+        ) : (
+          <>
+            <KairoonMark className="h-8 w-auto shrink-0 text-white" />
+            <div className="min-w-0">
+              <p className="font-display text-[17px] font-bold leading-tight text-white">Kairoon</p>
+              <p className="truncate text-xs text-white">
+                {establishment?.name ?? 'Agendamentos'}
+              </p>
+            </div>
+          </>
+        )}
       </div>
 
       <nav className="mt-4 flex-1 space-y-6 overflow-y-auto">

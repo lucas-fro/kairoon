@@ -3,6 +3,7 @@ import { useMutation } from '@tanstack/react-query'
 import { Check, Lock, Save } from 'lucide-react'
 import { ApiError } from '../../api/client'
 import { updateEstablishment } from '../../api/establishment'
+import { uploadImage } from '../../api/uploads'
 import { useAuth } from '../../contexts/AuthContext'
 import { usePlan } from '../../hooks/usePlan'
 import { readableTextColor } from '../../lib/color'
@@ -24,6 +25,7 @@ import type { Establishment } from '../../types/api'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
+import { ImageUploadField } from '../ui/ImageUploadField'
 import { Input } from '../ui/Input'
 import { Textarea } from '../ui/Textarea'
 import { useToast } from '../ui/Toast'
@@ -323,14 +325,26 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
         </div>
 
         {/* Banner e mensagem */}
-        <Input
-          label="Imagem do banner (URL)"
-          type="url"
-          value={bannerImageUrl}
-          onChange={(e) => setBannerImageUrl(e.target.value)}
-          placeholder="https://exemplo.com/banner.jpg"
-          hint="Opcional. Sem imagem, o banner usa a cor da paleta."
+        <ImageUploadField
+          label="Imagem do banner"
+          hint="PNG, JPG ou WEBP, até 5 MB. Sem imagem, o banner usa a cor da paleta."
+          value={bannerImageUrl || null}
+          name={establishment.name}
+          variant="banner"
           disabled={!hasPersonalizacao}
+          onUpload={async (file) => {
+            const { url } = await uploadImage('banner', file, bannerImageUrl || null)
+            setBannerImageUrl(url)
+            const res = await updateEstablishment({ bannerImageUrl: url })
+            setEstablishment(res)
+            toast.success('Banner atualizado!')
+          }}
+          onRemove={async () => {
+            setBannerImageUrl('')
+            const res = await updateEstablishment({ bannerImageUrl: '' })
+            setEstablishment(res)
+            toast.success('Banner removido')
+          }}
         />
         <Input
           label="Mensagem de rodapé"

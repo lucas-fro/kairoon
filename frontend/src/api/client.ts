@@ -37,8 +37,12 @@ interface RequestOptions {
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, auth = true } = options
 
+  // FormData (upload de arquivo) viaja como multipart: não serializa em JSON e
+  // deixa o browser definir o Content-Type com o boundary correto.
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData
+
   const headers: Record<string, string> = {}
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  if (body !== undefined && !isFormData) headers['Content-Type'] = 'application/json'
   const token = getToken()
   if (auth && token) headers.Authorization = `Bearer ${token}`
 
@@ -47,7 +51,7 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
     response = await fetch(`${API_URL}${path}`, {
       method,
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body === undefined ? undefined : isFormData ? (body as FormData) : JSON.stringify(body),
     })
   } catch {
     throw new ApiError('Não foi possível conectar ao servidor', 0)

@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/react-query'
 import { CheckCircle2, Copy, ExternalLink, Save, Search, XCircle } from 'lucide-react'
 import { ApiError } from '../../api/client'
 import { checkSlugAvailability, updateEstablishment, updateSlug } from '../../api/establishment'
+import { uploadImage } from '../../api/uploads'
 import { useAuth } from '../../contexts/AuthContext'
 import { FixedCostsSection } from './FixedCostsSection'
 import {
@@ -21,6 +22,7 @@ import type { Establishment, PaymentSettings } from '../../types/api'
 import { Button } from '../ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import { HelpTooltip } from '../ui/HelpTooltip'
+import { ImageUploadField } from '../ui/ImageUploadField'
 import { Input } from '../ui/Input'
 import { SelectMenu } from '../ui/SelectMenu'
 import type { SelectMenuOption } from '../ui/SelectMenu'
@@ -377,12 +379,25 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
               />
             </div>
 
-            <Input
-              label="URL do logo (opcional)"
-              type="url"
-              value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
-              placeholder="https://exemplo.com/logo.png"
+            <ImageUploadField
+              label="Logo do estabelecimento (opcional)"
+              hint="PNG, JPG ou WEBP, até 5 MB. Aparece no link público e na barra lateral."
+              value={logoUrl || null}
+              name={name || establishment.name}
+              variant="circle"
+              onUpload={async (file) => {
+                const { url } = await uploadImage('logo', file, logoUrl || null)
+                setLogoUrl(url)
+                const res = await updateEstablishment({ logoUrl: url })
+                setEstablishment(res)
+                toast.success('Logo atualizado!')
+              }}
+              onRemove={async () => {
+                setLogoUrl('')
+                const res = await updateEstablishment({ logoUrl: '' })
+                setEstablishment(res)
+                toast.success('Logo removido')
+              }}
             />
 
             {/* Redes sociais */}

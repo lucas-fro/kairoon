@@ -1,0 +1,35 @@
+import type { FastifyInstance } from 'fastify'
+import { readImageUpload, storeImage } from '../../lib/imageUpload'
+import { assertFeature } from '../../lib/plan'
+import { uploadImageQuerySchema } from './schemas'
+
+export async function uploadsRoutes(app: FastifyInstance) {
+  app.addHook('preHandler', app.authenticate)
+
+  /**
+   * Recebe uma imagem (multipart) e devolve a URL pública na Bunny CDN. Não
+   * persiste nada: o frontend grava a URL no campo certo (logoUrl / bannerImageUrl
+   * / photoUrl) pelos endpoints já existentes. Banner segue o gate de plano
+   * `personalizacao` (logo e foto são liberados em qualquer plano, como hoje).
+   * É um POST mutante, então o gate global de somente-leitura já barra contas
+   * com teste expirado.
+   */
+  app.post('/image', {
+    // Cada upload grava um objeto novo na Storage Zone (nome único, sem
+    // sobrescrever), então limita a taxa para conter abuso de storage/custo.
+    config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+  }, async (request) => {
+    const { kind, replaces } = uploadImageQuerySchema.parse(request.query)
+    if (kind === 'banner') {
+      await assertFeature(request.user.establishmentId, 'personalizacao')
+    }
+    const image = await readImageUpload(request)
+    const url = await storeImage({
+      establishmentId: request.user.establishmentId,
+      kind,
+      image,
+      replaces,
+    })
+    return { url }
+  })
+}

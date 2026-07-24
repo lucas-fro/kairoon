@@ -23,6 +23,7 @@ import {
 import type { EmployeePayload } from '../../api/employees'
 import { getPlan } from '../../api/establishment'
 import { listServices } from '../../api/services'
+import { uploadImage } from '../../api/uploads'
 import { WEEKDAY_LABELS_SHORT } from '../../lib/dates'
 import {
   cn,
@@ -42,6 +43,7 @@ import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { Dialog } from '../ui/Dialog'
 import { DialogActions } from '../ui/DialogActions'
 import { EmptyState } from '../ui/EmptyState'
+import { ImageUploadField } from '../ui/ImageUploadField'
 import { Input } from '../ui/Input'
 import { SelectMenu } from '../ui/SelectMenu'
 import type { SelectMenuOption } from '../ui/SelectMenu'
@@ -735,12 +737,20 @@ export function EmployeesTab() {
                 options={GENDER_OPTIONS}
               />
             </div>
-            <Input
-              label="URL da foto (opcional)"
-              type="url"
-              placeholder="https://exemplo.com/foto.jpg"
-              value={form.photoUrl}
-              onChange={(e) => setForm((f) => ({ ...f, photoUrl: e.target.value }))}
+            <ImageUploadField
+              label="Foto do profissional (opcional)"
+              hint="PNG, JPG ou WEBP, até 5 MB."
+              value={form.photoUrl || null}
+              name={form.name || 'Profissional'}
+              variant="circle"
+              onUpload={async (file) => {
+                // Sem `replaces`: a foto só é persistida ao salvar o profissional
+                // (não no upload). Apagar a foto antiga aqui deixaria o registro
+                // apontando para um arquivo inexistente se o usuário cancelar.
+                const { url } = await uploadImage('photo', file)
+                setForm((f) => ({ ...f, photoUrl: url }))
+              }}
+              onRemove={() => setForm((f) => ({ ...f, photoUrl: '' }))}
             />
 
             {error && <p className="text-xs text-error-dark">{error}</p>}

@@ -1,9 +1,11 @@
 import cors from '@fastify/cors'
+import multipart from '@fastify/multipart'
 import rateLimit from '@fastify/rate-limit'
 import Fastify from 'fastify'
 import { ZodError } from 'zod'
 import { env } from './env'
 import { AppError } from './lib/errors'
+import { MAX_IMAGE_BYTES } from './lib/imageUpload'
 import { getAccessState } from './lib/plan'
 import { authPlugin } from './plugins/auth'
 
@@ -38,6 +40,7 @@ import { recurringExpensesRoutes } from './modules/recurringExpenses/routes'
 import { reportsRoutes } from './modules/reports/routes'
 import { servicesRoutes } from './modules/services/routes'
 import { transactionsRoutes } from './modules/transactions/routes'
+import { uploadsRoutes } from './modules/uploads/routes'
 import { waitlistRoutes } from './modules/waitlist/routes'
 
 export async function buildApp() {
@@ -79,6 +82,10 @@ export async function buildApp() {
   // (hoje apenas nas rotas públicas sensíveis a abuso)
   await app.register(rateLimit, { global: false })
   await app.register(authPlugin)
+  // Upload de imagens (logos/banners/fotos): 1 arquivo por request, teto de 5 MB.
+  await app.register(multipart, {
+    limits: { fileSize: MAX_IMAGE_BYTES, files: 1, fields: 5 },
+  })
 
   // Gate global de somente-leitura: contas com o teste grátis expirado (e sem
   // assinatura paga) podem LER tudo, mas não escrevem nada, exceto rotas
@@ -125,6 +132,7 @@ export async function buildApp() {
   await app.register(loyaltyRoutes, { prefix: '/loyalty' })
   await app.register(pointsRoutes, { prefix: '/points' })
   await app.register(paymentsRoutes, { prefix: '/payments' })
+  await app.register(uploadsRoutes, { prefix: '/uploads' })
   await app.register(publicRoutes, { prefix: '/public' })
   await app.register(realtimeRoutes, { prefix: '/realtime' })
 
