@@ -273,16 +273,16 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
               {previewBanner && (
                 <img src={previewBanner} alt="" className="h-full w-full object-cover" />
               )}
-              {hasPersonalizacao && (
-                <button
-                  type="button"
-                  onClick={() => setEditing('banner')}
-                  aria-label="Editar banner"
-                  className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-surface/95 text-ink-secondary shadow-card ring-1 ring-line transition-colors hover:text-ink"
-                >
-                  <Pencil className="h-4 w-4" />
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setEditing('banner')}
+                disabled={!hasPersonalizacao}
+                aria-label="Editar banner"
+                title={hasPersonalizacao ? 'Editar banner' : 'Disponível no plano Básico'}
+                className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-ink/55 text-white shadow-sm backdrop-blur-sm transition-colors enabled:hover:bg-ink/75 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
             </div>
 
             {/* Logo transpassando a borda inferior do banner */}
@@ -305,7 +305,8 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
                 type="button"
                 onClick={() => setEditing('logo')}
                 aria-label="Editar logo"
-                className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-surface text-ink-secondary shadow-card ring-1 ring-line transition-colors hover:text-ink"
+                title="Editar logo"
+                className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-ink/70 text-white shadow-sm ring-2 ring-surface transition-colors hover:bg-ink/85"
               >
                 <Pencil className="h-3.5 w-3.5" />
               </button>

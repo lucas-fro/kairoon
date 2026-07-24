@@ -3,6 +3,7 @@ import { readableTextColor } from '../../lib/color'
 import { cn, formatBRL, formatDuration } from '../../lib/format'
 import type { PublicBranding, PublicEstablishment } from '../../types/api'
 import type { PublicService } from './types'
+import { LocationMap } from './LocationMap'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 
@@ -171,6 +172,17 @@ export function WelcomeStep({
             </ul>
           </section>
         )}
+
+        {/* LOCALIZAÇÃO: mini mapa com o pin no endereço (some sem endereço). */}
+        <LocationMap
+          name={establishment.name}
+          address={establishment.address}
+          addressNumber={establishment.addressNumber}
+          neighborhood={establishment.neighborhood}
+          city={establishment.city}
+          state={establishment.state}
+          cep={establishment.cep}
+        />
 
         {/* REDES SOCIAIS: só quando habilitadas (Instagram/WhatsApp). */}
         {socialLinks.length > 0 && (

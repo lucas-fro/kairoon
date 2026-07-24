@@ -665,6 +665,12 @@ export interface PublicEstablishment {
     themeColor: string
     welcomeMessage: string | null
     businessType: string
+    address: string | null
+    addressNumber: string | null
+    neighborhood: string | null
+    city: string | null
+    state: string | null
+    cep: string | null
     socials: Socials | null
     /** false quando o dono está com o teste grátis expirado (não recebe agendamentos). */
     acceptingBookings: boolean

@@ -125,6 +125,14 @@ export async function getPublicEstablishment(slug: string) {
       themeColor: establishment.themeColor,
       welcomeMessage: establishment.welcomeMessage,
       businessType: establishment.businessType,
+      // Endereço do estabelecimento: alimenta o mini mapa (pin) no link público.
+      // É um negócio com local de atendimento; expor o endereço é intencional.
+      address: establishment.address,
+      addressNumber: establishment.addressNumber,
+      neighborhood: establishment.neighborhood,
+      city: establishment.city,
+      state: establishment.state,
+      cep: establishment.cep,
       // phone NÃO é exposto aqui: o link público não usa e vazaria o número
       // mesmo com o WhatsApp oculto (o handle do WhatsApp costuma ser o phone).
       socials,
