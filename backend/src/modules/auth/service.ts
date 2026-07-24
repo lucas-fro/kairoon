@@ -33,7 +33,7 @@ const MAX_RESET_ATTEMPTS = 5
 
 /**
  * Hash bcrypt "de mentira" (senha impossível de casar) usado para gastar tempo
- * comparando quando não há código ativo — assim o tempo de resposta não denuncia
+ * comparando quando não há código ativo, assim o tempo de resposta não denuncia
  * se o e-mail existe / tem um código pendente.
  */
 const DUMMY_RESET_HASH = bcrypt.hashSync('kairoon-uniform-timing-placeholder', 10)
@@ -74,7 +74,7 @@ export async function isSlugAvailable(slug: string) {
  * pessoais e um link público provisório autogerado; o dono completa o negócio
  * nas etapas seguintes). Se vier preenchido (fluxo completo/legado), usamos como
  * está. `trialEndsAt = agora + TRIAL_DAYS` e `termsAcceptedAt = agora` são
- * setados no servidor — nunca vêm do cliente.
+ * setados no servidor. Nunca vêm do cliente.
  */
 export async function registerOwner(input: RegisterInput) {
   const email = input.email.toLowerCase().trim()
@@ -151,7 +151,7 @@ export async function registerOwner(input: RegisterInput) {
         return { user: sanitizeUser(user), establishment }
       })
 
-      // E-mail de boas-vindas: fire-and-forget — nunca trava nem falha o cadastro.
+      // E-mail de boas-vindas: fire-and-forget (nunca trava nem falha o cadastro).
       // Sem negócio informado (fluxo em etapas), não cita o nome placeholder.
       void sendWelcomeEmail(
         result.user.email,
@@ -234,7 +234,7 @@ export async function getProfile(userId: string) {
 /**
  * Passo 1 (público): gera um código de 6 dígitos para o e-mail informado, guarda
  * o hash + validade (5 min) e envia por e-mail. A resposta é sempre genérica
- * (ok) — não revela se o e-mail existe (evita enumeração de contas). O envio é
+ * (ok). Não revela se o e-mail existe (evita enumeração de contas). O envio é
  * fire-and-forget para não vazar existência por erro/tempo de resposta.
  */
 export async function requestPasswordResetByEmail(email: string) {
@@ -266,7 +266,7 @@ export async function requestPasswordResetByEmail(email: string) {
 
 /**
  * Localiza o usuário pelo e-mail e confere o código (válido e não expirado) sem
- * consumi-lo. Retorna null em qualquer falha — o chamador devolve sempre a mesma
+ * consumi-lo. Retorna null em qualquer falha: o chamador devolve sempre a mesma
  * mensagem, sem distinguir e-mail inexistente de código errado. Sempre compara um
  * hash (dummy quando não há código ativo) para o tempo de resposta ser uniforme, e
  * conta cada tentativa errada, queimando o código após o limite (anti-brute-force).

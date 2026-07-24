@@ -11,7 +11,7 @@ import {
 import * as authService from './service'
 
 export async function authRoutes(app: FastifyInstance) {
-  // Rate limit por IP: cria contas (e inicia testes grátis) — freia bots/farming.
+  // Rate limit por IP: cria contas (e inicia testes grátis); freia bots/farming.
   app.post(
     '/register',
     { config: { rateLimit: { max: 5, timeWindow: '1 hour' } } },

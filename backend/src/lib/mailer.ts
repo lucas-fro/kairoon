@@ -5,7 +5,7 @@ import { AppError } from './errors'
 
 /**
  * E-mail transacional via Resend. Se RESEND_API_KEY não estiver definida, os
- * envios viram no-op (apenas logados) — a app continua funcionando em dev sem
+ * envios viram no-op (apenas logados), a app continua funcionando em dev sem
  * configurar e-mail. Em produção, defina a chave e um RESEND_FROM de domínio
  * verificado no Resend (o remetente de teste onboarding@resend.dev só entrega
  * para o e-mail dono da conta Resend).
@@ -47,7 +47,7 @@ interface SendArgs {
 
 async function sendEmail({ to, subject, html, text }: SendArgs): Promise<void> {
   if (!resend) {
-    console.warn(`[mailer] RESEND_API_KEY ausente — e-mail "${subject}" para ${to} NÃO enviado.`)
+    console.warn(`[mailer] RESEND_API_KEY ausente: e-mail "${subject}" para ${to} NÃO enviado.`)
     return
   }
   const { error } = await resend.emails.send({
@@ -96,7 +96,7 @@ function layout(bodyHtml: string): string {
 }
 
 export async function sendWelcomeEmail(to: string, name: string, establishmentName?: string | null) {
-  // No cadastro em etapas o negócio ainda não foi nomeado — evita citar o
+  // No cadastro em etapas o negócio ainda não foi nomeado: evita citar o
   // placeholder ("Meu negócio") e manda uma saudação genérica.
   const htmlAccountLine = establishmentName
     ? `Sua conta da <strong style="color:${BRAND.ink};">${establishmentName}</strong> foi criada com sucesso.`
@@ -204,7 +204,7 @@ export async function sendPaymentReceiptEmail(args: PaymentReceiptArgs) {
 export async function sendPasswordResetEmail(to: string, name: string, code: string) {
   // Sem chave: registra o código no log para não travar o dev local.
   if (!resend) {
-    console.warn(`[mailer] RESEND_API_KEY ausente — código de redefinição para ${to}: ${code}`)
+    console.warn(`[mailer] RESEND_API_KEY ausente, código de redefinição para ${to}: ${code}`)
     return
   }
   const html = layout(`

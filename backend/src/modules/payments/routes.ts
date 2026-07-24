@@ -5,7 +5,7 @@ import { PLANS } from '../../lib/plans'
 import { changePlanSchema, subscribeSchema, webhookSchema } from './schemas'
 import * as paymentsService from './service'
 
-/** Comparação em tempo constante — evita timing attack no token do webhook. */
+/** Comparação em tempo constante: evita timing attack no token do webhook. */
 function isValidWebhookToken(received: string | undefined): boolean {
   if (!received) return false
   const expected = Buffer.from(env.ASAAS_WEBHOOK_TOKEN)
@@ -67,7 +67,7 @@ export async function paymentsRoutes(app: FastifyInstance) {
     },
   )
 
-  // Público (o Asaas não manda JWT) — autenticado pelo header próprio abaixo.
+  // Público (o Asaas não manda JWT), autenticado pelo header próprio abaixo.
   app.post(
     '/webhook',
     { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } },

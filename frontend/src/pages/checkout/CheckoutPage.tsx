@@ -71,7 +71,7 @@ export function CheckoutPage() {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>(
     searchParams.get('cycle') === 'monthly' ? 'monthly' : 'yearly',
   )
-  // Parcelas do cartão — só no anual (o mensal é sempre à vista). 1 = à vista
+  // Parcelas do cartão: só no anual (o mensal é sempre à vista). 1 = à vista
   // (assinatura recorrente); 2–12 = cobrança parcelada imediata.
   const [installments, setInstallments] = useState(1)
 
@@ -92,7 +92,7 @@ export function CheckoutPage() {
   const currentSub = subscriptionQuery.data?.subscription ?? null
   const isChange = currentSub !== null && currentSub.status !== 'canceled'
 
-  // Data real da 1ª cobrança — espelha o backend (payments/service.ts#subscribe):
+  // Data real da 1ª cobrança, espelha o backend (payments/service.ts#subscribe):
   // troca de plano e teste expirado cobram hoje; teste em andamento cobra no fim
   // do teste (trialEndsAt, sem reiniciar os 14 dias); conta legada sem teste
   // ganha 14 dias de cortesia. Evita prometer "14 dias grátis" pra quem não tem.
@@ -107,19 +107,19 @@ export function CheckoutPage() {
         : addDays(todayStr(), TRIAL_DAYS)
   const firstChargeLabel = formatDate(firstChargeDate)
 
-  // Etapa 1 — cartão
+  // Etapa 1: cartão
   const [holderName, setHolderName] = useState('')
   const [cardNumber, setCardNumber] = useState('')
   const [expiry, setExpiry] = useState('')
   const [ccv, setCcv] = useState('')
 
-  // Etapa 2 — dados pessoais
+  // Etapa 2: dados pessoais
   const [name, setName] = useState(user?.name ?? '')
   const [email, setEmail] = useState(user?.email ?? '')
   const [cpfCnpj, setCpfCnpj] = useState(user?.cpf ?? establishment?.document ?? '')
   const [phone, setPhone] = useState(user?.phone ?? '')
 
-  // Etapa 3 — endereço
+  // Etapa 3: endereço
   const [postalCode, setPostalCode] = useState(establishment?.cep ?? '')
   const [addressNumber, setAddressNumber] = useState(establishment?.addressNumber ?? '')
   const [street, setStreet] = useState('')
@@ -177,7 +177,7 @@ export function CheckoutPage() {
     }
   }, [personalComplete, maxUnlocked])
 
-  // Autopreenchimento de endereço pelo CEP (ViaCEP) — só dispara quando o
+  // Autopreenchimento de endereço pelo CEP (ViaCEP): só dispara quando o
   // usuário edita o CEP, igual ao padrão já usado em Configurações.
   useEffect(() => {
     if (!cepDirty.current) return
@@ -338,7 +338,7 @@ export function CheckoutPage() {
                       {isInstallment ? (
                         <div className="mt-3 rounded-lg bg-secondary-light px-3 py-2.5 text-xs text-primary">
                           <span className="font-semibold">1ª parcela cobrada hoje.</span> As outras{' '}
-                          {installments - 1} caem automaticamente, uma por mês, no seu cartão — sem juros.
+                          {installments - 1} caem automaticamente, uma por mês, no seu cartão, sem juros.
                         </div>
                       ) : !isChange ? (
                         <div className="mt-3 rounded-lg bg-secondary-light px-3 py-2.5 text-xs text-primary">

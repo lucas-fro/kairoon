@@ -43,7 +43,7 @@ export function computeAvailableSlots(options: ComputeSlotsOptions): string[] {
   return slots
 }
 
-/** true se [startA, endA) sobrepõe [startB, endB) — horários 'HH:mm' */
+/** true se [startA, endA) sobrepõe [startB, endB) (horários 'HH:mm') */
 export function timesOverlap(startA: string, endA: string, startB: string, endB: string): boolean {
   return timeToMinutes(startA) < timeToMinutes(endB) && timeToMinutes(endA) > timeToMinutes(startB)
 }

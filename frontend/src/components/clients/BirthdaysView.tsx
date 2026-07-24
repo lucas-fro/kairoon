@@ -43,7 +43,7 @@ function WhatsAppButton({ phone, label }: { phone: string; label: string }) {
 export function BirthdaysView() {
   const navigate = useNavigate()
   const { data, isLoading, isError, refetch } = useQuery({
-    // 'insights' isola do key da busca (['clients', <termo>]) — evita colisão de
+    // 'insights' isola do key da busca (['clients', <termo>]); evita colisão de
     // cache se alguém digitar "birthdays" na busca da Listagem.
     queryKey: ['clients', 'insights', 'birthdays'],
     queryFn: listBirthdays,
@@ -57,7 +57,7 @@ export function BirthdaysView() {
     <div>
       <PageHeader
         title="Aniversários"
-        description="Aniversariantes em ordem de proximidade — celebre e traga seus clientes de volta."
+        description="Aniversariantes em ordem de proximidade: celebre e traga seus clientes de volta."
       />
 
       {isLoading ? (

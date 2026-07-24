@@ -1,6 +1,6 @@
 /**
  * PNG (base64) do símbolo Kairoon em branco, para o cabeçalho dos e-mails.
- * É anexado inline via `contentId` e referenciado com `cid:` no HTML — SVG
+ * É anexado inline via `contentId` e referenciado com `cid:` no HTML: SVG
  * não renderiza na maioria dos clientes de e-mail (Gmail, Outlook). Gerado a
  * partir de frontend/public/logo.svg (mark de dois chevrons).
  */

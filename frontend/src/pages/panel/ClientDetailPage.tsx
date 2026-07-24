@@ -376,7 +376,7 @@ export function ClientDetailPage() {
         <StatCard
           icon={Clock}
           label="Última visita"
-          value={stats.lastVisit ? formatDate(stats.lastVisit) : '—'}
+          value={stats.lastVisit ? formatDate(stats.lastVisit) : '-'}
         />
       </div>
 

@@ -53,7 +53,7 @@ const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   credit: 'Crédito',
 }
 
-/** Origem do lançamento — dirige o badge da coluna "Tipo". */
+/** Origem do lançamento: dirige o badge da coluna "Tipo". */
 function transactionKind(t: Transaction): 'appointment' | 'fixed' | 'manual' {
   if (t.appointmentId) return 'appointment'
   if (t.recurringExpenseId || (t.employeeId && t.payrollDay != null)) return 'fixed'
@@ -658,7 +658,7 @@ export function FinancePage() {
                             )}
                           </Td>
                           <Td className="!h-auto !px-3 !py-2 whitespace-nowrap text-[13px] text-ink-secondary">
-                            {method ?? <span className="text-ink-tertiary">—</span>}
+                            {method ?? <span className="text-ink-tertiary">-</span>}
                           </Td>
                           <Td className="!h-auto !px-3 !py-2 whitespace-nowrap text-right">
                             <div

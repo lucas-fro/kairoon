@@ -2,7 +2,7 @@ export interface DashboardMonthSummary {
   revenueCents: number
   /** variação vs. mesmo período do mês anterior; null sem base de comparação */
   revenueChangePct: number | null
-  /** atendimentos concluídos no período — denominador do ticket médio */
+  /** atendimentos concluídos no período (denominador do ticket médio) */
   completedCount: number
   appointmentsCount: number
   appointmentsChangePct: number | null

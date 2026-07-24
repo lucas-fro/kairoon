@@ -39,7 +39,7 @@ export interface AsaasCustomer {
   cpfCnpj: string
 }
 
-/** Busca por CPF/CNPJ — o Asaas não deduplica automaticamente na criação. */
+/** Busca por CPF/CNPJ: o Asaas não deduplica automaticamente na criação. */
 export async function findCustomerByCpfCnpj(cpfCnpj: string): Promise<AsaasCustomer | null> {
   const result = await asaasFetch<{ data: AsaasCustomer[] }>(
     `/customers?cpfCnpj=${encodeURIComponent(cpfCnpj)}`,
@@ -126,7 +126,7 @@ export async function cancelAsaasSubscription(asaasSubscriptionId: string): Prom
 export interface AsaasInstallmentCharge {
   /** Id da 1ª cobrança da série (uma por parcela). */
   id: string
-  /** Id do grupo de parcelamento — é o que vem em `payment.installment` no webhook. */
+  /** Id do grupo de parcelamento: é o que vem em `payment.installment` no webhook. */
   installment: string
   status: string
   value: number
@@ -135,7 +135,7 @@ export interface AsaasInstallmentCharge {
 }
 
 /**
- * Parcelamento no cartão (cobrança avulsa parcelada) — usado só no plano anual
+ * Parcelamento no cartão (cobrança avulsa parcelada): usado só no plano anual
  * quando o cliente escolhe dividir em 2–12x. Diferente da assinatura recorrente:
  * é UMA compra parcelada (o Asaas cobra as parcelas ao longo dos meses) e a
  * captura no cartão é IMEDIATA (a 1ª parcela cai hoje, independentemente do
@@ -168,7 +168,7 @@ export async function createCreditCardInstallment(input: {
 
 /**
  * Atualiza valor/ciclo de uma assinatura já existente mantendo o mesmo cartão
- * (o Asaas já mantém o cartão vinculado à assinatura do lado dele — não
+ * (o Asaas já mantém o cartão vinculado à assinatura do lado dele; não
  * precisa reenviar dado nenhum de cartão aqui). Por padrão só afeta cobranças
  * futuras, a já gerada pro ciclo atual não muda.
  */
@@ -184,8 +184,8 @@ export async function updateAsaasSubscription(
 
 /**
  * Últimos 4 dígitos + bandeira do cartão tokenizado na assinatura. Serve só pra
- * exibir na confirmação de troca de plano ("a cobrança vai no cartão •••• 8829")
- * — o dado sensível do cartão nunca volta pra cá. Devolve null se o Asaas não
+ * exibir na confirmação de troca de plano ("a cobrança vai no cartão •••• 8829").
+ * O dado sensível do cartão nunca volta pra cá. Devolve null se o Asaas não
  * trouxer o bloco de cartão (ex.: assinatura sem cartão vinculado).
  */
 export async function getAsaasSubscriptionCard(

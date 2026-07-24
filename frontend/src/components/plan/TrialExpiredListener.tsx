@@ -7,7 +7,7 @@ import { DialogActions } from '../ui/DialogActions'
 
 /**
  * Escuta o evento `trial:expired` (disparado por api/client quando o backend
- * bloqueia uma escrita com 402 TRIAL_EXPIRED) e abre um convite de upgrade —
+ * bloqueia uma escrita com 402 TRIAL_EXPIRED) e abre um convite de upgrade,
  * assim qualquer ação bloqueada dá um retorno claro, sem deslogar o usuário.
  */
 export function TrialExpiredListener() {
@@ -30,7 +30,7 @@ export function TrialExpiredListener() {
     >
       <div className="flex items-center gap-2.5 rounded-lg bg-secondary-light px-4 py-3 text-sm text-ink-secondary">
         <Lock className="h-4 w-4 shrink-0 text-primary" />
-        Seus dados continuam salvos e visíveis — só a edição fica bloqueada até assinar.
+        Seus dados continuam salvos e visíveis: só a edição fica bloqueada até assinar.
       </div>
       <DialogActions className="mt-6">
         <Button type="button" variant="outline" onClick={() => setOpen(false)}>

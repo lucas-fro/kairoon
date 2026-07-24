@@ -79,7 +79,7 @@ export function PlanTab() {
     queryFn: getPlans,
     enabled: upgradeOpen || confirmPlan !== null,
   })
-  // Cartão cadastrado — buscado só quando o usuário abre a confirmação da troca.
+  // Cartão cadastrado: buscado só quando o usuário abre a confirmação da troca.
   const paymentMethodQuery = useQuery({
     queryKey: ['payments', 'payment-method'],
     queryFn: getPaymentMethod,
@@ -132,12 +132,12 @@ export function PlanTab() {
 
   const subscription = subscriptionQuery.data?.subscription ?? null
   const hasSubscriptionRecord = subscription !== null
-  // Anual parcelado: as parcelas já foram compradas — não há assinatura pra
+  // Anual parcelado: as parcelas já foram compradas; não há assinatura pra
   // cancelar nem cartão tokenizado pra trocar de plano. Um registro parcelado
   // (installments>=2) é diferente da assinatura recorrente.
   const isInstallmentRecord = (subscription?.installments ?? 0) >= 2
   // Termo do parcelamento AINDA em aberto (parcelas caindo): troca e cancelamento
-  // só ao fim do período pago — espelha o guard do backend (service.subscribe).
+  // só ao fim do período pago: espelha o guard do backend (service.subscribe).
   // Depois que vence (status 'canceled'), o usuário pode assinar de novo normal.
   const installmentTermActive =
     isInstallmentRecord &&
@@ -234,7 +234,7 @@ export function PlanTab() {
             }`}
           >
             {trialState === 'trial'
-              ? `Teste grátis com tudo desbloqueado — faltam ${trialDaysLeft} ${
+              ? `Teste grátis com tudo desbloqueado. Faltam ${trialDaysLeft} ${
                   trialDaysLeft === 1 ? 'dia' : 'dias'
                 }. Assine para não perder o acesso.`
               : 'Seu teste grátis acabou. A conta está em somente-leitura até você assinar um plano.'}
@@ -376,7 +376,7 @@ export function PlanTab() {
         open={confirmPlan !== null}
         onClose={closeConfirm}
         title="Confirmar troca de plano"
-        description="A cobrança reaproveita o cartão já cadastrado — você não precisa digitar os dados de novo."
+        description="A cobrança reaproveita o cartão já cadastrado: você não precisa digitar os dados de novo."
         maxWidth="max-w-md"
       >
         <div className="space-y-3">
@@ -411,8 +411,8 @@ export function PlanTab() {
           <p className="text-sm text-ink-secondary">
             O acesso ao plano {confirmInfo?.name ?? ''} é liberado na hora.{' '}
             {nextChargeLabel
-              ? `O novo valor passa a valer a partir da próxima cobrança, em ${nextChargeLabel} — nada é cobrado agora.`
-              : 'O novo valor passa a valer a partir da próxima cobrança — nada é cobrado agora.'}
+              ? `O novo valor passa a valer a partir da próxima cobrança, em ${nextChargeLabel}; nada é cobrado agora.`
+              : 'O novo valor passa a valer a partir da próxima cobrança; nada é cobrado agora.'}
           </p>
         </div>
 

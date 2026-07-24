@@ -21,7 +21,7 @@ export function SettingsPage() {
 
   const tabParam = searchParams.get('tab')
 
-  // Serviços e Profissionais viraram páginas próprias na sidebar —
+  // Serviços e Profissionais viraram páginas próprias na sidebar;
   // redireciona links antigos (?tab=) para as novas rotas.
   if (tabParam === 'servicos') return <Navigate to="/app/servicos" replace />
   if (tabParam === 'funcionarios') return <Navigate to="/app/funcionarios" replace />

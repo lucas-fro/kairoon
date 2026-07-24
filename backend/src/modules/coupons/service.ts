@@ -186,7 +186,7 @@ export async function findBestAutoApplyCoupon(
         discountCents: await validateCouponAgainstContext(client, candidate, ctx),
       })
     } catch (err) {
-      if (err instanceof AppError) continue // campanha não casa — segue
+      if (err instanceof AppError) continue // campanha não casa: segue
       throw err
     }
   }
@@ -224,7 +224,7 @@ export async function resolveCouponForCheckout(
     })
     if (!coupon) throw new AppError('Cupom não encontrado', 404)
     // Serializa o resgate: a recontagem de usos é check-then-insert.
-    // Adquirido depois de lockEmployeeDay (quando houve remarcação) — manter a ordem.
+    // Adquirido depois de lockEmployeeDay (quando houve remarcação), para manter a ordem.
     await lockCoupon(tx, coupon.id)
     const discountCents = await validateCouponAgainstContext(tx, coupon, ctx)
     return toAppliedCoupon(coupon, discountCents)
@@ -293,7 +293,7 @@ export async function mintPersonalCoupon(
         .returning()
       return coupon
     } catch (err) {
-      if (isUniqueViolation(err)) continue // colisão de código — gera outro
+      if (isUniqueViolation(err)) continue // colisão de código: gera outro
       throw err
     }
   }
@@ -496,7 +496,7 @@ export async function deleteCoupon(establishmentId: string, id: string) {
     .where(eq(couponRedemptions.couponId, id))
   const hasRedemptions = Number(row?.value ?? 0) > 0
 
-  // Com histórico de resgates o delete é bloqueado pelo FK restrict —
+  // Com histórico de resgates o delete é bloqueado pelo FK restrict:
   // desativa (soft delete) preservando o ledger.
   if (hasRedemptions) {
     await db

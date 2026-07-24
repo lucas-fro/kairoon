@@ -11,14 +11,14 @@ declare module 'fastify' {
   interface FastifyContextConfig {
     /**
      * Rotas marcadas com isto continuam liberadas quando a conta está em
-     * somente-leitura (teste grátis expirado sem assinatura) — ex.: assinar,
+     * somente-leitura (teste grátis expirado sem assinatura), ex.: assinar,
      * gerenciar/excluir a conta. Ver o hook `onRequest` abaixo.
      */
     allowWhenReadOnly?: boolean
   }
 }
 
-/** Métodos que alteram estado — o gate de somente-leitura só age nestes. */
+/** Métodos que alteram estado: o gate de somente-leitura só age nestes. */
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 import { appointmentsRoutes } from './modules/appointments/routes'
 import { authRoutes } from './modules/auth/routes'
@@ -42,7 +42,7 @@ import { waitlistRoutes } from './modules/waitlist/routes'
 
 export async function buildApp() {
   // trustProxy: o backend roda atrás do nginx do frontend (X-Forwarded-For /
-  // X-Real-IP) — sem isso, request.ip sempre traz o IP interno do container,
+  // X-Real-IP). Sem isso, request.ip sempre traz o IP interno do container,
   // o que quebra o remoteIp exigido pelo antifraude do Asaas.
   const app = Fastify({ logger: true, trustProxy: true })
 
@@ -75,13 +75,13 @@ export async function buildApp() {
   })
 
   await app.register(cors, { origin: env.CORS_ORIGIN.split(',').map((o) => o.trim()) })
-  // global: false — o limite é aplicado por rota via config.rateLimit
+  // global: false, pois o limite é aplicado por rota via config.rateLimit
   // (hoje apenas nas rotas públicas sensíveis a abuso)
   await app.register(rateLimit, { global: false })
   await app.register(authPlugin)
 
   // Gate global de somente-leitura: contas com o teste grátis expirado (e sem
-  // assinatura paga) podem LER tudo, mas não escrevem nada — exceto rotas
+  // assinatura paga) podem LER tudo, mas não escrevem nada, exceto rotas
   // marcadas com `config.allowWhenReadOnly` (assinar/gerenciar conta). É a
   // garantia no servidor: a UI só reforça. Roda em onRequest (após o roteamento,
   // então routeOptions já existe) e só toca requisições autenticadas de dono;

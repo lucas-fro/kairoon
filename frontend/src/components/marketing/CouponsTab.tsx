@@ -274,7 +274,7 @@ export function CouponsTab() {
                 <Tr key={coupon.id}>
                   <Td>
                     <span className="font-mono text-sm font-medium text-ink">
-                      {coupon.code ?? '—'}
+                      {coupon.code ?? '-'}
                     </span>
                     {coupon.name && (
                       <p className="mt-0.5 text-xs text-ink-tertiary">{coupon.name}</p>

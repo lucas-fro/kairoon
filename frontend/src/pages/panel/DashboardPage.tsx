@@ -52,7 +52,7 @@ function formatAvg(value: number): string {
 
 /* ------------------------------ StatCard ------------------------------ */
 
-/** Pílula de variação vs. mês anterior — verde/vermelho por direção, "Novo" sem base de comparação. */
+/** Pílula de variação vs. mês anterior: verde/vermelho por direção, "Novo" sem base de comparação. */
 function ChangeBadge({ pct, current }: { pct: number | null; current: number }) {
   if (pct === null) {
     if (current <= 0) return null
@@ -355,7 +355,7 @@ export function DashboardPage() {
           />
         </div>
 
-        {/* 2ª linha: gráfico de linhas — atividade de clientes, não financeiro */}
+        {/* 2ª linha: gráfico de linhas (atividade de clientes, não financeiro) */}
         <ActivityTrendCard trend={data.trend} />
 
         {/* 3ª linha: tabela de agendamentos de hoje */}

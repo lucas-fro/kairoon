@@ -1,7 +1,7 @@
 /**
  * Datas são strings 'YYYY-MM-DD' e horários strings 'HH:mm', sempre no fuso
  * local do servidor. Nunca use `new Date('YYYY-MM-DD')` para extrair o dia da
- * semana — o parse é feito em UTC e desloca o dia em fusos negativos.
+ * semana: o parse é feito em UTC e desloca o dia em fusos negativos.
  */
 
 export function timeToMinutes(time: string): number {

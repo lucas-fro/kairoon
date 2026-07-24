@@ -1,5 +1,5 @@
 /**
- * Seed "estabelecimento real" — limpa o banco e popula a Barbearia Navalha de
+ * Seed "estabelecimento real": limpa o banco e popula a Barbearia Navalha de
  * Ouro com 3 meses de operação natural: mês passado, mês atual e próximo mês
  * cheios de agendamentos, fechamentos, comissões, caixa, fidelidade e pontos.
  *
@@ -110,7 +110,7 @@ const svcDefs: SvcDef[] = [
 ]
 const svcId: Record<string, string> = {}
 for (const s of svcDefs) svcId[s.key] = id()
-// Pacote (combo) — calculado a partir dos itens
+// Pacote (combo): calculado a partir dos itens
 const comboKeys = ['corte', 'barba', 'sobrancelha']
 const comboSum = comboKeys.reduce((a, k) => a + svcDefs.find((s) => s.key === k)!.priceCents, 0)
 const comboDur = comboKeys.reduce((a, k) => a + svcDefs.find((s) => s.key === k)!.durationMinutes, 0)
@@ -612,7 +612,7 @@ for (let date = rangeStart; date <= rangeEnd; date = addDays(date, 1)) {
 
         const finalCents = Math.max(0, subtotal - discountCents)
 
-        // Gorjeta / fiado (dívida) — casos naturais
+        // Gorjeta / fiado (dívida): casos naturais
         const roll = rand()
         let collected = finalCents
         if (roll < 0.08) {
@@ -804,7 +804,7 @@ for (const ms of [prevMonthStart, today.slice(0, 7) + '-01']) {
       establishmentId: estId,
       employeeId: empId[emp.key],
       payrollDay: 5,
-      description: `Salário — ${emp.name}`,
+      description: `Salário de ${emp.name}`,
       amountCents: emp.salaryCents,
       type: 'expense',
       date: payDate,
@@ -862,8 +862,8 @@ for (let i = 0; i < 3; i++) {
 // Bloqueios de agenda (os dois feriados de dia inteiro)
 // ---------------------------------------------------------------------------
 const timeBlockRows: (typeof schema.timeBlocks.$inferInsert)[] = [
-  { establishmentId: estId, date: holidayPast, reason: 'Feriado — barbearia fechada' },
-  { establishmentId: estId, date: holidayFuture, reason: 'Feriado — barbearia fechada' },
+  { establishmentId: estId, date: holidayPast, reason: 'Feriado: barbearia fechada' },
+  { establishmentId: estId, date: holidayFuture, reason: 'Feriado: barbearia fechada' },
 ]
 
 // ===========================================================================
@@ -876,7 +876,7 @@ async function insertAll<T>(table: any, rows: T[], chunkSize = 400) {
 }
 
 async function wipeDatabase() {
-  // TRUNCATE de tudo, reiniciando e cascateando — banco limpo de verdade.
+  // TRUNCATE de tudo, reiniciando e cascateando. Banco limpo de verdade.
   const tables = [
     'points_entries', 'points_rewards', 'points_programs',
     'loyalty_stamps', 'loyalty_redemptions', 'loyalty_programs',
@@ -1028,7 +1028,7 @@ async function main() {
     {
       id: couponVolta10Id,
       establishmentId: estId,
-      name: 'Volte sempre — 10%',
+      name: 'Volte sempre (10%)',
       code: 'VOLTA10',
       source: 'manual',
       discountType: 'percent',
@@ -1111,7 +1111,7 @@ async function main() {
 
   console.log('')
   console.log('════════════════════════════════════════════════')
-  console.log('  Seed concluído — Barbearia Navalha de Ouro')
+  console.log('  Seed concluído: Barbearia Navalha de Ouro')
   console.log('════════════════════════════════════════════════')
   console.log(`  Período: ${rangeStart} → ${rangeEnd} (hoje: ${today})`)
   console.log(`  Clientes:       ${clients.length}`)

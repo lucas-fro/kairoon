@@ -43,7 +43,7 @@ const holderSchema = z.object({
 export const subscribeSchema = z.object({
   planSlug: z.enum(planSlugs),
   billingCycle: z.enum(['monthly', 'yearly']),
-  // Parcelas do cartão (2–12) — só faz efeito no anual; o service ignora no
+  // Parcelas do cartão (2–12): só faz efeito no anual; o service ignora no
   // mensal. Ausente/1 = à vista (assinatura recorrente).
   installments: z.number().int().min(1).max(12).optional(),
   card: cardSchema,
@@ -59,7 +59,7 @@ export type ChangePlanInput = z.infer<typeof changePlanSchema>
 
 export type SubscribeInput = z.infer<typeof subscribeSchema>
 
-// Payload do webhook do Asaas — só declaramos os campos que efetivamente
+// Payload do webhook do Asaas: só declaramos os campos que efetivamente
 // usamos; o resto do corpo é ignorado (zod não é .strict() aqui de propósito).
 export const webhookSchema = z.object({
   event: z.string(),
@@ -68,7 +68,7 @@ export const webhookSchema = z.object({
       id: z.string(),
       subscription: z.string().optional(),
       // Presente quando a cobrança faz parte de um parcelamento (POST /payments
-      // com installmentCount) — casamos o webhook pelo grupo de parcelas.
+      // com installmentCount): casamos o webhook pelo grupo de parcelas.
       installment: z.string().optional(),
       value: z.number().optional(),
       status: z.string().optional(),

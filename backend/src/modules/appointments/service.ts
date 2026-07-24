@@ -235,7 +235,7 @@ export async function listAppointments(establishmentId: string, query: ListAppoi
 
 /**
  * Agendamentos criados recentemente (por createdAt, não pela data do
- * atendimento). Alimenta a notificação de "novo agendamento" no painel —
+ * atendimento). Alimenta a notificação de "novo agendamento" no painel:
  * inclui reservas do link público e do próprio painel. Ignora cancelados.
  */
 export async function listRecentAppointments(
@@ -504,7 +504,7 @@ export async function updateAppointment(
     }
     const finalCents = Math.max(0, subtotalCents - discountToStore)
     // Valor efetivamente recebido no fechamento. Pode diferir do total quando o
-    // cliente deixa gorjeta (paga a mais) ou fica devendo (paga a menos) — nesse
+    // cliente deixa gorjeta (paga a mais) ou fica devendo (paga a menos), nesse
     // caso a receita reflete o dinheiro que de fato entrou, não o valor nominal.
     const collectedCents =
       newStatus === 'completed' && paymentsToStore && paymentsToStore.length > 0
@@ -588,7 +588,7 @@ export async function updateAppointment(
       const product = await tx.query.products.findFirst({
         where: and(eq(products.id, productId), eq(products.establishmentId, establishmentId)),
       })
-      if (!product) continue // produto removido do catálogo — ignora
+      if (!product) continue // produto removido do catálogo: ignora
       const newStock = product.stockQuantity + change
       if (newStock < 0) {
         throw new AppError(`Estoque insuficiente de "${product.name}"`, 400)
@@ -622,8 +622,8 @@ export async function updateAppointment(
       const immediateCents = collectedCents - deferredCents
 
       // Fluxo de caixa: o dinheiro entra quando é recebido (no fechamento), não
-      // numa data futura. Ancoramos a receita em min(data do atendimento, hoje)
-      // — atendimento futuro finalizado adiantado cai hoje; retroativo mantém a
+      // numa data futura. Ancoramos a receita em min(data do atendimento, hoje):
+      // atendimento futuro finalizado adiantado cai hoje; retroativo mantém a
       // data passada. As parcelas do crédito mês a mês contam a partir daí.
       const today = todayStr()
       const receivedDate = updated.date > today ? today : updated.date

@@ -216,7 +216,7 @@ export const employees = pgTable('employees', {
   // como interpretar os valores por serviço em employee_commissions.
   commissionEnabled: boolean('commission_enabled').notNull().default(false),
   commissionType: text('commission_type').notNull().default('percent'),
-  // Folha de pagamento — usada na previsão de custos fixos e na futura folha
+  // Folha de pagamento: usada na previsão de custos fixos e na futura folha
   // salarial. Valores em centavos; bônus é uma lista de itens nomeados.
   salaryCents: integer('salary_cents'),
   bonuses: jsonb('bonuses')
@@ -499,7 +499,7 @@ export const commissionEntries = pgTable(
   ],
 )
 
-// Cupom de desconto (definição/regra) — serve o cupom manual, a campanha
+// Cupom de desconto (definição/regra): serve o cupom manual, a campanha
 // automática (autoApply, code null) e o cupom pessoal cunhado por
 // fidelidade/pontos (clientId preenchido, maxUses 1). discountValue: 0–100
 // quando 'percent', centavos quando 'fixed', ignorado em 'free_service'.
@@ -711,7 +711,7 @@ export const pointsEntries = pgTable(
 )
 
 // Assinatura paga do estabelecimento (cobrança recorrente via Asaas). 1 por
-// estabelecimento — cancelar não apaga a linha, só marca status/canceledAt
+// estabelecimento. Cancelar não apaga a linha, só marca status/canceledAt
 // (mantém acesso até currentPeriodEnd, ver lib/plan.ts#getEffectivePlan).
 export const subscriptions = pgTable(
   'subscriptions',
@@ -748,7 +748,7 @@ export const subscriptions = pgTable(
   ],
 )
 
-// Log de cobranças recebidas via webhook do Asaas — existe principalmente
+// Log de cobranças recebidas via webhook do Asaas: existe principalmente
 // para idempotência (asaasPaymentId único: o Asaas reenvia webhook em não-2xx).
 export const payments = pgTable(
   'payments',

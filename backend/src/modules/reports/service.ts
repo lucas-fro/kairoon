@@ -102,7 +102,7 @@ export async function getTopServicesReport(establishmentId: string, query: TopSe
 
 /**
  * Total recebido por método de pagamento (dinheiro, pix, débito, crédito).
- * Fonte: o snapshot `payments` dos atendimentos concluídos no período — é o
+ * Fonte: o snapshot `payments` dos atendimentos concluídos no período; é o
  * único lugar com o dinheiro discriminado por método.
  */
 export async function getPaymentMethodsReport(establishmentId: string, query: DateRangeQuery) {

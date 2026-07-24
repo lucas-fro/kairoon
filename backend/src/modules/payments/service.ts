@@ -67,7 +67,7 @@ export async function subscribe(establishmentId: string, remoteIp: string, input
   // Parcelamento anual em aberto não pode ser trocado no meio do período: as
   // parcelas já foram comprometidas no cartão e seguem sendo cobradas mesmo
   // após cancelamento/atraso (não dá pra cancelá-las de forma simples). Bloqueia
-  // ENQUANTO o período pago não vencer — independentemente do status — pra evitar
+  // ENQUANTO o período pago não vencer (independentemente do status), pra evitar
   // cobrança duplicada (parcelas antigas + a nova).
   if (
     existing?.asaasInstallmentId &&
@@ -105,7 +105,7 @@ export async function subscribe(establishmentId: string, remoteIp: string, input
     const totalValue = centsToReais(getPlanCycleCents(input.planSlug, 'yearly'))
     // A captura no cartão é IMEDIATA (o Asaas cobra a 1ª parcela hoje mesmo,
     // independentemente do dueDate); por isso o parcelado não tem teste grátis
-    // diferido — o dueDate abaixo é só informativo.
+    // diferido: o dueDate abaixo é só informativo.
     const dueDate = now.toISOString().slice(0, 10)
 
     const charge = await createCreditCardInstallment({
@@ -142,7 +142,7 @@ export async function subscribe(establishmentId: string, remoteIp: string, input
     // Data da 1ª cobrança:
     // - Troca de plano: cobra já no ciclo atual (hoje).
     // - Assinatura nova durante o teste grátis: alinha ao fim do teste
-    //   (`trialEndsAt`) — reaproveita os dias que faltam, sem duplicar cortesia.
+    //   (`trialEndsAt`), reaproveita os dias que faltam, sem duplicar cortesia.
     // - Teste já expirado: cobra no início (hoje) para reativar a conta.
     // - Conta legada (sem teste): 14 dias de cortesia, como antes.
     let firstDue: Date
@@ -234,7 +234,7 @@ export async function cancel(establishmentId: string) {
 
   // Assinatura recorrente: cancela no Asaas pra parar as próximas cobranças.
   // Parcelamento (sem asaasSubscriptionId): as parcelas já foram compradas e
-  // seguem sendo cobradas — aqui só marcamos como cancelado localmente.
+  // seguem sendo cobradas. Aqui só marcamos como cancelado localmente.
   if (subscription.asaasSubscriptionId) {
     await cancelAsaasSubscription(subscription.asaasSubscriptionId)
   }
@@ -251,7 +251,7 @@ export async function cancel(establishmentId: string) {
 
 /**
  * Troca o plano/ciclo reaproveitando o cartão que o Asaas já mantém tokenizado
- * na assinatura — sem pedir os dados do cartão de novo. Só rola quando já existe
+ * na assinatura, sem pedir os dados do cartão de novo. Só rola quando já existe
  * uma assinatura viva (não cancelada): atualizamos valor e ciclo na assinatura
  * existente do Asaas e liberamos o novo plano na hora. O novo valor passa a
  * valer nas próximas cobranças (a data da próxima cobrança não muda), então não
@@ -268,7 +268,7 @@ export async function changePlan(establishmentId: string, input: ChangePlanInput
     throw new AppError('Nenhuma assinatura ativa para alterar. Faça uma nova assinatura.', 409)
   }
   // Parcelamento não é assinatura tokenizada no Asaas: não dá pra ajustar
-  // valor/ciclo sem uma nova cobrança — a troca só rola ao fim do período.
+  // valor/ciclo sem uma nova cobrança: a troca só rola ao fim do período.
   if (!subscription.asaasSubscriptionId) {
     throw new AppError(
       'Seu plano anual parcelado não pode ser alterado por aqui. A troca ficará disponível ao fim do período pago.',
@@ -338,7 +338,7 @@ const PAYMENT_STATUS_MAP: Record<string, (typeof payments.$inferSelect)['status'
 export async function handleWebhook(event: string, payment: WebhookInput['payment']) {
   if (!payment) return
   // Casamos o pagamento pela assinatura recorrente OU pelo grupo de parcelamento.
-  // Sem nenhum dos dois, é cobrança de outro fluxo — ignora.
+  // Sem nenhum dos dois, é cobrança de outro fluxo: ignora.
   const where = payment.subscription
     ? eq(subscriptions.asaasSubscriptionId, payment.subscription)
     : payment.installment
@@ -397,14 +397,14 @@ export async function handleWebhook(event: string, payment: WebhookInput['paymen
   if (event === 'PAYMENT_CONFIRMED' || event === 'PAYMENT_RECEIVED') {
     // NÃO reativa um registro já cancelado (estorno, chargeback ou cancelamento
     // manual). No parcelamento as parcelas seguem caindo mesmo após a revogação
-    // e cada uma dispararia este evento — sem esta trava, o acesso pago voltaria
+    // e cada uma dispararia este evento: sem esta trava, o acesso pago voltaria
     // sozinho, anulando a revogação. Recuperação de atraso (past_due→active)
     // continua funcionando porque só 'canceled' é terminal aqui.
     if (subscription.status !== 'canceled') {
       const dueDate = payment.dueDate ? new Date(payment.dueDate) : new Date()
       // Assinatura recorrente: cada cobrança confirma um novo ciclo → avança o
       // período. Parcelamento: o prazo é fixo (1 ano, definido na compra), então
-      // NÃO avança a cada parcela paga — mantém o currentPeriodEnd original.
+      // NÃO avança a cada parcela paga: mantém o currentPeriodEnd original.
       const nextChargeDate = isInstallment
         ? (subscription.currentPeriodEnd ?? addBillingCycle(dueDate, subscription.billingCycle))
         : addBillingCycle(dueDate, subscription.billingCycle)
@@ -434,7 +434,7 @@ export async function handleWebhook(event: string, payment: WebhookInput['paymen
     // Mesma trava do PAYMENT_CONFIRMED/RECEIVED acima: um registro já cancelado
     // é terminal. Sem isto, uma parcela que falha DEPOIS do usuário cancelar
     // reverteria o status de volta pra 'past_due' (regressão de um estado
-    // terminal) — e mais tarde, ao vencer a graça, plan.ts sobrescreveria
+    // terminal), e mais tarde, ao vencer a graça, plan.ts sobrescreveria
     // canceledAt com a data da graça, apagando a data real do cancelamento.
     if (subscription.status !== 'canceled') {
       const graceUntil = new Date()
@@ -446,7 +446,7 @@ export async function handleWebhook(event: string, payment: WebhookInput['paymen
     }
   } else if (event === 'PAYMENT_REFUNDED' || event === 'PAYMENT_CHARGEBACK_REQUESTED') {
     // Idem: se já está cancelado (ex.: o próprio usuário cancelou antes, ou um
-    // reembolso duplicado/reentrega do Asaas), não reprocessa — preserva o
+    // reembolso duplicado/reentrega do Asaas), não reprocessa: preserva o
     // canceledAt original e evita cancelar no Asaas duas vezes à toa.
     if (subscription.status !== 'canceled') {
       // Estorno ou chargeback: revoga o acesso na hora (assinatura cancelada,

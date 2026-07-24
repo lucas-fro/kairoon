@@ -45,7 +45,7 @@ function currentMonth(): string {
 
 /**
  * Data da baixa no caixa: o vencimento, exceto quando ele ainda está no futuro
- * dentro do mês corrente — aí lança hoje, para a saída aparecer no fluxo de
+ * dentro do mês corrente, aí lança hoje, para a saída aparecer no fluxo de
  * caixa "até hoje" em vez de ficar com data futura invisível na lista.
  */
 function settleDate(month: string, day: number): string {
@@ -131,7 +131,7 @@ interface ForecastItem {
  * Previsão dos custos fixos do mês: custos fixos manuais + os pagamentos de
  * folha de cada profissional (um item por dia de pagamento). Marca cada item
  * como pago quando há uma transação vinculada no mês. Na última parcela de cada
- * profissional soma a comissão do mês ao valor a pagar — é saída real do caixa.
+ * profissional soma a comissão do mês ao valor a pagar: é saída real do caixa.
  */
 export async function getForecast(establishmentId: string, month?: string) {
   const targetMonth = month ?? currentMonth()
@@ -187,7 +187,7 @@ export async function getForecast(establishmentId: string, month?: string) {
   ])
 
   const postedByExpense = new Map<string, (typeof postedRows)[number]>()
-  // Chave por (profissional, dia configurado) — não pela data, que pode
+  // Chave por (profissional, dia configurado), não pela data, que pode
   // "encurtar" e colidir entre dois dias em meses mais curtos.
   const postedByPayroll = new Map<string, (typeof postedRows)[number]>()
   for (const row of postedRows) {
@@ -330,7 +330,7 @@ export async function settlePayroll(
   const monthStart = `${month}-01`
   const monthEnd = dueDateFor(month, 31)
 
-  // Idempotência por (profissional, dia configurado) dentro do mês — assim dois
+  // Idempotência por (profissional, dia configurado) dentro do mês, assim dois
   // dias que "encurtam" para a mesma data continuam sendo baixas independentes.
   const existing = await db.query.transactions.findFirst({
     columns: { id: true },
@@ -344,7 +344,7 @@ export async function settlePayroll(
   })
   if (existing) throw new AppError('Este pagamento já foi baixado neste mês', 409)
 
-  // Na última parcela do profissional, soma a comissão do mês ao pagamento —
+  // Na última parcela do profissional, soma a comissão do mês ao pagamento:
   // é saída real do caixa, então precisa ser contabilizada na baixa.
   const validDays = (employee.paymentDays ?? []).filter((p) => p.amountCents > 0)
   const isLastPaymentDay =

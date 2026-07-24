@@ -17,7 +17,7 @@ export async function clientsRoutes(app: FastifyInstance) {
     return clientsService.listClients(request.user.establishmentId, search)
   })
 
-  // Insights de clientes (aniversariantes / sumidos) — plano Essencial+.
+  // Insights de clientes (aniversariantes / sumidos): plano Essencial+.
   // Rotas estáticas: o find-my-way as prioriza sobre '/:id'.
   app.get('/birthdays', async (request) => {
     await assertFeature(request.user.establishmentId, 'clientes_crm')

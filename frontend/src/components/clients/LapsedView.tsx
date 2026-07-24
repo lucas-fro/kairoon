@@ -48,7 +48,7 @@ export function LapsedView() {
   const [minDays, setMinDays] = useState(30)
 
   const { data, isLoading, isError, refetch, isPlaceholderData } = useQuery({
-    // 'insights' isola do key da busca (['clients', <termo>]) — ver BirthdaysView.
+    // 'insights' isola do key da busca (['clients', <termo>]); ver BirthdaysView.
     queryKey: ['clients', 'insights', 'lapsed', minDays],
     queryFn: () => listLapsed(minDays),
     placeholderData: (prev) => prev,
@@ -81,7 +81,7 @@ export function LapsedView() {
     <div>
       <PageHeader
         title="Sumidos"
-        description="Clientes que já vieram mas não voltam há um tempo — do mais ausente ao menos ausente."
+        description="Clientes que já vieram mas não voltam há um tempo, do mais ausente ao menos ausente."
       />
 
       <div className="mb-4 overflow-x-auto">{filterChips}</div>

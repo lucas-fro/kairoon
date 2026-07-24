@@ -9,7 +9,7 @@ import { KairoonLogotype } from '../brand/Logo'
 export function AuthShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen">
-      {/* Painel de marca com foto — visível em telas grandes */}
+      {/* Painel de marca com foto (visível em telas grandes) */}
       <aside className="relative hidden overflow-hidden bg-primary lg:flex lg:w-1/2 xl:w-[55%]">
         <img src="/imgTelaLogin.webp" alt="" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-br from-primary/95 via-primary/80 to-primary/45" />
@@ -36,7 +36,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
 
       {/* Painel do formulário */}
       <div className="relative flex w-full flex-col items-center justify-center px-4 py-12 lg:w-1/2 lg:bg-background xl:w-[45%]">
-        {/* Fundo com foto + filtro navy — só no mobile */}
+        {/* Fundo com foto + filtro navy (só no mobile) */}
         <img
           src="/imgTelaLogin.webp"
           alt=""
@@ -44,10 +44,10 @@ export function AuthShell({ children }: { children: ReactNode }) {
         />
         <div className="absolute inset-0 bg-gradient-to-br from-primary/95 via-primary/85 to-primary/70 lg:hidden" />
 
-        {/* Logo sobre o fundo — só no mobile */}
+        {/* Logo sobre o fundo (só no mobile) */}
         <KairoonLogotype className="relative z-10 mb-8 h-14 w-auto text-white lg:hidden" />
 
-        {/* Card do form — branco com sombra flutuante em todas as telas */}
+        {/* Card do form (branco com sombra flutuante em todas as telas) */}
         <div className="relative z-10 w-full max-w-md rounded-2xl bg-surface p-6 shadow-floating sm:p-8">
           {children}
         </div>

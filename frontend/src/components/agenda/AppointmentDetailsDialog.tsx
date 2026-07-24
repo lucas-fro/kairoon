@@ -809,7 +809,7 @@ function PaymentCheckout({
           )}
           {couponError && <p className="text-xs font-medium text-error-dark">{couponError}</p>}
 
-          {/* Recompensas cunhadas disponíveis do cliente — aplicar em um toque.
+          {/* Recompensas cunhadas disponíveis do cliente: aplicar em um toque.
               Cupom restrito a serviços que não incluem o serviço deste
               atendimento fica desabilitado, indicando para qual serviço vale. */}
           {!appliedCoupon &&
@@ -1008,7 +1008,7 @@ function PaymentCheckout({
               <span
                 className={discountCents > 0 ? 'font-medium text-success-dark' : 'text-ink-tertiary'}
               >
-                {discountCents > 0 ? `− ${formatBRL(discountCents)}` : '—'}
+                {discountCents > 0 ? `− ${formatBRL(discountCents)}` : '-'}
               </span>
             </div>
             <div className="flex items-center justify-between border-t border-line-divider pt-2">
@@ -1023,7 +1023,7 @@ function PaymentCheckout({
               </span>
             </div>
 
-            {/* Dívida anterior do cliente — pode ser somada ao valor a cobrar */}
+            {/* Dívida anterior do cliente (pode ser somada ao valor a cobrar) */}
             {previousDebtCents > 0 && (
               <>
                 <label className="flex cursor-pointer items-start justify-between gap-3 rounded-lg border border-warning/40 bg-warning-light/40 px-3 py-2.5">

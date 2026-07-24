@@ -475,7 +475,7 @@ export interface DashboardMonthSummary {
   revenueCents: number
   /** variação vs. mesmo período do mês anterior; null sem base de comparação */
   revenueChangePct: number | null
-  /** atendimentos concluídos no período — denominador do ticket médio */
+  /** atendimentos concluídos no período: denominador do ticket médio */
   completedCount: number
   appointmentsCount: number
   appointmentsChangePct: number | null
@@ -580,7 +580,7 @@ export type AccessState = 'paid' | 'trial' | 'trial_expired' | 'free'
 
 export interface PlanInfo {
   plan: string
-  /** Estado de acesso — usado nos banners de teste e no modo somente-leitura. */
+  /** Estado de acesso, usado nos banners de teste e no modo somente-leitura. */
   state: AccessState
   /** false quando o teste grátis acabou sem assinatura: conta em somente-leitura. */
   canWrite: boolean

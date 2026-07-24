@@ -1,6 +1,6 @@
 /**
  * Datas são strings 'YYYY-MM-DD' e horários 'HH:mm' (mesma convenção do
- * backend). NUNCA use new Date('YYYY-MM-DD') — o parse UTC desloca o dia.
+ * backend). NUNCA use new Date('YYYY-MM-DD'): o parse UTC desloca o dia.
  */
 
 export const WEEKDAY_LABELS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']

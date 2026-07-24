@@ -6,7 +6,7 @@ interface LegalPageMeta {
   label: string
 }
 
-/** As três páginas públicas de conteúdo legal — linkadas entre si no rodapé. */
+/** As três páginas públicas de conteúdo legal, linkadas entre si no rodapé. */
 export const LEGAL_PAGES: LegalPageMeta[] = [
   { key: 'privacidade', path: '/politica-de-privacidade', label: 'Política de Privacidade' },
   { key: 'termos', path: '/termos-de-uso', label: 'Termos de Uso' },

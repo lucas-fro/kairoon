@@ -1621,7 +1621,7 @@ tbody tr:not(:last-child) td.plan-col-featured {
   will-change: transform, opacity;
 }
 
-/* Pilha de cards — profundidade controlada via data-depth (JS) */
+/* Pilha de cards: profundidade controlada via data-depth (JS) */
 .testimonial-card {
   z-index: 1;
   opacity: 0;
@@ -1652,7 +1652,7 @@ tbody tr:not(:last-child) td.plan-col-featured {
   pointer-events: auto;
 }
 
-/* Card da frente saindo — voa para o lado antes de recuar pro fundo */
+/* Card da frente saindo: voa para o lado antes de recuar pro fundo */
 .testimonial-card.is-leaving {
   z-index: 6;
   opacity: 0;

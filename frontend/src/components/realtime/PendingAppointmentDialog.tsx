@@ -8,7 +8,7 @@ import { Dialog } from '../ui/Dialog'
 import { DialogActions } from '../ui/DialogActions'
 import { useToast } from '../ui/Toast'
 
-/** Dados mínimos para o popup — vindos do SSE (achatado) ou da lista. */
+/** Dados mínimos para o popup: vindos do SSE (achatado) ou da lista. */
 export interface PendingAppointmentView {
   id: string
   date: string

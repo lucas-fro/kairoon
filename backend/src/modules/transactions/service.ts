@@ -47,7 +47,7 @@ export async function listTransactions(establishmentId: string, query: ListTrans
   }
 
   // Contas a receber: parcelas de crédito ainda não vencidas (date > hoje),
-  // independentes do período filtrado — olham o futuro. "Este mês" = as que
+  // independentes do período filtrado. Olham o futuro. "Este mês" = as que
   // ainda vencem até o fim do mês corrente.
   const sumAmount = sql<string>`coalesce(sum(${transactions.amountCents}), 0)`
   const receivableWhere = and(

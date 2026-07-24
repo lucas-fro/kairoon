@@ -92,7 +92,7 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
   const { setEstablishment } = useAuth()
   const toast = useToast()
 
-  // Personalização segue o plano EFETIVO (getPlan) — cobre o teste grátis, cuja
+  // Personalização segue o plano EFETIVO (getPlan): cobre o teste grátis, cuja
   // coluna `plan` é 'free' mas o acesso é Essencial. Enquanto o plano carrega (ou
   // se a query falhar) cai na coluna crua como fallback otimista, evitando piscar
   // "bloqueado" para quem já tem acesso.

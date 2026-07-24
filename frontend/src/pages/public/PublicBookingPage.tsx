@@ -201,7 +201,7 @@ export function PublicBookingPage() {
 
   // Dono com o teste grátis expirado (somente-leitura): a página não aceita
   // novos agendamentos. O bloqueio real é no backend (createPublicBooking); aqui
-  // é só a UX — evita levar o cliente a um fluxo que terminaria em erro.
+  // é só a UX: evita levar o cliente a um fluxo que terminaria em erro.
   if (!establishment.acceptingBookings) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-6 text-center">
@@ -426,7 +426,7 @@ export function PublicBookingPage() {
         className={cn(
           'step-enter mx-auto flex w-full min-h-0 max-w-md flex-1 flex-col',
           // Nos passos "bare" o banner de marca precisa encostar nas laterais e no
-          // topo — o padding horizontal fica por conta de cada etapa internamente.
+          // topo; o padding horizontal fica por conta de cada etapa internamente.
           !isBareStep && 'px-4',
         )}
       >

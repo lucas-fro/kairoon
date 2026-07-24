@@ -178,7 +178,7 @@ function ClientsListView() {
 
   const countLabel = data
     ? `${clients.length} ${clients.length === 1 ? 'cliente' : 'clientes'}`
-    : '—'
+    : '-'
 
   const goToClient = (client: ClientListItem) => navigate(`/app/clientes/${client.id}`)
 
@@ -227,7 +227,7 @@ function ClientsListView() {
         }
       />
 
-      {/* Busca (mobile) — no desktop ela vive no toolbar do card */}
+      {/* Busca (mobile); no desktop ela vive no toolbar do card */}
       <div className="mb-4 md:hidden">{searchField}</div>
 
       {/* Desktop: card CRM com toolbar + tabela */}
@@ -279,7 +279,7 @@ function ClientsListView() {
                   </Td>
                   <Td>{formatPhone(client.phone)}</Td>
                   <Td>{client.appointmentsCount}</Td>
-                  <Td>{client.lastVisit ? formatDate(client.lastVisit) : '—'}</Td>
+                  <Td>{client.lastVisit ? formatDate(client.lastVisit) : '-'}</Td>
                   <Td className="font-medium text-ink">{formatBRL(client.totalSpentCents)}</Td>
                 </Tr>
               ))}
@@ -325,7 +325,7 @@ function ClientsListView() {
                   <div>
                     <p className="text-xs text-ink-tertiary">Última visita</p>
                     <p className="text-sm font-medium text-ink">
-                      {client.lastVisit ? formatDate(client.lastVisit) : '—'}
+                      {client.lastVisit ? formatDate(client.lastVisit) : '-'}
                     </p>
                   </div>
                   <div>

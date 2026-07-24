@@ -108,7 +108,7 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
   }>({})
 
   // Autopreenchimento de endereço pelo CEP (ViaCEP). Só dispara quando o
-  // usuário edita o CEP — não sobrescreve os dados salvos ao abrir a tela.
+  // usuário edita o CEP; não sobrescreve os dados salvos ao abrir a tela.
   useEffect(() => {
     if (!cepDirty.current) return
     const digits = onlyDigits(cep)

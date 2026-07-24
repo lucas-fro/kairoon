@@ -262,7 +262,7 @@ export async function syncPointsEntry(
   }
 
   // Se o saldo ficaria negativo, os pontos deste atendimento já financiaram um
-  // resgate — bloqueia (espelha o throw de estoque insuficiente).
+  // resgate: bloqueia (espelha o throw de estoque insuficiente).
   const balance = await getPointsBalance(tx, params.establishmentId, params.clientId)
   if (balance < 0) {
     throw new AppError(

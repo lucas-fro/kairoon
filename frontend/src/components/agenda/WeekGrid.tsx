@@ -250,7 +250,7 @@ export function WeekGrid({
                       className={cn(
                         'group absolute z-[1] flex h-[var(--block-h)] flex-col overflow-hidden px-2 text-left leading-tight shadow-card',
                         // Altura/sombra animam em 200ms; o z-index sobe na hora ao
-                        // passar o mouse e só volta 200ms depois de sair — assim o
+                        // passar o mouse e só volta 200ms depois de sair; assim o
                         // card fica por cima dos vizinhos durante toda a expansão E
                         // o recolhimento, sem "piscar" atrás deles.
                         'ease-out [transition-property:height,box-shadow,z-index] [transition-duration:200ms,200ms,0ms] [transition-delay:0ms,0ms,200ms]',

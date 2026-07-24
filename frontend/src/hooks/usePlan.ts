@@ -15,7 +15,7 @@ export function useFeature(feature: PlanFeatureKey): { allowed: boolean; isPendi
 
 /**
  * A conta pode criar/editar? `false` só quando o teste grátis acabou sem
- * assinatura (somente-leitura). Otimista enquanto carrega — o backend é a
+ * assinatura (somente-leitura). Otimista enquanto carrega: o backend é a
  * garantia real (bloqueia com 402 TRIAL_EXPIRED).
  */
 export function useCanWrite(): boolean {

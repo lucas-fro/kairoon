@@ -24,7 +24,7 @@ const ToastContext = createContext<ToastContextValue | null>(null)
 
 // Fundo -dark + texto branco em success/error/info (contraste ~5-6.5:1). O
 // warning foge à regra: escurecer o âmbar o bastante pra ter contraste com
-// texto branco o deixa marrom, não amarelo — por isso usa o tom claro (a cor
+// texto branco o deixa marrom, não amarelo. Por isso usa o tom claro (a cor
 // que de fato lê como "amarelo") com texto escuro, que passa de ~8:1.
 const kindStyles: Record<ToastKind, { icon: typeof CheckCircle2; bg: string; fg: string }> = {
   success: { icon: CheckCircle2, bg: 'bg-success-dark', fg: 'text-white' },

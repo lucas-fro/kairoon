@@ -30,7 +30,7 @@ type EstablishmentAccessRow = { id: string; plan: string; trialEndsAt: Date | nu
  * Avalia SÓ o plano pago vindo de assinatura (mesma lógica/efeitos colaterais de
  * antes): devolve o plano pago ativo ou 'free'. Faz o downgrade preguiçoso quando
  * a assinatura venceu (tolerância estourada) ou foi cancelada e o período já
- * acabou — mantendo os call-sites lendo só a coluna `plan`.
+ * acabou, mantendo os call-sites lendo só a coluna `plan`.
  */
 async function evaluatePaidPlan(est: EstablishmentAccessRow): Promise<string> {
   if (est.plan === 'free') return 'free'
@@ -79,7 +79,7 @@ function daysUntil(date: Date): number {
 }
 
 /**
- * Estado de acesso da conta — fonte ÚNICA da verdade do plano efetivo E da
+ * Estado de acesso da conta: fonte ÚNICA da verdade do plano efetivo E da
  * permissão de escrita. Ordem de prioridade:
  *   1. Assinatura paga ativa → plano pago, gravável.
  *   2. Teste grátis em andamento → plano de teste (essencial), gravável.
@@ -132,7 +132,7 @@ export async function getAccessState(
 }
 
 /**
- * Reavaliação "preguiçosa" (sem cron) do plano efetivo — a coluna
+ * Reavaliação "preguiçosa" (sem cron) do plano efetivo: a coluna
  * `establishments.plan` continua sendo lida pelo resto do código; aqui só
  * resolvemos o plano efetivo (delegando ao motor de acesso).
  */

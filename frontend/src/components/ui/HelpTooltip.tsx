@@ -12,7 +12,7 @@ interface HelpTooltipProps {
 
 /**
  * Ícone de interrogação que revela uma explicação num balão ao passar o mouse
- * ou focar (teclado). Puramente CSS/estado local — ideal para textos curtos de
+ * ou focar (teclado). Puramente CSS/estado local: ideal para textos curtos de
  * apoio ao lado de rótulos de campos.
  */
 export function HelpTooltip({ label, ariaLabel = 'Ajuda', className }: HelpTooltipProps) {

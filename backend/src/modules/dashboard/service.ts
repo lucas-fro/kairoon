@@ -56,7 +56,7 @@ export async function getSummary(establishmentId: string): Promise<DashboardSumm
   const today = todayStr()
   const monthStart = `${today.slice(0, 7)}-01`
   // Período comparável do mês anterior: mesmo nº de dias decorridos, com clamp
-  // no último dia do mês anterior — compara "maçã com maçã" (não mês parcial
+  // no último dia do mês anterior: compara "maçã com maçã" (não mês parcial
   // contra mês cheio).
   const prevMonthEnd = addMonthsClamped(today, -1)
   const prevMonthStart = `${prevMonthEnd.slice(0, 7)}-01`
@@ -193,7 +193,7 @@ export async function getSummary(establishmentId: string): Promise<DashboardSumm
   const todayOccupancyRate =
     todayAvailableMinutes > 0 ? Math.min(todayScheduledMinutes / todayAvailableMinutes, 1) : 0
 
-  // Série diária do mês (agendamentos e novos clientes) — dado de clientes/
+  // Série diária do mês (agendamentos e novos clientes): dado de clientes/
   // atividade para o gráfico, não financeiro.
   const apptCountByDate = new Map<string, number>()
   for (const row of currentApptRows) {
@@ -225,7 +225,7 @@ export async function getSummary(establishmentId: string): Promise<DashboardSumm
       todayOccupancyRate,
     },
     trend,
-    // Dia inteiro (qualquer status) — concluído/cancelado permanece visível em
+    // Dia inteiro (qualquer status): concluído/cancelado permanece visível em
     // vez de sumir, com o status indicado na tabela.
     todayAppointments: todayApptRows.map((appointment) => ({
       id: appointment.id,

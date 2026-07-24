@@ -210,7 +210,7 @@ export async function getAvailability(slug: string, query: AvailabilityQuery) {
 export async function createPublicBooking(slug: string, input: CreateBookingInput) {
   const establishment = await findEstablishmentBySlug(slug)
 
-  // Booking público é uma escrita SEM JWT — por isso o gate de somente-leitura
+  // Booking público é uma escrita SEM JWT: por isso o gate de somente-leitura
   // (hook global em app.ts) não a alcança e precisamos barrar aqui: dono com o
   // teste grátis expirado (e sem assinatura) não recebe novos agendamentos.
   const access = await getAccessState(establishment.id, establishment)

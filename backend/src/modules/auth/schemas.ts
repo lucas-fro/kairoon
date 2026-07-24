@@ -31,7 +31,7 @@ export const registerSchema = z.object({
   name: z.string().min(2, 'Nome muito curto'),
   email: z.string().email('E-mail inválido'),
   password: z.string().min(6, 'A senha deve ter no mínimo 6 caracteres'),
-  // Dados de identidade do dono — opcionais no cadastro, completáveis depois nas
+  // Dados de identidade do dono: opcionais no cadastro, completáveis depois nas
   // configurações. Só pedimos o essencial para criar a conta.
   cpf: emptyToNull(cpfSchema),
   phone: emptyToNull(phoneSchema),
@@ -43,7 +43,7 @@ export const registerSchema = z.object({
       .max(40, 'O link deve ter no máximo 40 caracteres')
       .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Use apenas letras minúsculas, números e hífens'),
     businessType: z.enum(['barbearia', 'salao', 'clinica', 'outro']),
-    // Contato público do estabelecimento — o que o cliente vê na página de
+    // Contato público do estabelecimento: o que o cliente vê na página de
     // agendamento. Pode reaproveitar o contato pessoal do dono (ver frontend).
     phone: z.string().optional(),
     email: z
@@ -56,7 +56,7 @@ export const registerSchema = z.object({
         whatsapp: z.string().trim().max(20).optional(),
       })
       .optional(),
-    // Dados fiscais/endereço — opcionais no cadastro, completáveis nas configurações.
+    // Dados fiscais/endereço: opcionais no cadastro, completáveis nas configurações.
     document: emptyToNull(cnpjSchema),
     address: emptyToNull(z.string().trim().min(3, 'Informe o endereço do estabelecimento')),
     addressNumber: emptyToNull(z.string().trim().max(20, 'Número inválido')),

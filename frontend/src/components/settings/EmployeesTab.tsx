@@ -115,7 +115,7 @@ interface FormState {
   commissionEnabled: boolean
   commissionType: CommissionType
   applyCommissionToAll: boolean
-  // Remuneração (folha) — valores em texto BRL
+  // Remuneração (folha): valores em texto BRL
   salary: string
   bonuses: { label: string; value: string }[]
   vr: string
@@ -381,7 +381,7 @@ export function EmployeesTab() {
   }
 
   /** Total mensal da folha (salário + bônus + VR + VT + VA), em centavos.
-   * Só conta bônus com rótulo — igual ao que o handleSave persiste. */
+   * Só conta bônus com rótulo, igual ao que o handleSave persiste. */
   function payrollTotalCents(f: FormState): number {
     const bonuses = f.bonuses.reduce(
       (sum, b) => sum + (b.label.trim() ? toCents(b.value) : 0),
@@ -585,7 +585,7 @@ export function EmployeesTab() {
                         <p className="text-ink-tertiary">{formatPhone(employee.phone)}</p>
                       )}
                       {!employee.email && !employee.phone && (
-                        <span className="text-ink-tertiary">—</span>
+                        <span className="text-ink-tertiary">-</span>
                       )}
                     </div>
                   </Td>
@@ -1156,7 +1156,7 @@ export function EmployeesTab() {
                       <div className="flex items-center gap-2">
                         <div className="w-24 shrink-0">
                           <SelectMenu
-                            ariaLabel={`${row.label} — dia`}
+                            ariaLabel={`${row.label}: dia`}
                             value={form[row.dayKey]}
                             onChange={(v) => setForm((f) => ({ ...f, [row.dayKey]: v }))}
                             options={PAY_DAY_OPTIONS.map((day) => ({

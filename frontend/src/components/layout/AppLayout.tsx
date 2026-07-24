@@ -43,7 +43,7 @@ import { AppHeader } from './AppHeader'
 /** Item de navegação simples (link direto). */
 type NavLeaf = { to: string; label: string; icon: LucideIcon; end?: boolean; feature?: PlanFeatureKey }
 
-/** Sub-opção de um dropdown — navega para `${parent.to}?tab=${tab}`. */
+/** Sub-opção de um dropdown: navega para `${parent.to}?tab=${tab}`. */
 type NavSubItem = { tab: string; label: string; icon: LucideIcon; feature?: PlanFeatureKey }
 
 /** Item de navegação com sub-opções (dropdown que expande na própria sidebar). */
@@ -253,7 +253,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   const featureLocked: FeatureLocked = (feature) => !!feature && !!plan && !plan.features[feature]
 
-  // Parent (dropdown) da rota atual — mantém a seção aberta ao navegar/deep-link.
+  // Parent (dropdown) da rota atual: mantém a seção aberta ao navegar/deep-link.
   const activeParentTo =
     NAV_GROUPS.flatMap((group) => group.items).find(
       (item): item is NavParent => isParent(item) && location.pathname.startsWith(item.to),
@@ -320,7 +320,7 @@ export function AppLayout() {
         <SidebarContent />
       </aside>
 
-      {/* Drawer mobile — sempre montado para animar entrada/saída */}
+      {/* Drawer mobile (sempre montado para animar entrada/saída) */}
       <div
         className={cn(
           'fixed inset-0 z-40 lg:hidden',

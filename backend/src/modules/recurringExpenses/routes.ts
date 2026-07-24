@@ -42,7 +42,7 @@ export async function recurringExpensesRoutes(app: FastifyInstance) {
     return reply.status(204).send()
   })
 
-  // Baixa da folha de um profissional — rota estática (tem prioridade sobre /:id)
+  // Baixa da folha de um profissional, rota estática (tem prioridade sobre /:id)
   app.post('/payroll/settle', async (request, reply) => {
     const { employeeId, month, day } = settlePayrollSchema.parse(request.body)
     const transaction = await recurringExpensesService.settlePayroll(

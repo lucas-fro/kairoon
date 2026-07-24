@@ -209,10 +209,10 @@ export function RegisterPage() {
 
   const [step, setStep] = useState(1)
   // A conta é criada ao concluir a etapa 1; a partir daí o usuário já está
-  // logado mas segue no wizard — este flag impede o guard de abortar o fluxo.
+  // logado mas segue no wizard; este flag impede o guard de abortar o fluxo.
   const [onboarding, setOnboarding] = useState(false)
 
-  // Etapa 1 — conta (identidade + login do dono) + aceite legal
+  // Etapa 1: conta (identidade + login do dono) + aceite legal
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [emailApiError, setEmailApiError] = useState<string | null>(null)
@@ -220,7 +220,7 @@ export function RegisterPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  // Etapa 2 — negócio
+  // Etapa 2: negócio
   const [businessName, setBusinessName] = useState('')
   const [businessType, setBusinessType] = useState<BusinessType | null>(null)
   const [slug, setSlug] = useState('')
@@ -229,7 +229,7 @@ export function RegisterPage() {
   const [slugStatus, setSlugStatus] = useState<SlugStatus>('idle')
 
   // Contato do estabelecimento (o que o cliente vê). Por padrão reaproveita o
-  // contato pessoal do dono — evita digitar o mesmo telefone/e-mail duas vezes.
+  // contato pessoal do dono, evitando digitar o mesmo telefone/e-mail duas vezes.
   const [sameContact, setSameContact] = useState(true)
   const [bizWhatsapp, setBizWhatsapp] = useState('')
   const [bizEmail, setBizEmail] = useState('')
@@ -237,7 +237,7 @@ export function RegisterPage() {
   // Aceite dos Termos + Política (etapa 1, obrigatório para criar a conta)
   const [acceptedLegal, setAcceptedLegal] = useState(false)
 
-  // Etapa 3 — quiz (opcional)
+  // Etapa 3: quiz (opcional)
   const [quiz, setQuiz] = useState<Record<string, string>>({})
 
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -283,7 +283,7 @@ export function RegisterPage() {
   const slugHasError = Boolean(slugApiError || slugFormatError) || slugStatus === 'taken'
   const slugIsAvailable = slugStatus === 'available'
   // Só libera o avanço quando o link foi confirmado como livre (ou se a checagem
-  // falhou por rede — o servidor revalida na criação).
+  // falhou por rede: o servidor revalida na criação).
   const slugUsable =
     SLUG_REGEX.test(slug) && slug.length >= 3 && (slugStatus === 'available' || slugStatus === 'error')
 
@@ -301,7 +301,7 @@ export function RegisterPage() {
   const step2Valid =
     businessName.trim().length >= 2 && businessType !== null && slugUsable && contactValid
 
-  // Quiz é opcional — a etapa final sempre pode concluir.
+  // Quiz é opcional: a etapa final sempre pode concluir.
   const step3Valid = true
   const currentStepValid = step === 1 ? step1Valid : step === 2 ? step2Valid : step3Valid
 
@@ -319,7 +319,7 @@ export function RegisterPage() {
     setSlugApiError(null)
   }
 
-  // Etapa 1 — cria a conta (já loga e inicia o teste grátis de 14 dias). A partir
+  // Etapa 1: cria a conta (já loga e inicia o teste grátis de 14 dias). A partir
   // daqui o usuário segue autenticado dentro do wizard (ver flag `onboarding`).
   async function handleCreateAccount() {
     setSubmitError(null)
@@ -349,7 +349,7 @@ export function RegisterPage() {
     }
   }
 
-  // Etapa 2 — grava o negócio (nome/tipo/contato) e o link público escolhido
+  // Etapa 2: grava o negócio (nome/tipo/contato) e o link público escolhido
   // (a conta nasceu com um link provisório).
   async function handleSaveBusiness() {
     setSubmitError(null)
@@ -380,7 +380,7 @@ export function RegisterPage() {
     }
   }
 
-  // Etapa 3 — salva o quiz (opcional) e entra no app (ou no checkout, se veio de
+  // Etapa 3: salva o quiz (opcional) e entra no app (ou no checkout, se veio de
   // um card de plano da LP).
   async function handleFinish() {
     setSubmitError(null)
@@ -409,7 +409,7 @@ export function RegisterPage() {
 
   return (
     <div className="flex min-h-screen">
-      {/* Painel de marca com foto — visível em telas grandes */}
+      {/* Painel de marca com foto (visível em telas grandes) */}
       <aside className="relative hidden overflow-hidden bg-primary lg:flex lg:w-1/2 xl:w-[45%]">
         <img src="/imgTelaLogin.webp" alt="" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-br from-primary/95 via-primary/80 to-primary/45" />
@@ -445,7 +445,7 @@ export function RegisterPage() {
 
       {/* Painel do formulário */}
       <div className="relative flex w-full flex-col overflow-y-auto bg-primary lg:w-1/2 lg:bg-background xl:w-[55%]">
-        {/* Fundo com foto + filtro navy — só no mobile */}
+        {/* Fundo com foto + filtro navy (só no mobile) */}
         <img
           src="/imgTelaLogin.webp"
           alt=""
@@ -454,10 +454,10 @@ export function RegisterPage() {
         <div className="absolute inset-0 bg-gradient-to-br from-primary/95 via-primary/85 to-primary/70 lg:hidden" />
 
         <div className="relative z-10 m-auto flex w-full max-w-md flex-col items-center px-4 py-8">
-          {/* Logo sobre o fundo — só no mobile */}
+          {/* Logo sobre o fundo (só no mobile) */}
           <KairoonLogotype className="mb-6 h-12 w-auto text-white lg:hidden" />
 
-          {/* Card do form — branco com sombra flutuante em todas as telas */}
+          {/* Card do form (branco com sombra flutuante em todas as telas) */}
           <div className="w-full rounded-2xl bg-surface p-5 shadow-floating sm:p-6">
             {/* Barra de progresso */}
             <div className="mb-5">
@@ -662,7 +662,7 @@ export function RegisterPage() {
                       )}
                     </div>
 
-                    {/* Contato do estabelecimento — o que o cliente vê no link público */}
+                    {/* Contato do estabelecimento (o que o cliente vê no link público) */}
                     <div className="rounded-lg border border-line bg-background/60 p-3">
                       <label className="flex cursor-pointer items-start gap-2.5">
                         <input

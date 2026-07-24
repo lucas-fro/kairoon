@@ -4,7 +4,7 @@ import { MoreVertical } from 'lucide-react'
 import { cn } from '../../lib/format'
 
 interface DropdownMenuProps {
-  /** Itens do menu — use <DropdownItem>. */
+  /** Itens do menu: use <DropdownItem>. */
   children: ReactNode
   /** Conteúdo do gatilho padrão (ícone de reticências se omitido). */
   trigger?: ReactNode

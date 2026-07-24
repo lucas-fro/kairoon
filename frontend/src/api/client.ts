@@ -63,7 +63,7 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
       window.dispatchEvent(new Event('auth:logout'))
     }
     // Teste grátis expirado: conta em somente-leitura. NÃO desloga (diferente do
-    // 401) — só avisa a UI para mostrar o convite de upgrade.
+    // 401); só avisa a UI para mostrar o convite de upgrade.
     if (response.status === 402 && data?.code === 'TRIAL_EXPIRED') {
       window.dispatchEvent(new Event('trial:expired'))
     }

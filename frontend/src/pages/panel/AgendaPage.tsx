@@ -272,7 +272,7 @@ export function AgendaPage() {
   )
   useHeaderSlot(searchNode)
 
-  // Controles de manipulação da agenda — reutilizados inline (desktop) e dentro
+  // Controles de manipulação da agenda: reutilizados inline (desktop) e dentro
   // do painel de filtros (tablet/mobile).
   const dateNav = (
     <div className="flex items-center gap-0.5">

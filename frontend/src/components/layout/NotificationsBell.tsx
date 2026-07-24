@@ -46,7 +46,7 @@ interface NotificationItem {
   tone: Tone
   title: string
   description: string
-  /** ISO de quando o evento aconteceu — exibido como "há X" no rodapé */
+  /** ISO de quando o evento aconteceu: exibido como "há X" no rodapé */
   timestamp?: string
   onClick: () => void
 }
@@ -73,7 +73,7 @@ export function NotificationsBell() {
     queryFn: () => listAppointments({ start: today, end: addDays(today, 365), status: 'pending' }),
     refetchInterval: 45000,
   })
-  // Agendamentos criados nas últimas 24h (por data de criação) — "novo agendamento"
+  // Agendamentos criados nas últimas 24h (por data de criação): "novo agendamento"
   const recentQuery = useQuery({
     queryKey: ['appointments', 'recent'],
     queryFn: () => listRecentAppointments(24),
@@ -132,7 +132,7 @@ export function NotificationsBell() {
 
     // 2. Novos agendamentos (criados nas últimas 24h e já confirmados). Os
     // pendentes aparecem acima como "a aprovar", então aqui só entram os
-    // confirmados — reservas auto-confirmadas do link público e do painel.
+    // confirmados: reservas auto-confirmadas do link público e do painel.
     for (const a of recentQuery.data ?? []) {
       if (a.status !== 'confirmed') continue
       list.push({
