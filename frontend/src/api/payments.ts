@@ -4,6 +4,8 @@ import { api } from './client'
 export interface SubscribePayload {
   planSlug: PlanSlug
   billingCycle: BillingCycle
+  /** Parcelas do cartão (2–12) — só vale no anual; 1/ausente = à vista. */
+  installments?: number
   card: {
     holderName: string
     number: string

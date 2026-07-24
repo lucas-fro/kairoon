@@ -123,6 +123,49 @@ export async function cancelAsaasSubscription(asaasSubscriptionId: string): Prom
   await asaasFetch(`/subscriptions/${asaasSubscriptionId}`, { method: 'DELETE' })
 }
 
+export interface AsaasInstallmentCharge {
+  /** Id da 1ª cobrança da série (uma por parcela). */
+  id: string
+  /** Id do grupo de parcelamento — é o que vem em `payment.installment` no webhook. */
+  installment: string
+  status: string
+  value: number
+  dueDate: string
+  invoiceUrl?: string
+}
+
+/**
+ * Parcelamento no cartão (cobrança avulsa parcelada) — usado só no plano anual
+ * quando o cliente escolhe dividir em 2–12x. Diferente da assinatura recorrente:
+ * é UMA compra parcelada (o Asaas cobra as parcelas ao longo dos meses) e a
+ * captura no cartão é IMEDIATA (a 1ª parcela cai hoje, independentemente do
+ * dueDate). Não renova sozinho. `totalValue` é o valor cheio do ano em reais;
+ * o Asaas divide entre as parcelas (ajustando centavos na última).
+ */
+export async function createCreditCardInstallment(input: {
+  customer: string
+  installmentCount: number
+  totalValue: number
+  dueDate: string
+  creditCard: AsaasCreditCard
+  creditCardHolderInfo: AsaasCreditCardHolderInfo
+  remoteIp: string
+}): Promise<AsaasInstallmentCharge> {
+  return asaasFetch<AsaasInstallmentCharge>('/payments', {
+    method: 'POST',
+    body: JSON.stringify({
+      customer: input.customer,
+      billingType: 'CREDIT_CARD',
+      installmentCount: input.installmentCount,
+      totalValue: input.totalValue,
+      dueDate: input.dueDate,
+      creditCard: input.creditCard,
+      creditCardHolderInfo: input.creditCardHolderInfo,
+      remoteIp: input.remoteIp,
+    }),
+  })
+}
+
 /**
  * Atualiza valor/ciclo de uma assinatura já existente mantendo o mesmo cartão
  * (o Asaas já mantém o cartão vinculado à assinatura do lado dele — não

@@ -138,13 +138,30 @@ export function PlanTab() {
 
   const subscription = subscriptionQuery.data?.subscription ?? null
   const hasSubscriptionRecord = subscription !== null
-  const canCancel = subscription !== null && subscription.status !== 'canceled'
+  // Anual parcelado: as parcelas já foram compradas — não há assinatura pra
+  // cancelar nem cartão tokenizado pra trocar de plano. Um registro parcelado
+  // (installments>=2) é diferente da assinatura recorrente.
+  const isInstallmentRecord = (subscription?.installments ?? 0) >= 2
+  // Termo do parcelamento AINDA em aberto (parcelas caindo): troca e cancelamento
+  // só ao fim do período pago — espelha o guard do backend (service.subscribe).
+  // Depois que vence (status 'canceled'), o usuário pode assinar de novo normal.
+  const installmentTermActive =
+    isInstallmentRecord &&
+    subscription?.status !== 'canceled' &&
+    !!subscription?.currentPeriodEnd &&
+    new Date(subscription.currentPeriodEnd) > new Date()
+  const canCancel = subscription !== null && subscription.status !== 'canceled' && !installmentTermActive
   // Assinatura viva = cartão tokenizado no Asaas: dá pra trocar de plano sem
-  // pedir o cartão de novo. Sem ela (free/cancelada), cai no checkout.
+  // pedir o cartão de novo. Sem ela (free/cancelada/parcelada), cai no checkout.
   const hasActiveSub = subscription !== null && subscription.status !== 'canceled'
+  const canTokenizedChange = hasActiveSub && !isInstallmentRecord
 
   function handlePickPlan(planSlug: PlanSlug) {
-    if (hasActiveSub) {
+    if (installmentTermActive) {
+      toast.info('Seu plano anual parcelado permite troca só ao fim do período pago.')
+      return
+    }
+    if (canTokenizedChange) {
       // Troca tokenizada: confirma e reaproveita o cartão já cadastrado.
       setUpgradeOpen(false)
       setConfirmPlan(planSlug)
@@ -243,7 +260,11 @@ export function PlanTab() {
             )}
             {subscription.status !== 'canceled' && subscription.currentPeriodEnd && (
               <p className="mt-1">
-                Próxima cobrança em {formatDate(toIsoDate(subscription.currentPeriodEnd))}.
+                {isInstallmentRecord
+                  ? `Plano anual parcelado em ${subscription.installments}x · acesso pago até ${formatDate(
+                      toIsoDate(subscription.currentPeriodEnd),
+                    )}.`
+                  : `Próxima cobrança em ${formatDate(toIsoDate(subscription.currentPeriodEnd))}.`}
               </p>
             )}
           </div>

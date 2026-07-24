@@ -610,6 +610,8 @@ export interface Subscription {
   planSlug: string
   billingCycle: BillingCycle
   status: SubscriptionStatus
+  /** Nº de parcelas do anual parcelado (2–12); null = assinatura recorrente. */
+  installments: number | null
   currentPeriodEnd: string | null
   graceUntil: string | null
   canceledAt: string | null

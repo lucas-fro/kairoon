@@ -721,7 +721,15 @@ export const subscriptions = pgTable(
     billingCycle: billingCycleEnum('billing_cycle').notNull(),
     status: subscriptionStatusEnum('status').notNull().default('pending'),
     asaasCustomerId: text('asaas_customer_id').notNull(),
-    asaasSubscriptionId: text('asaas_subscription_id').notNull(),
+    // Assinatura recorrente do Asaas (mensal ou anual à vista). Null quando o
+    // registro é um parcelamento (cobrança avulsa parcelada no cartão).
+    asaasSubscriptionId: text('asaas_subscription_id'),
+    // Parcelamento anual (POST /payments installmentCount): id do grupo de
+    // parcelas no Asaas. Null quando o registro é uma assinatura recorrente.
+    asaasInstallmentId: text('asaas_installment_id'),
+    // Nº de parcelas do anual parcelado (2–12). Null = assinatura recorrente
+    // (mensal ou anual à vista, que não é parcelamento).
+    installments: integer('installments'),
     currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),
     // Prazo de tolerância após um PAYMENT_OVERDUE; expirado = rebaixa pro free
     // (ver getEffectivePlan). Null = sem atraso em aberto.
@@ -733,6 +741,7 @@ export const subscriptions = pgTable(
   (t) => [
     uniqueIndex('subscriptions_establishment_idx').on(t.establishmentId),
     uniqueIndex('subscriptions_asaas_subscription_idx').on(t.asaasSubscriptionId),
+    uniqueIndex('subscriptions_asaas_installment_idx').on(t.asaasInstallmentId),
   ],
 )
 

@@ -47,8 +47,8 @@ export function TermsOfServicePage() {
         Para criar uma conta você deve ter no mínimo 18 anos ou capacidade civil plena, e ser
         legalmente capaz de contratar. Você é responsável por fornecer informações verdadeiras,
         completas e atualizadas, por manter sua senha em sigilo e por todas as atividades realizadas
-        na sua conta. Avise-nos imediatamente pelo e-mail de contato em caso de uso não autorizado
-        ou suspeita de comprometimento da conta.
+        na sua conta. Avise-nos imediatamente pelo e-mail <strong>contato@kairoon.com.br</strong> em
+        caso de uso não autorizado ou suspeita de comprometimento da conta.
       </p>
 
       <h2>4. Link público de agendamento</h2>
@@ -110,8 +110,8 @@ export function TermsOfServicePage() {
         <strong>5.8 Direito de arrependimento.</strong> Nas contratações feitas pela internet, você
         tem o direito de se arrepender em até 7 (sete) dias corridos contados da data da
         contratação, nos termos do art. 49 do Código de Defesa do Consumidor. Nesse caso, o valor
-        pago é integralmente devolvido. Para exercer esse direito, entre em contato pelo e-mail
-        indicado no fim destes Termos.
+        pago é integralmente devolvido. Para exercer esse direito, entre em contato pelo e-mail{' '}
+        <strong>contato@kairoon.com.br</strong>.
       </p>
       <p>
         <strong>5.9 Reembolsos.</strong> Fora da hipótese de arrependimento do item 5.8, os valores

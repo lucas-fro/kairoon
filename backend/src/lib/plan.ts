@@ -47,14 +47,23 @@ async function evaluatePaidPlan(est: EstablishmentAccessRow): Promise<string> {
     subscription.status === 'canceled' &&
     !!subscription.currentPeriodEnd &&
     subscription.currentPeriodEnd < now
+  // Parcelamento anual não renova sozinho: quando o ano pago vence, o acesso
+  // acaba (a assinatura recorrente, ao contrário, seguiria cobrando o ciclo).
+  const installmentTermEnded =
+    !!subscription.asaasInstallmentId &&
+    subscription.status === 'active' &&
+    !!subscription.currentPeriodEnd &&
+    subscription.currentPeriodEnd < now
 
-  if (graceExpired || canceledPeriodEnded) {
+  if (graceExpired || canceledPeriodEnded || installmentTermEnded) {
     await db.transaction(async (tx) => {
       await tx.update(establishments).set({ plan: 'free' }).where(eq(establishments.id, est.id))
-      if (graceExpired) {
+      // Fecha o registro quando o motivo é atraso vencido ou fim do parcelamento
+      // (o cancelamento manual já chega com status 'canceled').
+      if (graceExpired || installmentTermEnded) {
         await tx
           .update(subscriptions)
-          .set({ status: 'canceled', graceUntil: null, updatedAt: now })
+          .set({ status: 'canceled', canceledAt: now, graceUntil: null, updatedAt: now })
           .where(eq(subscriptions.id, subscription.id))
       }
     })

@@ -9,6 +9,9 @@ export const PLANS = {
 export type PlanSlug = keyof typeof PLANS
 export type BillingCycle = 'monthly' | 'yearly'
 
+/** Máximo de parcelas no cartão para o plano anual (até 12x). */
+export const MAX_INSTALLMENTS = 12
+
 // ---------------------------------------------------------------------------
 // Matriz de planos: fonte ÚNICA da verdade de o que cada plano libera e limita.
 // Para mover um recurso de plano, mexa só aqui (o backend aplica e o getPlan

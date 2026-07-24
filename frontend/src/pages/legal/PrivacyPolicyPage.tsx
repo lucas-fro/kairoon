@@ -148,7 +148,8 @@ export function PrivacyPolicyPage() {
         anonimização, bloqueio ou eliminação de dados desnecessários; portabilidade; informação
         sobre compartilhamentos; e revogação do consentimento. A exclusão completa da conta e dos
         dados associados pode ser feita diretamente pelo painel (veja a página de{' '}
-        <strong>Exclusão de Conta</strong>) ou solicitada pelo e-mail de contato. Se você é um
+        <strong>Exclusão de Conta</strong>) ou solicitada pelo e-mail{' '}
+        <strong>contato@kairoon.com.br</strong>. Se você é um
         cliente final, direcione seus pedidos ao estabelecimento, que é o controlador desses dados;
         podemos apoiá-lo tecnicamente quando necessário.
       </p>

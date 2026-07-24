@@ -1111,12 +1111,12 @@ button {
 .plans-toggle-btn {
   position: relative;
   z-index: 1;
-  flex: 1 0 auto;
+  flex: 1 1 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 10px 30px;
+  min-width: 176px;
+  padding: 10px 20px;
   background: none;
   border: none;
   cursor: pointer;
@@ -1133,6 +1133,10 @@ button {
 }
 
 .plans-save {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
   font-size: 0.72rem;
   font-weight: 700;
   color: #15803d;
@@ -1313,14 +1317,22 @@ tbody tr:not(:last-child) td.plan-col-featured {
 }
 
 .plan-annual-total {
-  margin-top: 2px;
-  font-size: 0.78rem;
-  font-weight: 600;
+  margin-top: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
   color: var(--color-primary);
 }
 
 .plan-annual-total[hidden] {
   display: none;
+}
+
+.plan-installments {
+  display: block;
+  margin-top: 1px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--color-ink-tertiary);
 }
 
 .plan-col-head .btn {
@@ -1464,6 +1476,9 @@ tbody tr:not(:last-child) td.plan-col-featured {
   .plan-billing,
   .plan-annual-total {
     font-size: 0.72rem;
+  }
+  .plan-installments {
+    font-size: 0.66rem;
   }
   .pt-value {
     font-size: 0.78rem;
@@ -1983,6 +1998,7 @@ tbody tr:not(:last-child) td.plan-col-featured {
 }
 
 .footer-social {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2002,6 +2018,56 @@ tbody tr:not(:last-child) td.plan-col-featured {
   background: rgba(255, 255, 255, 0.16);
   border-color: rgba(255, 255, 255, 0.3);
   transform: translateY(-2px);
+}
+
+/* Tooltip no hover: mostra o @, o número ou o e-mail (data-tooltip no HTML). */
+.footer-social[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+  z-index: 3;
+}
+
+/* Setinha do balão apontando pro ícone. */
+.footer-social[data-tooltip]::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  border: 5px solid transparent;
+  border-top-color: #fff;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+  z-index: 3;
+}
+
+.footer-social[data-tooltip]:hover::after,
+.footer-social[data-tooltip]:focus-visible::after,
+.footer-social[data-tooltip]:hover::before,
+.footer-social[data-tooltip]:focus-visible::before {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
 .footer-social img {

@@ -146,22 +146,27 @@
         if (!amount) return;
         amount.textContent =
           period === 'annual' ? amount.getAttribute('data-annual') : amount.getAttribute('data-monthly');
+        // Sublinha do preço, sempre uma linha só pra ficar limpo: no anual mostra
+        // o total do ano + parcelamento (o número grande continua sendo o
+        // equivalente por mês, que gera desejo); no mensal, só "cobrado mensalmente".
         var billing = card.querySelector('.plan-billing');
-        if (billing) {
-          billing.textContent = period === 'annual' ? 'cobrado anualmente' : 'cobrado mensalmente';
-        }
-
-        // No anual, mostra embaixo o valor total cobrado de uma vez no ano
-        // (o número grande do card continua sendo o equivalente por mês).
         var annualTotal = card.querySelector('.plan-annual-total');
-        if (annualTotal) {
-          if (period === 'annual') {
+        if (period === 'annual') {
+          if (billing) billing.hidden = true;
+          if (annualTotal) {
             var totalPerYear = Number(amount.getAttribute('data-annual')) * 12;
-            annualTotal.textContent = 'Total de R$' + totalPerYear.toLocaleString('pt-BR') + '/ano';
+            annualTotal.innerHTML =
+              'R$' +
+              totalPerYear.toLocaleString('pt-BR') +
+              '/ano <span class="plan-installments">em até 12x no cartão</span>';
             annualTotal.hidden = false;
-          } else {
-            annualTotal.hidden = true;
           }
+        } else {
+          if (billing) {
+            billing.textContent = 'cobrado mensalmente';
+            billing.hidden = false;
+          }
+          if (annualTotal) annualTotal.hidden = true;
         }
 
         // Propaga o ciclo escolhido pro checkout (cards Básico/Essencial only).

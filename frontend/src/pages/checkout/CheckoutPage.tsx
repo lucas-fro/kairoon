@@ -71,11 +71,22 @@ export function CheckoutPage() {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>(
     searchParams.get('cycle') === 'monthly' ? 'monthly' : 'yearly',
   )
+  // Parcelas do cartão — só no anual (o mensal é sempre à vista). 1 = à vista
+  // (assinatura recorrente); 2–12 = cobrança parcelada imediata.
+  const [installments, setInstallments] = useState(1)
+
+  function handleCycleChange(cycle: BillingCycle) {
+    setBillingCycle(cycle)
+    if (cycle === 'monthly') setInstallments(1)
+  }
 
   const plansQuery = useQuery({ queryKey: ['payments', 'plans'], queryFn: getPlans })
   const plan = plansQuery.data?.[planSlug]
   const cycleCents = plan ? (billingCycle === 'yearly' ? plan.yearlyCents : plan.monthlyCents) : null
   const discountPercent = plan ? getAnnualDiscountPercent(plan.monthlyCents, plan.yearlyCents) : 0
+  // Parcelado de verdade = anual com 2+ parcelas (cobrança imediata, sem trial).
+  const isInstallment = billingCycle === 'yearly' && installments >= 2
+  const perInstallmentCents = cycleCents && installments > 0 ? Math.round(cycleCents / installments) : 0
 
   const subscriptionQuery = useQuery({ queryKey: ['payments', 'subscription'], queryFn: getSubscription })
   const currentSub = subscriptionQuery.data?.subscription ?? null
@@ -217,6 +228,7 @@ export function CheckoutPage() {
       await subscribe({
         planSlug,
         billingCycle,
+        installments: isInstallment ? installments : 1,
         card: {
           holderName: holderName.trim(),
           number: onlyDigits(cardNumber),
@@ -239,13 +251,15 @@ export function CheckoutPage() {
       setEstablishment(me.establishment)
 
       toast.success(
-        isChange
-          ? 'Plano alterado com sucesso!'
-          : trialState === 'trial_expired'
-            ? 'Assinatura ativada! Seu acesso foi liberado.'
-            : trialState === 'trial'
-              ? `Assinatura confirmada! Primeira cobrança em ${firstChargeLabel}.`
-              : 'Pronto! Seu teste grátis de 14 dias começou.',
+        isInstallment
+          ? `Assinatura confirmada! Plano parcelado em ${installments}x no cartão.`
+          : isChange
+            ? 'Plano alterado com sucesso!'
+            : trialState === 'trial_expired'
+              ? 'Assinatura ativada! Seu acesso foi liberado.'
+              : trialState === 'trial'
+                ? `Assinatura confirmada! Primeira cobrança em ${firstChargeLabel}.`
+                : 'Pronto! Seu teste grátis de 14 dias começou.',
       )
       navigate('/app')
     } catch (err) {
@@ -279,8 +293,30 @@ export function CheckoutPage() {
                 <h2 className="font-display text-base font-semibold text-ink">Resumo da assinatura</h2>
 
                 <div className="mt-4">
-                  <BillingCycleToggle value={billingCycle} onChange={setBillingCycle} discountPercent={discountPercent} />
+                  <BillingCycleToggle value={billingCycle} onChange={handleCycleChange} discountPercent={discountPercent} />
                 </div>
+
+                {billingCycle === 'yearly' && plan && (
+                  <div className="mt-4">
+                    <label htmlFor="installments" className="mb-1.5 block text-xs font-medium text-ink-secondary">
+                      Parcelar no cartão
+                    </label>
+                    <select
+                      id="installments"
+                      value={installments}
+                      onChange={(e) => setInstallments(Number(e.target.value))}
+                      className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm font-medium text-ink outline-none transition-colors duration-150 focus:border-primary"
+                    >
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                        <option key={n} value={n}>
+                          {n === 1
+                            ? `À vista · ${formatBRL(plan.yearlyCents)}`
+                            : `${n}x de ${formatBRL(Math.round(plan.yearlyCents / n))} sem juros`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div className="mt-4 border-t border-line-divider pt-4">
                   {plansQuery.isPending && <Skeleton className="h-14 w-full" />}
@@ -293,11 +329,18 @@ export function CheckoutPage() {
                         </span>
                       </div>
                       <p className="mt-1 text-xs text-ink-secondary">
-                        {billingCycle === 'yearly'
-                          ? `Cobrado uma vez por ano · equivale a ${formatBRL(plan.yearlyCents / 12)}/mês`
-                          : 'Cobrado mensalmente'}
+                        {isInstallment
+                          ? `${installments}x de ${formatBRL(perInstallmentCents)} sem juros no cartão`
+                          : billingCycle === 'yearly'
+                            ? `Cobrado uma vez por ano · equivale a ${formatBRL(plan.yearlyCents / 12)}/mês`
+                            : 'Cobrado mensalmente'}
                       </p>
-                      {!isChange && (
+                      {isInstallment ? (
+                        <div className="mt-3 rounded-lg bg-secondary-light px-3 py-2.5 text-xs text-primary">
+                          <span className="font-semibold">1ª parcela cobrada hoje.</span> As outras{' '}
+                          {installments - 1} caem automaticamente, uma por mês, no seu cartão — sem juros.
+                        </div>
+                      ) : !isChange ? (
                         <div className="mt-3 rounded-lg bg-secondary-light px-3 py-2.5 text-xs text-primary">
                           {trialState === 'trial_expired' ? (
                             <>
@@ -316,7 +359,7 @@ export function CheckoutPage() {
                             </>
                           )}
                         </div>
-                      )}
+                      ) : null}
                     </>
                   )}
                 </div>
@@ -337,13 +380,15 @@ export function CheckoutPage() {
                   isLoading={isSubmitting}
                   leftIcon={<Lock className="h-4 w-4" />}
                 >
-                  {isChange
-                    ? 'Trocar de plano'
-                    : trialState === 'trial_expired'
-                      ? 'Assinar agora'
-                      : trialState === 'trial'
-                        ? 'Assinar plano'
-                        : 'Começar 14 dias grátis'}
+                  {isInstallment
+                    ? `Parcelar em ${installments}x`
+                    : isChange
+                      ? 'Trocar de plano'
+                      : trialState === 'trial_expired'
+                        ? 'Assinar agora'
+                        : trialState === 'trial'
+                          ? 'Assinar plano'
+                          : 'Começar 14 dias grátis'}
                 </Button>
 
                 <div className="mt-3 flex items-center gap-3 rounded-lg bg-success-light px-4 py-3">
