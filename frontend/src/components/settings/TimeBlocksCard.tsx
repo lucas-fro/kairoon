@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarOff, Plus, Trash2 } from 'lucide-react'
+import { CalendarOff, Plus, Store, Trash2, User } from 'lucide-react'
 import { ApiError } from '../../api/client'
+import { listEmployees } from '../../api/employees'
 import { createTimeBlock, deleteTimeBlock, listTimeBlocks } from '../../api/establishment'
 import { formatDate } from '../../lib/format'
 import { todayStr } from '../../lib/dates'
@@ -9,6 +10,8 @@ import type { TimeBlock } from '../../types/api'
 import { Button } from '../ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import { Input } from '../ui/Input'
+import { SelectMenu } from '../ui/SelectMenu'
+import type { SelectMenuOption } from '../ui/SelectMenu'
 import { SkeletonList } from '../ui/Skeleton'
 import { useToast } from '../ui/Toast'
 
@@ -22,6 +25,8 @@ export function TimeBlocksCard() {
   const toast = useToast()
 
   const [date, setDate] = useState('')
+  // '' = pausa geral (todo o estabelecimento); uuid = um profissional específico.
+  const [target, setTarget] = useState('')
   const [fullDay, setFullDay] = useState(true)
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
@@ -29,6 +34,19 @@ export function TimeBlocksCard() {
   const [error, setError] = useState<string | undefined>()
 
   const query = useQuery({ queryKey: ['time-blocks'], queryFn: listTimeBlocks })
+  const employeesQuery = useQuery({ queryKey: ['employees'], queryFn: listEmployees })
+  const employees = employeesQuery.data ?? []
+
+  const targetOptions: SelectMenuOption[] = [
+    { value: '', label: 'Todo o estabelecimento' },
+    ...employees.map((e) => ({ value: e.id, label: e.name })),
+  ]
+  const employeeName = new Map(employees.map((e) => [e.id, e.name]))
+
+  function targetLabel(block: TimeBlock): string {
+    if (!block.employeeId) return 'Todo o estabelecimento'
+    return employeeName.get(block.employeeId) ?? 'Profissional'
+  }
 
   const createMutation = useMutation({
     mutationFn: createTimeBlock,
@@ -36,6 +54,7 @@ export function TimeBlocksCard() {
       queryClient.invalidateQueries({ queryKey: ['time-blocks'] })
       toast.success('Bloqueio adicionado')
       setDate('')
+      setTarget('')
       setFullDay(true)
       setStartTime('')
       setEndTime('')
@@ -73,6 +92,7 @@ export function TimeBlocksCard() {
     setError(undefined)
     createMutation.mutate({
       date,
+      employeeId: target || null,
       startTime: fullDay ? undefined : startTime,
       endTime: fullDay ? undefined : endTime,
       reason: reason.trim() || undefined,
@@ -88,13 +108,20 @@ export function TimeBlocksCard() {
       </CardHeader>
       <CardContent className="space-y-5">
         <p className="text-sm text-ink-secondary">
-          Datas ou horários em que não haverá atendimento: feriados, folgas ou compromissos. Esses
-          períodos ficam indisponíveis no link público de agendamento.
+          Datas ou horários sem atendimento: feriados, folgas ou compromissos. Bloqueie o
+          estabelecimento inteiro (todos os profissionais) ou apenas um profissional específico.
+          Esses períodos ficam indisponíveis no link público de agendamento.
         </p>
 
         {/* Formulário de novo bloqueio */}
         <div className="space-y-3 rounded-lg bg-background p-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <SelectMenu
+              label="Aplicar a"
+              value={target}
+              onChange={setTarget}
+              options={targetOptions}
+            />
             <Input
               label="Data"
               type="date"
@@ -102,13 +129,13 @@ export function TimeBlocksCard() {
               value={date}
               onChange={(e) => setDate(e.target.value)}
             />
-            <Input
-              label="Motivo (opcional)"
-              placeholder="Ex.: Feriado, folga…"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-            />
           </div>
+          <Input
+            label="Motivo (opcional)"
+            placeholder="Ex.: Feriado, folga…"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          />
 
           <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-secondary">
             <input
@@ -168,6 +195,14 @@ export function TimeBlocksCard() {
                   <p className="text-sm font-medium text-ink">
                     {formatDate(block.date)}{' '}
                     <span className="font-normal text-ink-secondary">· {describeBlock(block)}</span>
+                  </p>
+                  <p className="mt-0.5 flex items-center gap-1 text-xs text-ink-secondary">
+                    {block.employeeId ? (
+                      <User className="h-3 w-3 shrink-0" />
+                    ) : (
+                      <Store className="h-3 w-3 shrink-0" />
+                    )}
+                    <span className="truncate">{targetLabel(block)}</span>
                   </p>
                   {block.reason && <p className="text-xs text-ink-tertiary">{block.reason}</p>}
                 </div>

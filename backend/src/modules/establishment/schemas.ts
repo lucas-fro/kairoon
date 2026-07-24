@@ -108,6 +108,15 @@ const optionalTime = z
 export const createTimeBlockSchema = z
   .object({
     date: z.string().regex(DATE_REGEX, 'Data inválida').refine(isValidDateStr, 'Data inválida'),
+    // Alvo do bloqueio: null/ausente = estabelecimento inteiro; uuid = um único
+    // profissional (validado no service). '' vira null (opção "estabelecimento").
+    employeeId: z
+      .string()
+      .uuid('Profissional inválido')
+      .or(z.literal(''))
+      .nullable()
+      .optional()
+      .transform((value) => (value ? value : null)),
     startTime: optionalTime,
     endTime: optionalTime,
     reason: z

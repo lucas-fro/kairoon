@@ -32,6 +32,32 @@ function validatePayroll(data: { paymentDays?: { day: number; amountCents: numbe
   }
 }
 
+// Campos editáveis do profissional dono: só a jornada e o status (ativo).
+// Nome/contato/foto espelham a conta; comissão e folha do dono não fazem sentido
+// (é dele o negócio). É a garantia no servidor — a UI só reforça.
+const OWNER_EDITABLE_KEYS = [
+  'workStart',
+  'workEnd',
+  'lunchStart',
+  'lunchEnd',
+  'workDays',
+  'active',
+] as const
+
+type EmployeeUpdateData = Omit<
+  UpdateEmployeeInput,
+  'applyScheduleToAll' | 'applyCommissionToAll' | 'commissions'
+>
+
+/** Mantém só os campos que o dono pode alterar, descartando o resto. */
+function pickOwnerEditable(data: EmployeeUpdateData): EmployeeUpdateData {
+  const result: Record<string, unknown> = {}
+  for (const key of OWNER_EDITABLE_KEYS) {
+    if (data[key] !== undefined) result[key] = data[key]
+  }
+  return result as EmployeeUpdateData
+}
+
 type EmployeeRow = typeof employees.$inferSelect
 type CommissionRow = typeof employeeCommissions.$inferSelect
 type Commission = { serviceId: string; value: number }
@@ -175,16 +201,29 @@ export async function updateEmployee(
   id: string,
   input: UpdateEmployeeInput,
 ) {
-  const { applyScheduleToAll, applyCommissionToAll, commissions, ...data } = input
-  const hasData = Object.keys(data).length > 0
-  if (!hasData && commissions === undefined && !applyScheduleToAll && !applyCommissionToAll) {
-    throw new AppError('Nenhum dado para atualizar', 400)
-  }
-  validateSchedule(data)
-  validatePayroll(data)
+  const { applyScheduleToAll, applyCommissionToAll, commissions, ...rest } = input
 
   return db.transaction(async (tx) => {
-    let updated: EmployeeRow | undefined
+    const existing = await tx.query.employees.findFirst({
+      where: and(eq(employees.id, id), eq(employees.establishmentId, establishmentId)),
+    })
+    if (!existing) throw new AppError('Profissional não encontrado', 404)
+
+    // Dono: só jornada e status. O resto (nome, contato, comissão, folha) é
+    // ignorado, incluindo replicar comissão para todos.
+    const isOwner = existing.isOwner
+    const data = isOwner ? pickOwnerEditable(rest) : rest
+    const nextCommissions = isOwner ? undefined : commissions
+    const applyCommission = isOwner ? false : applyCommissionToAll
+
+    const hasData = Object.keys(data).length > 0
+    if (!hasData && nextCommissions === undefined && !applyScheduleToAll && !applyCommission) {
+      throw new AppError('Nenhum dado para atualizar', 400)
+    }
+    validateSchedule(data)
+    validatePayroll(data)
+
+    let updated: EmployeeRow = existing
     if (hasData) {
       const rows = await tx
         .update(employees)
@@ -192,20 +231,34 @@ export async function updateEmployee(
         .where(and(eq(employees.id, id), eq(employees.establishmentId, establishmentId)))
         .returning()
       updated = rows[0]
-    } else {
-      updated = await tx.query.employees.findFirst({
-        where: and(eq(employees.id, id), eq(employees.establishmentId, establishmentId)),
-      })
     }
-    if (!updated) throw new AppError('Profissional não encontrado', 404)
-    if (commissions !== undefined) await replaceCommissions(tx, establishmentId, id, commissions)
+    if (nextCommissions !== undefined) await replaceCommissions(tx, establishmentId, id, nextCommissions)
     if (applyScheduleToAll) await applyScheduleToOthers(tx, establishmentId, updated)
-    if (applyCommissionToAll) await applyCommissionToOthers(tx, establishmentId, updated)
+    if (applyCommission) await applyCommissionToOthers(tx, establishmentId, updated)
     return getEmployeeShaped(tx, establishmentId, id)
   })
 }
 
 export async function deleteEmployee(establishmentId: string, id: string) {
+  const employee = await db.query.employees.findFirst({
+    where: and(eq(employees.id, id), eq(employees.establishmentId, establishmentId)),
+  })
+  if (!employee) throw new AppError('Profissional não encontrado', 404)
+
+  // O dono é o profissional responsável pelo estabelecimento: nunca é excluído.
+  if (employee.isOwner) {
+    throw new AppError('O dono não pode ser excluído.', 409)
+  }
+
+  // Invariante: um estabelecimento não pode ficar sem nenhum profissional.
+  const remaining = await db
+    .select({ id: employees.id })
+    .from(employees)
+    .where(eq(employees.establishmentId, establishmentId))
+  if (remaining.length <= 1) {
+    throw new AppError('O estabelecimento precisa de pelo menos um profissional.', 409)
+  }
+
   try {
     const deleted = await db
       .delete(employees)

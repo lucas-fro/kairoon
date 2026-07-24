@@ -1,4 +1,4 @@
-import { and, asc, eq, ne } from 'drizzle-orm'
+import { and, asc, eq, isNull, ne, or } from 'drizzle-orm'
 import { db } from '../../db'
 import {
   appointments,
@@ -208,9 +208,15 @@ export async function getAvailability(slug: string, query: AvailabilityQuery) {
     busy.push({ startTime: employee.lunchStart, endTime: employee.lunchEnd })
   }
 
-  // Bloqueios (feriados/folgas) da data
+  // Bloqueios (feriados/folgas) da data. Aplica as pausas gerais do
+  // estabelecimento (employeeId null) e as folgas específicas deste profissional;
+  // ignora bloqueios dos outros profissionais.
   const blocks = await db.query.timeBlocks.findMany({
-    where: and(eq(timeBlocks.establishmentId, establishment.id), eq(timeBlocks.date, query.date)),
+    where: and(
+      eq(timeBlocks.establishmentId, establishment.id),
+      eq(timeBlocks.date, query.date),
+      or(isNull(timeBlocks.employeeId), eq(timeBlocks.employeeId, employee.id)),
+    ),
   })
   for (const block of blocks) {
     if (!block.startTime || !block.endTime) return { employeeId: employee.id, slots: [] }
@@ -278,9 +284,14 @@ export async function createPublicBooking(slug: string, input: CreateBookingInpu
     throw new AppError('Horário indisponível (intervalo de almoço)', 400)
   }
 
-  // Bloqueios (feriados/folgas)
+  // Bloqueios (feriados/folgas): pausas gerais (employeeId null) + folgas deste
+  // profissional. Bloqueios de outros profissionais não impedem este agendamento.
   const blocks = await db.query.timeBlocks.findMany({
-    where: and(eq(timeBlocks.establishmentId, establishment.id), eq(timeBlocks.date, input.date)),
+    where: and(
+      eq(timeBlocks.establishmentId, establishment.id),
+      eq(timeBlocks.date, input.date),
+      or(isNull(timeBlocks.employeeId), eq(timeBlocks.employeeId, employee.id)),
+    ),
   })
   for (const block of blocks) {
     if (

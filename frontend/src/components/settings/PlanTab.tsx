@@ -25,7 +25,12 @@ import { DialogActions } from '../ui/DialogActions'
 import { Skeleton } from '../ui/Skeleton'
 import { useToast } from '../ui/Toast'
 
-const FREE_FEATURES = [
+// Recursos de contas legadas (criadas antes do sistema de teste, sem
+// trialEndsAt): é o único caso em que o plano 'free' é de fato utilizável para
+// sempre (ver lib/plan.ts#getAccessState). Não representa um "plano grátis"
+// oferecido hoje: contas novas só têm o teste de 14 dias e, sem assinatura
+// depois dele, ficam em somente-leitura (state 'trial_expired').
+const LEGACY_FREE_FEATURES = [
   '1 profissional',
   'Agenda e agendamentos ilimitados',
   'Link público de agendamento',
@@ -48,6 +53,10 @@ const PLAN_HIGHLIGHTS: Record<PlanSlug, string[]> = {
     'Cupons e campanhas de marketing',
     'CRM de clientes (aniversários e sumidos)',
   ],
+}
+
+function isPlanSlug(value: string): value is PlanSlug {
+  return value === 'basico' || value === 'essencial'
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -130,6 +139,24 @@ export function PlanTab() {
         ? 'Teste encerrado'
         : `Plano ${planName.charAt(0).toUpperCase()}${planName.slice(1)}`
 
+  // Recursos exibidos abaixo do badge: reflete o que a conta TEM agora, não uma
+  // lista fixa de "grátis". No teste o efetivo é o essencial; em trial_expired
+  // não mostramos nada (a conta está em somente-leitura, o aviso abaixo já
+  // explica); 'profissional' (plano sob consulta) cai no highlight do
+  // essencial, do qual é superset.
+  const planFeaturesList: string[] | null =
+    trialState === undefined
+      ? null
+      : trialState === 'free'
+        ? LEGACY_FREE_FEATURES
+        : trialState === 'trial_expired'
+          ? null
+          : trialState === 'trial'
+            ? PLAN_HIGHLIGHTS.essencial
+            : isPlanSlug(planName)
+              ? PLAN_HIGHLIGHTS[planName]
+              : PLAN_HIGHLIGHTS.essencial
+
   const subscription = subscriptionQuery.data?.subscription ?? null
   const hasSubscriptionRecord = subscription !== null
   // Anual parcelado: as parcelas já foram compradas; não há assinatura pra
@@ -192,14 +219,16 @@ export function PlanTab() {
         </Badge>
       </CardHeader>
       <CardContent>
-        <ul className="space-y-2">
-          {FREE_FEATURES.map((feature) => (
-            <li key={feature} className="flex items-center gap-2 text-sm text-ink-secondary">
-              <Check className="h-4 w-4 shrink-0 text-success-dark" />
-              {feature}
-            </li>
-          ))}
-        </ul>
+        {planFeaturesList && (
+          <ul className="space-y-2">
+            {planFeaturesList.map((feature) => (
+              <li key={feature} className="flex items-center gap-2 text-sm text-ink-secondary">
+                <Check className="h-4 w-4 shrink-0 text-success-dark" />
+                {feature}
+              </li>
+            ))}
+          </ul>
+        )}
 
         <div className="mt-4 rounded-lg bg-background px-4 py-3">
           {planQuery.isPending && <Skeleton className="h-5 w-48" />}
@@ -443,7 +472,7 @@ export function PlanTab() {
         onClose={() => setCancelOpen(false)}
         onConfirm={() => cancelMutation.mutate()}
         title="Cancelar assinatura?"
-        description="Você continua com acesso ao plano pago até o fim do período já pago. Depois disso, a conta volta pro plano gratuito."
+        description="Você continua com acesso ao plano pago até o fim do período já pago. Depois disso, a conta fica em somente-leitura (dá para consultar os dados, mas não criar, editar ou excluir nada) até você assinar de novo."
         confirmLabel="Cancelar assinatura"
         danger
         isLoading={cancelMutation.isPending}

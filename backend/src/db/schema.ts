@@ -217,6 +217,11 @@ export const employees = pgTable('employees', {
   lunchEnd: text('lunch_end'),
   workDays: jsonb('work_days').$type<number[]>().notNull().default([1, 2, 3, 4, 5, 6]),
   active: boolean('active').notNull().default(true),
+  // O dono do estabelecimento também é um profissional (criado no cadastro).
+  // Exatamente um por estabelecimento. Marcado aqui para: exibir a coroa no
+  // painel, impedir a exclusão (todo estabelecimento tem no mínimo o dono) e
+  // limitar a edição ao que faz sentido para o dono (jornada e ativo/inativo).
+  isOwner: boolean('is_owner').notNull().default(false),
   // Comissão do profissional: se habilitada, o tipo ('percent' | 'fixed') define
   // como interpretar os valores por serviço em employee_commissions.
   commissionEnabled: boolean('commission_enabled').notNull().default(false),
@@ -289,6 +294,10 @@ export const timeBlocks = pgTable(
     establishmentId: uuid('establishment_id')
       .notNull()
       .references(() => establishments.id, { onDelete: 'cascade' }),
+    // Alvo do bloqueio: null = pausa geral (o estabelecimento inteiro, todos os
+    // profissionais); preenchido = folga/indisponibilidade de um único
+    // profissional. Cascade: apagar o profissional remove os bloqueios dele.
+    employeeId: uuid('employee_id').references(() => employees.id, { onDelete: 'cascade' }),
     date: date('date', { mode: 'string' }).notNull(),
     startTime: text('start_time'),
     endTime: text('end_time'),

@@ -862,8 +862,18 @@ for (let i = 0; i < 3; i++) {
 // Bloqueios de agenda (os dois feriados de dia inteiro)
 // ---------------------------------------------------------------------------
 const timeBlockRows: (typeof schema.timeBlocks.$inferInsert)[] = [
+  // Pausas gerais do estabelecimento (employeeId null = todos os profissionais).
   { establishmentId: estId, date: holidayPast, reason: 'Feriado: barbearia fechada' },
   { establishmentId: estId, date: holidayFuture, reason: 'Feriado: barbearia fechada' },
+  // Folga da tarde só de um profissional (bloqueio específico do Rafael).
+  {
+    establishmentId: estId,
+    employeeId: empId.rafael,
+    date: weekdayNear(nextMonthStart, 21),
+    startTime: '13:00',
+    endTime: '19:00',
+    reason: 'Rafael: folga da tarde',
+  },
 ]
 
 // ===========================================================================
@@ -952,6 +962,18 @@ async function main() {
       isClosed: h.isClosed,
     })),
   )
+
+  // O dono da conta também é um profissional (isOwner): aparece com a coroa, não
+  // pode ser excluído e só tem jornada/status editáveis. Sem comissão/folha nem
+  // agenda (o dono aqui administra). Inserido primeiro, como no cadastro real.
+  await db.insert(schema.employees).values({
+    establishmentId: estId,
+    name: 'Lucas Oliveira',
+    isOwner: true,
+    workStart: '09:00',
+    workEnd: '19:00',
+    workDays: [1, 2, 3, 4, 5, 6],
+  })
 
   await insertAll(
     schema.employees,

@@ -74,6 +74,18 @@ async function main() {
     { establishmentId: establishment.id, dayOfWeek: 6, opensAt: '09:00', closesAt: '18:00', isClosed: false },
   ])
 
+  // O dono da conta também é um profissional (isOwner): aparece com a coroa,
+  // não pode ser excluído e só tem jornada/status editáveis. Inserido primeiro,
+  // como no cadastro real.
+  await db.insert(schema.employees).values({
+    establishmentId: establishment.id,
+    name: user.name,
+    isOwner: true,
+    workStart: '09:00',
+    workEnd: '19:00',
+    workDays: [1, 2, 3, 4, 5, 6],
+  })
+
   const [employee] = await db
     .insert(schema.employees)
     .values({

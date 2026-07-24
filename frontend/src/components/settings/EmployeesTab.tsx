@@ -158,6 +158,93 @@ const EMPTY_FORM: FormState = {
   paymentAmount2: '',
 }
 
+interface ScheduleFieldsProps {
+  form: FormState
+  onChange: (patch: Partial<FormState>) => void
+}
+
+/** Campos de jornada (entrada/saída, almoço, dias e "aplicar a todos").
+ *  Compartilhado entre a etapa 2 do cadastro e a edição do dono (só jornada). */
+function ScheduleFields({ form, onChange }: ScheduleFieldsProps) {
+  function toggleDay(day: number) {
+    onChange({
+      workDays: form.workDays.includes(day)
+        ? form.workDays.filter((d) => d !== day)
+        : [...form.workDays, day].sort((a, b) => a - b),
+    })
+  }
+
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-4">
+        <Input
+          label="Entrada"
+          type="time"
+          value={form.workStart}
+          onChange={(e) => onChange({ workStart: e.target.value })}
+        />
+        <Input
+          label="Saída"
+          type="time"
+          value={form.workEnd}
+          onChange={(e) => onChange({ workEnd: e.target.value })}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <Input
+          label="Início do almoço"
+          type="time"
+          value={form.lunchStart}
+          onChange={(e) => onChange({ lunchStart: e.target.value })}
+        />
+        <Input
+          label="Fim do almoço"
+          type="time"
+          value={form.lunchEnd}
+          onChange={(e) => onChange({ lunchEnd: e.target.value })}
+        />
+      </div>
+      <div>
+        <span className="mb-2 block text-[13px] font-medium text-ink-secondary">
+          Dias de trabalho
+        </span>
+        <div className="grid grid-cols-7 gap-1.5">
+          {WEEKDAY_LABELS_SHORT.map((label, day) => {
+            const on = form.workDays.includes(day)
+            return (
+              <button
+                key={day}
+                type="button"
+                onClick={() => toggleDay(day)}
+                className={cn(
+                  'h-9 w-full rounded-lg border text-[13px] font-medium transition-colors',
+                  on
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-line text-ink-secondary hover:bg-surface-hover',
+                )}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <label className="flex cursor-pointer items-start gap-2 rounded-lg bg-background p-3 text-sm text-ink-secondary">
+        <input
+          type="checkbox"
+          className="mt-0.5 h-4 w-4 rounded border-line accent-primary"
+          checked={form.applyToAll}
+          onChange={(e) => onChange({ applyToAll: e.target.checked })}
+        />
+        <span>
+          Aplicar esta jornada a <strong>todos os profissionais</strong> ao salvar
+        </span>
+      </label>
+    </>
+  )
+}
+
 export function EmployeesTab() {
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -302,15 +389,6 @@ export function EmployeesTab() {
       return
     }
     openCreate()
-  }
-
-  function toggleDay(day: number) {
-    setForm((f) => ({
-      ...f,
-      workDays: f.workDays.includes(day)
-        ? f.workDays.filter((d) => d !== day)
-        : [...f.workDays, day].sort((a, b) => a - b),
-    }))
   }
 
   function setCommissionValue(serviceId: string, raw: string) {
@@ -513,8 +591,34 @@ export function EmployeesTab() {
     })
   }
 
+  /** Salvar a edição do dono: só a jornada (o backend ignora o resto de todo
+   *  jeito). O status ativo/inativo continua no botão da lista. */
+  function handleSaveOwner() {
+    const se = scheduleError()
+    if (se) {
+      setError(se)
+      return
+    }
+    setError(undefined)
+    saveMutation.mutate({
+      id: editing?.id,
+      data: {
+        // name espelha a conta e o backend o ignora para o dono; enviamos só
+        // para satisfazer o tipo do payload compartilhado com o cadastro.
+        name: form.name,
+        workStart: form.workStart,
+        workEnd: form.workEnd,
+        lunchStart: form.lunchStart,
+        lunchEnd: form.lunchEnd,
+        workDays: form.workDays,
+        applyScheduleToAll: form.applyToAll,
+      },
+    })
+  }
+
   const employees = employeesQuery.data ?? []
   const plan = planQuery.data
+  const isEditingOwner = editing?.isOwner ?? false
 
   return (
     <div className="space-y-4">
@@ -578,6 +682,15 @@ export function EmployeesTab() {
                         </div>
                       )}
                       <span className="font-medium text-ink">{employee.name}</span>
+                      {employee.isOwner && (
+                        <span
+                          title="Dono do estabelecimento"
+                          className="inline-flex shrink-0 items-center gap-1 rounded-md bg-warning-light px-1.5 py-0.5 text-[11px] font-semibold text-warning-dark"
+                        >
+                          <Crown className="h-3 w-3" />
+                          Dono
+                        </span>
+                      )}
                     </div>
                   </Td>
                   <Td>
@@ -624,15 +737,19 @@ export function EmployeesTab() {
                           {employee.active ? 'Desativar' : 'Ativar'}
                         </span>
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDeleting(employee)}
-                        className="text-error-dark hover:bg-error-light hover:text-error-dark"
-                        leftIcon={<Trash2 className="h-3.5 w-3.5" />}
-                      >
-                        Excluir
-                      </Button>
+                      {/* O dono não pode ser excluído (o estabelecimento precisa
+                          de ao menos um profissional). */}
+                      {!employee.isOwner && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDeleting(employee)}
+                          className="text-error-dark hover:bg-error-light hover:text-error-dark"
+                          leftIcon={<Trash2 className="h-3.5 w-3.5" />}
+                        >
+                          Excluir
+                        </Button>
+                      )}
                     </div>
                   </Td>
                 </Tr>
@@ -646,9 +763,40 @@ export function EmployeesTab() {
       <Dialog
         open={dialogOpen}
         onClose={closeDialog}
-        title={editing ? 'Editar profissional' : 'Adicionar profissional'}
+        title={
+          isEditingOwner
+            ? 'Editar meu horário'
+            : editing
+              ? 'Editar profissional'
+              : 'Adicionar profissional'
+        }
         maxWidth="max-w-lg"
       >
+        {isEditingOwner ? (
+          // Dono: só a jornada é editável (o status ativo fica no botão da lista).
+          <div className="space-y-4">
+            <p className="text-sm text-ink-secondary">
+              Como dono, você faz parte da equipe e aparece com a{' '}
+              <span className="font-medium text-warning-dark">coroa</span>. Aqui você ajusta a sua
+              jornada de atendimento; para pausar ou retomar seus agendamentos, use o botão de
+              status na lista.
+            </p>
+            <ScheduleFields
+              form={form}
+              onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+            />
+            {error && <p className="text-xs text-error-dark">{error}</p>}
+            <DialogActions className="pt-2">
+              <Button type="button" variant="outline" onClick={closeDialog}>
+                Cancelar
+              </Button>
+              <Button type="button" onClick={handleSaveOwner} isLoading={saveMutation.isPending}>
+                Salvar alterações
+              </Button>
+            </DialogActions>
+          </div>
+        ) : (
+          <>
         {/* Etapas clicáveis: navegue direto por qualquer uma. No mobile a faixa
             rola horizontalmente (scroll só nas etapas), sem estourar o diálogo. */}
         <div className="mb-5 flex items-stretch gap-2 overflow-x-auto">
@@ -766,71 +914,10 @@ export function EmployeesTab() {
           </div>
         ) : step === 2 ? (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Entrada"
-                type="time"
-                value={form.workStart}
-                onChange={(e) => setForm((f) => ({ ...f, workStart: e.target.value }))}
-              />
-              <Input
-                label="Saída"
-                type="time"
-                value={form.workEnd}
-                onChange={(e) => setForm((f) => ({ ...f, workEnd: e.target.value }))}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Início do almoço"
-                type="time"
-                value={form.lunchStart}
-                onChange={(e) => setForm((f) => ({ ...f, lunchStart: e.target.value }))}
-              />
-              <Input
-                label="Fim do almoço"
-                type="time"
-                value={form.lunchEnd}
-                onChange={(e) => setForm((f) => ({ ...f, lunchEnd: e.target.value }))}
-              />
-            </div>
-            <div>
-              <span className="mb-2 block text-[13px] font-medium text-ink-secondary">
-                Dias de trabalho
-              </span>
-              <div className="grid grid-cols-7 gap-1.5">
-                {WEEKDAY_LABELS_SHORT.map((label, day) => {
-                  const on = form.workDays.includes(day)
-                  return (
-                    <button
-                      key={day}
-                      type="button"
-                      onClick={() => toggleDay(day)}
-                      className={cn(
-                        'h-9 w-full rounded-lg border text-[13px] font-medium transition-colors',
-                        on
-                          ? 'border-primary bg-primary text-white'
-                          : 'border-line text-ink-secondary hover:bg-surface-hover',
-                      )}
-                    >
-                      {label}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            <label className="flex cursor-pointer items-start gap-2 rounded-lg bg-background p-3 text-sm text-ink-secondary">
-              <input
-                type="checkbox"
-                className="mt-0.5 h-4 w-4 rounded border-line accent-primary"
-                checked={form.applyToAll}
-                onChange={(e) => setForm((f) => ({ ...f, applyToAll: e.target.checked }))}
-              />
-              <span>
-                Aplicar esta jornada a <strong>todos os profissionais</strong> ao salvar
-              </span>
-            </label>
+            <ScheduleFields
+              form={form}
+              onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+            />
 
             {error && <p className="text-xs text-error-dark">{error}</p>}
 
@@ -1225,6 +1312,8 @@ export function EmployeesTab() {
               </Button>
             </DialogActions>
           </div>
+        )}
+          </>
         )}
       </Dialog>
 

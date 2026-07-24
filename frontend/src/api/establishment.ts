@@ -64,6 +64,8 @@ export function listTimeBlocks() {
 
 export function createTimeBlock(data: {
   date: string
+  /** null/ausente = estabelecimento inteiro; uuid = um profissional específico. */
+  employeeId?: string | null
   startTime?: string
   endTime?: string
   reason?: string

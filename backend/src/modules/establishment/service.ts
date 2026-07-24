@@ -165,10 +165,25 @@ export async function listTimeBlocks(establishmentId: string) {
 }
 
 export async function createTimeBlock(establishmentId: string, input: CreateTimeBlockInput) {
+  // Bloqueio de um profissional específico: garante que ele é deste
+  // estabelecimento (evita bloquear profissional de outro tenant). null = pausa
+  // geral (o estabelecimento inteiro).
+  if (input.employeeId) {
+    const employee = await db.query.employees.findFirst({
+      columns: { id: true },
+      where: and(
+        eq(employees.id, input.employeeId),
+        eq(employees.establishmentId, establishmentId),
+      ),
+    })
+    if (!employee) throw new AppError('Profissional não encontrado', 404)
+  }
+
   const [row] = await db
     .insert(timeBlocks)
     .values({
       establishmentId,
+      employeeId: input.employeeId,
       date: input.date,
       startTime: input.startTime,
       endTime: input.endTime,

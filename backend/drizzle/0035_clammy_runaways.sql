@@ -1,0 +1,2 @@
+ALTER TABLE "time_blocks" ADD COLUMN "employee_id" uuid;--> statement-breakpoint
+ALTER TABLE "time_blocks" ADD CONSTRAINT "time_blocks_employee_id_employees_id_fk" FOREIGN KEY ("employee_id") REFERENCES "public"."employees"("id") ON DELETE cascade ON UPDATE no action;

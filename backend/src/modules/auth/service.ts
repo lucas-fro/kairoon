@@ -1,6 +1,6 @@
 import { randomBytes, randomInt } from 'node:crypto'
 import bcrypt from 'bcryptjs'
-import { and, eq, ne } from 'drizzle-orm'
+import { and, eq, inArray, ne } from 'drizzle-orm'
 import { db } from '../../db'
 import { employees, establishments, users, workingHours } from '../../db/schema'
 import { AppError } from '../../lib/errors'
@@ -146,7 +146,11 @@ export async function registerOwner(input: RegisterInput) {
         )
 
         // O primeiro (e único, no início) profissional é o próprio dono.
-        await tx.insert(employees).values({ establishmentId: establishment.id, name: input.name.trim() })
+        // isOwner: aparece com a coroa no painel, não pode ser excluído e só
+        // tem jornada/ativo editáveis (ver modules/employees/service.ts).
+        await tx
+          .insert(employees)
+          .values({ establishmentId: establishment.id, name: input.name.trim(), isOwner: true })
 
         return { user: sanitizeUser(user), establishment }
       })
@@ -216,6 +220,28 @@ export async function updateProfile(userId: string, input: UpdateProfileInput) {
 
   const [updated] = await db.update(users).set(data).where(eq(users.id, userId)).returning()
   if (!updated) throw new AppError('Usuário não encontrado', 404)
+
+  // O profissional-dono espelha o nome da conta (o nome não é editável na ficha
+  // do profissional dono; ver modules/employees). Ao renomear a conta, mantemos
+  // a coroa e a ficha em sincronia.
+  if (data.name !== undefined) {
+    await db
+      .update(employees)
+      .set({ name: data.name })
+      .where(
+        and(
+          eq(employees.isOwner, true),
+          inArray(
+            employees.establishmentId,
+            db
+              .select({ id: establishments.id })
+              .from(establishments)
+              .where(eq(establishments.ownerId, userId)),
+          ),
+        ),
+      )
+  }
+
   return sanitizeUser(updated)
 }
 

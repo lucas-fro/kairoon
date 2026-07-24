@@ -144,6 +144,9 @@ export interface Employee {
   lunchEnd: string | null
   workDays: number[]
   active: boolean
+  /** O dono do estabelecimento (exatamente um): exibe a coroa, não pode ser
+   *  excluído e só tem jornada/status editáveis. */
+  isOwner: boolean
   commissionEnabled: boolean
   commissionType: CommissionType
   commissions: EmployeeCommission[]
@@ -171,6 +174,8 @@ export interface EmployeePaymentDay {
 
 export interface TimeBlock {
   id: string
+  /** null = pausa geral do estabelecimento; preenchido = folga de um profissional. */
+  employeeId: string | null
   date: string
   startTime: string | null
   endTime: string | null
