@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm'
+import sharp from 'sharp'
 import type { MultipartFile } from '@fastify/multipart'
 import type { FastifyRequest } from 'fastify'
 import { db } from '../db'
@@ -16,6 +17,39 @@ const KIND_LABELS: Record<UploadKind, string> = {
   logo: 'logo',
   banner: 'banner',
   photo: 'perfil',
+}
+
+/**
+ * Dimensão máxima (px) por tipo. `fit: inside` reduz mantendo proporção e nunca
+ * corta nem amplia; o corte final (círculo do logo/foto, faixa do banner) fica a
+ * cargo do object-cover no frontend. Uma logo de vários MB vira dezenas de KB.
+ */
+const MAX_DIMENSIONS: Record<UploadKind, { width: number; height: number }> = {
+  logo: { width: 512, height: 512 },
+  banner: { width: 1600, height: 600 },
+  photo: { width: 400, height: 400 },
+}
+
+/**
+ * Otimiza a imagem: corrige orientação (EXIF), redimensiona para o teto do tipo
+ * e recomprime em WebP (bem menor que PNG/JPEG, suportado por todos os
+ * navegadores alvo). Devolve sempre WebP.
+ */
+async function optimizeImage(
+  buffer: Buffer,
+  kind: UploadKind,
+): Promise<{ buffer: Buffer; ext: string; contentType: string }> {
+  const { width, height } = MAX_DIMENSIONS[kind]
+  try {
+    const out = await sharp(buffer)
+      .rotate()
+      .resize(width, height, { fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 80 })
+      .toBuffer()
+    return { buffer: out, ext: 'webp', contentType: 'image/webp' }
+  } catch {
+    throw new AppError('Não foi possível processar a imagem enviada', 422)
+  }
 }
 
 /** Deixa o slug seguro para nome de arquivo (só a-z 0-9 e hífen, curto). */
@@ -94,12 +128,12 @@ export async function readImageUpload(request: FastifyRequest): Promise<Validate
 }
 
 /**
- * Sobe a imagem para a Bunny (estrutura PLANA, sem pastas) e devolve a URL
- * pública. Nome: `<slug>-<tipo>-<timestamp>-<establishmentId>.<ext>`. O timestamp
- * garante nome único (o CDN nunca serve cache antigo) e o establishmentId no
- * final marca o dono, o que permite apagar o arquivo antigo só do próprio tenant
- * (ver bunnyDeleteByUrl). Quando `replaces` aponta para um arquivo nosso do mesmo
- * tenant, ele é apagado depois (best-effort) para não acumular órfãos.
+ * Otimiza e sobe a imagem para a Bunny numa PASTA por estabelecimento e devolve
+ * a URL pública. Caminho: `<establishmentId>/<slug>-<tipo>-<timestamp>.webp`. A
+ * pasta (id) isola o tenant (facilita apagar tudo ao excluir a conta e escopa a
+ * exclusão do arquivo antigo), o timestamp garante nome único (o CDN nunca serve
+ * cache velho) e o slug deixa legível. Quando `replaces` aponta para um arquivo
+ * do próprio tenant, ele é apagado depois (best-effort) para não acumular órfãos.
  */
 export async function storeImage(opts: {
   establishmentId: string
@@ -111,9 +145,10 @@ export async function storeImage(opts: {
     columns: { slug: true },
     where: eq(establishments.id, opts.establishmentId),
   })
+  const optimized = await optimizeImage(opts.image.buffer, opts.kind)
   const slug = fileNameSlug(est?.slug)
-  const filename = `${slug}-${KIND_LABELS[opts.kind]}-${Date.now()}-${opts.establishmentId}.${opts.image.ext}`
-  const url = await bunnyPut(filename, opts.image.buffer, opts.image.contentType)
+  const path = `${opts.establishmentId}/${slug}-${KIND_LABELS[opts.kind]}-${Date.now()}.${optimized.ext}`
+  const url = await bunnyPut(path, optimized.buffer, optimized.contentType)
   if (opts.replaces) await bunnyDeleteByUrl(opts.replaces, opts.establishmentId)
   return url
 }

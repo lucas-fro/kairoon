@@ -66,11 +66,11 @@ export async function bunnyPut(
 
 /**
  * Apaga um arquivo a partir da sua URL pública. Best-effort e ESCOPADO ao tenant:
- * como o storage é plano (sem pastas), a posse é verificada pelo sufixo do nome
- * (`...-<establishmentId>.<ext>`). Isso impede um `replaces` forjado de apagar
- * imagem de outro estabelecimento (IDOR). Também exige arquivo na raiz (sem
- * subpasta) e rejeita path traversal ('..', inclusive percent-encoded). Nunca
- * propaga erro: a limpeza do arquivo antigo não deve derrubar o upload novo.
+ * como cada estabelecimento tem sua pasta (`<establishmentId>/...`), a posse é a
+ * própria pasta. Só apaga um arquivo DENTRO da pasta do tenant (impede `replaces`
+ * forjado de apagar imagem de outro estabelecimento). Exige um único arquivo na
+ * pasta (sem subpasta) e rejeita path traversal ('..', inclusive percent-encoded).
+ * Nunca propaga erro: a limpeza do arquivo antigo não deve derrubar o upload novo.
  */
 export async function bunnyDeleteByUrl(
   url: string | null | undefined,
@@ -81,18 +81,20 @@ export async function bunnyDeleteByUrl(
   if (!base || !url.startsWith(`${base}/`)) return
   const path = url.slice(base.length + 1)
 
-  // Arquivo na raiz (sem subpasta/traversal) e do próprio tenant (nome termina
-  // em `-<establishmentId>.<ext>`). Nossos nomes reais passam; forjados, não.
-  if (!path || path.includes('/')) return
+  // Tem que estar na pasta do próprio tenant e ser um único arquivo (sem subpasta
+  // nem traversal). O establishmentId é um uuid, então o prefixo é inequívoco.
+  const prefix = `${establishmentId}/`
+  if (!path.startsWith(prefix)) return
+  const filename = path.slice(prefix.length)
   let decoded: string
   try {
-    decoded = decodeURIComponent(path)
+    decoded = decodeURIComponent(filename)
   } catch {
     return
   }
-  if (decoded.includes('/') || decoded.includes('..')) return
-  const nameWithoutExt = decoded.replace(/\.[^.]+$/, '')
-  if (!nameWithoutExt.endsWith(`-${establishmentId}`)) return
+  if (!filename || filename.includes('/') || decoded.includes('/') || decoded.includes('..')) {
+    return
+  }
 
   try {
     await fetch(storageUrl(path), {
