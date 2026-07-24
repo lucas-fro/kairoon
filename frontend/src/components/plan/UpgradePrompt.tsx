@@ -1,4 +1,4 @@
-import { Lock, Sparkles } from 'lucide-react'
+import { Lock } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '../../lib/format'
 import { Button } from '../ui/Button'
@@ -38,7 +38,6 @@ export function UpgradePrompt({ plan, compact, className }: UpgradePromptProps) 
         <Button
           size="sm"
           variant="outline"
-          leftIcon={<Sparkles className="h-4 w-4" />}
           onClick={goToPlans}
         >
           Fazer upgrade
@@ -58,7 +57,7 @@ export function UpgradePrompt({ plan, compact, className }: UpgradePromptProps) 
         </p>
         <h2 className="mt-1 font-display text-xl font-semibold text-ink">Recurso do plano {plan}</h2>
         <p className="mt-2 max-w-sm text-sm text-ink-secondary">{message}</p>
-        <Button className="mt-6" onClick={goToPlans} leftIcon={<Sparkles className="h-4 w-4" />}>
+        <Button className="mt-6" onClick={goToPlans}>
           Fazer upgrade
         </Button>
       </div>

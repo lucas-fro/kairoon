@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Lock, Sparkles } from 'lucide-react'
+import { Lock } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../ui/Button'
 import { Dialog } from '../ui/Dialog'
@@ -38,7 +38,6 @@ export function TrialExpiredListener() {
         </Button>
         <Button
           type="button"
-          leftIcon={<Sparkles className="h-4 w-4" />}
           onClick={() => {
             setOpen(false)
             navigate('/app/configuracoes?tab=plano')

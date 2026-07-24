@@ -1,4 +1,4 @@
-import { Clock, Lock, Sparkles } from 'lucide-react'
+import { Clock, Lock } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { usePlan } from '../../hooks/usePlan'
 import { cn } from '../../lib/format'
@@ -40,7 +40,6 @@ export function TrialBanner({ variant = 'page' }: { variant?: 'page' | 'sidebar'
           onClick={goUpgrade}
           className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md bg-secondary px-2.5 py-1.5 text-xs font-semibold text-primary transition-colors duration-150 hover:bg-secondary/90"
         >
-          <Sparkles className="h-3.5 w-3.5" />
           {expired ? 'Assinar' : 'Fazer upgrade'}
         </button>
       </div>
@@ -74,7 +73,7 @@ export function TrialBanner({ variant = 'page' }: { variant?: 'page' | 'sidebar'
           </p>
         </div>
       </div>
-      <Button onClick={goUpgrade} leftIcon={<Sparkles className="h-4 w-4" />} className="shrink-0">
+      <Button onClick={goUpgrade} className="shrink-0">
         {expired ? 'Assinar agora' : 'Fazer upgrade'}
       </Button>
     </div>

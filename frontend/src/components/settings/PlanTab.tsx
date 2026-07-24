@@ -1,20 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  BarChart3,
-  Boxes,
-  Check,
-  CreditCard,
-  Crown,
-  Gift,
-  Palette,
-  Sparkles,
-  Ticket,
-  UserCircle,
-  Users,
-  Wallet,
-} from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import { Check, CreditCard, Crown, UserCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { getMe } from '../../api/auth'
 import { ApiError } from '../../api/client'
@@ -27,7 +13,7 @@ import {
   getSubscription,
 } from '../../api/payments'
 import { useAuth } from '../../contexts/AuthContext'
-import { formatBRL, formatDate } from '../../lib/format'
+import { cn, formatBRL, formatDate } from '../../lib/format'
 import type { BillingCycle, PlanSlug } from '../../types/api'
 import { BillingCycleToggle, getAnnualDiscountPercent } from '../payments/BillingCycleToggle'
 import { Badge } from '../ui/Badge'
@@ -46,15 +32,23 @@ const FREE_FEATURES = [
   'Cadastro de clientes e histórico',
 ]
 
-const PRO_BENEFITS: { icon: LucideIcon; label: string }[] = [
-  { icon: Users, label: 'Mais profissionais e comissões da equipe' },
-  { icon: Palette, label: 'Página de agendamento personalizada' },
-  { icon: Boxes, label: 'Controle de estoque' },
-  { icon: Wallet, label: 'Controle financeiro completo' },
-  { icon: Gift, label: 'Fidelidade e programa de pontos' },
-  { icon: BarChart3, label: 'Relatórios (avançados no Essencial)' },
-  { icon: Ticket, label: 'Cupons e campanhas de marketing (Essencial)' },
-]
+// Destaques por plano, mostrados nos dois cards do diálogo de upgrade.
+const PLAN_HIGHLIGHTS: Record<PlanSlug, string[]> = {
+  basico: [
+    'Até 5 profissionais',
+    'Página de agendamento personalizada',
+    'Estoque e controle financeiro',
+    'Fidelidade e programa de pontos',
+    'Relatórios essenciais',
+  ],
+  essencial: [
+    'Até 10 profissionais',
+    'Tudo do plano Básico',
+    'Relatórios avançados',
+    'Cupons e campanhas de marketing',
+    'CRM de clientes (aniversários e sumidos)',
+  ],
+}
 
 const STATUS_LABEL: Record<string, string> = {
   pending: 'Aguardando confirmação do pagamento',
@@ -276,7 +270,7 @@ export function PlanTab() {
               Cancelar assinatura
             </Button>
           )}
-          <Button type="button" onClick={() => setUpgradeOpen(true)} leftIcon={<Sparkles className="h-4 w-4" />}>
+          <Button type="button" onClick={() => setUpgradeOpen(true)}>
             Fazer upgrade
           </Button>
         </div>
@@ -286,34 +280,34 @@ export function PlanTab() {
         open={upgradeOpen}
         onClose={() => setUpgradeOpen(false)}
         title="Escolha seu plano"
-        description="Desbloqueie os recursos pagos do Kairoon."
+        description="Assine para desbloquear os recursos pagos do Kairoon."
+        maxWidth="max-w-2xl"
       >
-        <ul className="mb-4 space-y-3">
-          {PRO_BENEFITS.map(({ icon: Icon, label }) => (
-            <li key={label} className="flex items-center gap-3 text-sm text-ink-secondary">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                <Icon className="h-4 w-4 text-primary" />
-              </span>
-              {label}
-            </li>
-          ))}
-        </ul>
-
-        <div className="mb-4">
+        {/* Ciclo de cobrança (mensal / anual) no topo */}
+        <div className="mb-5 flex justify-center">
           <BillingCycleToggle
             value={selectedCycle}
             onChange={setSelectedCycle}
-            discountPercent={plansQuery.data ? getAnnualDiscountPercent(
-              (plansQuery.data.essencial ?? Object.values(plansQuery.data)[0]).monthlyCents,
-              (plansQuery.data.essencial ?? Object.values(plansQuery.data)[0]).yearlyCents,
-            ) : 0}
+            discountPercent={
+              plansQuery.data
+                ? getAnnualDiscountPercent(
+                    (plansQuery.data.essencial ?? Object.values(plansQuery.data)[0]).monthlyCents,
+                    (plansQuery.data.essencial ?? Object.values(plansQuery.data)[0]).yearlyCents,
+                  )
+                : 0
+            }
           />
         </div>
 
-        <div className="space-y-2">
-          {plansQuery.isPending && <Skeleton className="h-16 w-full" />}
-          {plansQuery.data &&
-            (
+        {/* Dois cards simplificados, um por plano */}
+        {plansQuery.isPending ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Skeleton className="h-72 w-full" />
+            <Skeleton className="h-72 w-full" />
+          </div>
+        ) : plansQuery.data ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {(
               Object.entries(plansQuery.data) as [
                 PlanSlug,
                 { name: string; monthlyCents: number; yearlyCents: number },
@@ -321,44 +315,61 @@ export function PlanTab() {
             ).map(([slug, info]) => {
               const priceCents = selectedCycle === 'yearly' ? info.yearlyCents : info.monthlyCents
               const isCurrent =
-                hasActiveSub && subscription?.planSlug === slug && subscription?.billingCycle === selectedCycle
+                hasActiveSub &&
+                subscription?.planSlug === slug &&
+                subscription?.billingCycle === selectedCycle
+              const recommended = slug === 'essencial'
               return (
-                <button
+                <div
                   key={slug}
-                  type="button"
-                  disabled={isCurrent}
-                  onClick={() => handlePickPlan(slug)}
-                  className="flex w-full items-center justify-between rounded-lg border border-line px-4 py-3 text-left transition-colors duration-150 enabled:hover:border-secondary enabled:hover:bg-secondary-light disabled:cursor-default disabled:opacity-60"
+                  className={cn(
+                    'flex flex-col rounded-xl border p-5',
+                    recommended ? 'border-primary shadow-soft' : 'border-line',
+                  )}
                 >
-                  <span className="flex items-center gap-2 font-medium text-ink">
-                    {info.name}
-                    {isCurrent && (
-                      <span className="rounded-full bg-background px-2 py-0.5 text-[11px] font-medium text-ink-secondary">
-                        Plano atual
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-right">
-                    <span className="block text-sm font-medium text-primary">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-display text-base font-semibold text-ink">{info.name}</h3>
+                    {recommended && <Badge tone="brand">Recomendado</Badge>}
+                  </div>
+                  <div className="mt-3">
+                    <span className="font-display text-2xl font-bold text-ink">
                       {formatBRL(priceCents)}
+                    </span>
+                    <span className="text-sm text-ink-secondary">
                       {selectedCycle === 'monthly' ? '/mês' : '/ano'}
                     </span>
                     {selectedCycle === 'yearly' && (
-                      <span className="block text-xs text-ink-tertiary">
+                      <p className="mt-0.5 text-xs text-ink-tertiary">
                         equivale a {formatBRL(info.yearlyCents / 12)}/mês
-                      </span>
+                      </p>
                     )}
-                  </span>
-                </button>
+                  </div>
+                  <ul className="mt-4 flex-1 space-y-2">
+                    {(PLAN_HIGHLIGHTS[slug] ?? []).map((item) => (
+                      <li key={item} className="flex items-start gap-2 text-sm text-ink-secondary">
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-success-dark" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                  <Button
+                    type="button"
+                    variant={recommended ? 'primary' : 'outline'}
+                    className="mt-5 w-full"
+                    disabled={isCurrent}
+                    onClick={() => handlePickPlan(slug)}
+                  >
+                    {isCurrent ? 'Plano atual' : 'Assinar'}
+                  </Button>
+                </div>
               )
             })}
-        </div>
-
-        <DialogActions className="mt-6">
-          <Button type="button" variant="outline" onClick={() => setUpgradeOpen(false)}>
-            Fechar
-          </Button>
-        </DialogActions>
+          </div>
+        ) : (
+          <p className="py-4 text-center text-sm text-ink-secondary">
+            Não foi possível carregar os planos.
+          </p>
+        )}
       </Dialog>
 
       <Dialog
