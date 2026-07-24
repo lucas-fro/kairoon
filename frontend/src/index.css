@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Paleta padrão (navy do Kairoon) como canais "r g b" — consumidos pelos tokens
+ * `primary`/`secondary`/`accent` no tailwind.config.ts. A paleta escolhida pelo
+ * estabelecimento sobrescreve estas variáveis em runtime (ver src/lib/palettes.ts:
+ * painel → document.documentElement; link público → wrapper da página).
+ */
+:root {
+  --primary: 30 47 94; /* #1E2F5E */
+  --primary-hover: 36 58 117; /* #243A75 */
+  --primary-active: 23 38 74; /* #17264A */
+  --secondary: 110 168 254; /* #6EA8FE */
+  --secondary-hover: 85 146 247; /* #5592F7 */
+  --secondary-light: 234 242 255; /* #EAF2FF */
+  --accent: 199 217 255; /* #C7D9FF */
+}
+
 body {
   @apply bg-background font-sans text-ink antialiased;
 }

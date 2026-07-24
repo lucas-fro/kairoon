@@ -21,6 +21,7 @@ export function updateEstablishment(data: {
   paymentSettings?: import('../types/api').PaymentSettings
   welcomeMessage?: string
   themeColor?: string
+  palette?: string
   logoUrl?: string
   bannerImageUrl?: string
   footerMessage?: string

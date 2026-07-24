@@ -37,6 +37,7 @@ import { KairoonMark } from '../brand/Logo'
 import { TrialBanner } from '../plan/TrialBanner'
 import { TrialExpiredListener } from '../plan/TrialExpiredListener'
 import { PendingBookingsListener } from '../realtime/PendingBookingsListener'
+import { PaletteThemeApplier } from '../theme/PaletteThemeApplier'
 import { AppHeader } from './AppHeader'
 
 /** Item de navegação simples (link direto). */
@@ -143,7 +144,10 @@ function LeafNav({
       className={({ isActive }) =>
         cn(
           'relative flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors duration-150',
-          isActive ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white',
+          // Texto sempre branco cheio: com paletas coloridas (primary ~5:1 no
+          // branco) qualquer opacidade no texto quebra o contraste AA. O estado
+          // ativo é sinalizado pelo realce (bg-white/10) + a barra indicadora.
+          isActive ? 'bg-white/10 text-white' : 'text-white hover:bg-white/10',
         )
       }
     >
@@ -188,7 +192,7 @@ function ParentNav({
         className={cn(
           'flex h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors duration-150',
           // Seção ativa recebe um realce sutil; a sub-opção ativa é o destaque forte.
-          sectionActive ? 'bg-white/5 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white',
+          sectionActive ? 'bg-white/5 text-white' : 'text-white hover:bg-white/10',
         )}
       >
         <item.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.9} />
@@ -225,7 +229,7 @@ function ParentNav({
                     'flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-[13px] transition-colors duration-150',
                     isActive
                       ? 'bg-white/10 font-medium text-white'
-                      : 'text-white/60 hover:bg-white/5 hover:text-white',
+                      : 'text-white hover:bg-white/5',
                   )}
                 >
                   <sub.icon className="h-4 w-4 shrink-0" strokeWidth={1.9} />
@@ -268,7 +272,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <KairoonMark className="h-8 w-auto shrink-0 text-white" />
         <div className="min-w-0">
           <p className="font-display text-[17px] font-bold leading-tight text-white">Kairoon</p>
-          <p className="truncate text-xs text-white/60">
+          <p className="truncate text-xs text-white">
             {establishment?.name ?? 'Agendamentos'}
           </p>
         </div>
@@ -359,6 +363,9 @@ export function AppLayout() {
           </main>
         </HeaderSlotProvider>
       </div>
+
+      {/* Aplica a paleta de cores escolhida em todo o painel */}
+      <PaletteThemeApplier />
 
       {/* Popup em tempo real de agendamentos pendentes do link público */}
       <PendingBookingsListener />

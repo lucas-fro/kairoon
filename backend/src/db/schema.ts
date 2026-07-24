@@ -103,6 +103,9 @@ export const establishments = pgTable('establishments', {
   slug: text('slug').notNull().unique(),
   logoUrl: text('logo_url'),
   themeColor: text('theme_color').notNull().default('#0F4C5C'),
+  // Paleta de cores escolhida (chave de preset ou 'custom'); null = legado.
+  // Tematiza o painel e o link público de uma vez (ver frontend/src/lib/palettes.ts).
+  palette: text('palette'),
   // Personalização da página pública (plano pago). Imagens são URLs (sem upload).
   bannerImageUrl: text('banner_image_url'),
   footerMessage: text('footer_message'),

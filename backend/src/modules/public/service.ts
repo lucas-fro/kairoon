@@ -97,6 +97,8 @@ export async function getPublicEstablishment(slug: string) {
   const isPaid = access.state === 'paid' || access.state === 'trial'
   const branding = {
     brandColor: isPaid ? establishment.themeColor : SYSTEM_PRIMARY,
+    // Paleta efetiva: no grátis/expirado volta ao sistema (null → defaults).
+    palette: isPaid ? establishment.palette : null,
     bannerImageUrl: isPaid ? establishment.bannerImageUrl : null,
     showKairoonWatermark: !isPaid,
     footerMessage: isPaid ? establishment.footerMessage : null,

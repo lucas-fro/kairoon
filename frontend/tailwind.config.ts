@@ -5,23 +5,32 @@ import type { Config } from 'tailwindcss'
  * Troque aqui e o app inteiro acompanha. Nos componentes use SEMPRE as
  * classes semânticas (bg-primary, text-ink-secondary, border-line...),
  * nunca hex hardcoded nem cores cruas do Tailwind.
+ *
+ * `primary`, `secondary` e `accent` são o "brand accent" e vêm de CSS custom
+ * properties (canais "r g b" em src/index.css :root), então trocam em runtime
+ * pela paleta escolhida (ver src/lib/palettes.ts). As demais cores (fundo,
+ * cards, tinta, estados) são neutras e fixas — mantêm tudo legível em qualquer
+ * paleta. O formato `rgb(var(--x) / <alpha-value>)` preserva os modificadores
+ * de opacidade do Tailwind (ex.: bg-primary/10).
  */
+const brand = (name: string) => `rgb(var(${name}) / <alpha-value>)`
+
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
         primary: {
-          DEFAULT: '#1E2F5E',
-          hover: '#243A75',
-          active: '#17264A',
+          DEFAULT: brand('--primary'),
+          hover: brand('--primary-hover'),
+          active: brand('--primary-active'),
         },
         secondary: {
-          DEFAULT: '#6EA8FE',
-          hover: '#5592F7',
-          light: '#EAF2FF',
+          DEFAULT: brand('--secondary'),
+          hover: brand('--secondary-hover'),
+          light: brand('--secondary-light'),
         },
-        accent: '#C7D9FF',
+        accent: brand('--accent'),
         success: { DEFAULT: '#22C55E', light: '#DCFCE7', dark: '#15803D' },
         warning: { DEFAULT: '#F59E0B', light: '#FEF3C7', dark: '#B45309' },
         error: { DEFAULT: '#EF4444', light: '#FEE2E2', dark: '#B91C1C' },

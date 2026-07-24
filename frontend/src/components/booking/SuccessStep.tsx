@@ -145,7 +145,7 @@ export function SuccessStep({ result, establishment, branding }: SuccessStepProp
           <Button
             variant="outline"
             size="lg"
-            className="mt-4 w-full border-secondary text-secondary-hover hover:border-secondary hover:bg-secondary-light/40 hover:text-secondary-hover"
+            className="mt-4 w-full border-secondary text-primary hover:border-secondary hover:bg-secondary-light/40 hover:text-primary"
             leftIcon={<CalendarPlus className="h-5 w-5" />}
             onClick={() => downloadIcs(result)}
           >

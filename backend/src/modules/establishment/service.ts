@@ -39,6 +39,7 @@ export async function updateEstablishment(
   const plan = await getEffectivePlan(establishmentId)
   if (!planHasFeature(plan, 'personalizacao')) {
     delete data.themeColor
+    delete data.palette
     delete data.bannerImageUrl
     delete data.footerMessage
   }

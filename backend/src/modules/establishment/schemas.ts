@@ -36,6 +36,13 @@ export const updateEstablishmentSchema = z.object({
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/, 'Cor inválida (use o formato #RRGGBB)')
     .optional(),
+  // Chave da paleta (preset em kebab-case ou 'custom'). O front é a autoridade
+  // sobre os presets válidos; aqui só barramos formato/tamanho. null limpa.
+  palette: z
+    .string()
+    .regex(/^[a-z][a-z0-9-]{1,39}$/, 'Paleta inválida')
+    .nullable()
+    .optional(),
   logoUrl: z
     .union([z.string().url('URL do logo inválida'), z.literal('')])
     .transform((value) => (value === '' ? null : value))

@@ -38,6 +38,8 @@ export interface Establishment {
   slug: string
   logoUrl: string | null
   themeColor: string
+  /** Chave da paleta escolhida (ver src/lib/palettes.ts); null = legado/custom. */
+  palette: string | null
   bannerImageUrl: string | null
   footerMessage: string | null
   welcomeMessage: string | null
@@ -642,6 +644,8 @@ export interface AuthResponse {
 export interface PublicBranding {
   /** Cor de marca efetiva (sistema no grátis, personalizada no pago) */
   brandColor: string
+  /** Paleta efetiva (null no grátis/legado) — tematiza o link público inteiro */
+  palette: string | null
   bannerImageUrl: string | null
   /** true no plano grátis: mostra "Agendamento feito pela Kairoon" */
   showKairoonWatermark: boolean

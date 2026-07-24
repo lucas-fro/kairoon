@@ -33,7 +33,7 @@ export function UpgradePrompt({ plan, compact, className }: UpgradePromptProps) 
         <span className="flex h-11 w-11 items-center justify-center rounded-full bg-secondary-light">
           <Lock className="h-5 w-5 text-primary" />
         </span>
-        <p className="text-xs font-medium uppercase tracking-wide text-secondary">Plano {plan}</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-primary">Plano {plan}</p>
         <p className="max-w-xs text-sm text-ink-secondary">{message}</p>
         <Button
           size="sm"
@@ -53,7 +53,7 @@ export function UpgradePrompt({ plan, compact, className }: UpgradePromptProps) 
         <span className="flex h-14 w-14 items-center justify-center rounded-full bg-secondary-light">
           <Lock className="h-6 w-6 text-primary" />
         </span>
-        <p className="mt-4 text-xs font-medium uppercase tracking-wide text-secondary">
+        <p className="mt-4 text-xs font-medium uppercase tracking-wide text-primary">
           Plano {plan}
         </p>
         <h2 className="mt-1 font-display text-xl font-semibold text-ink">Recurso do plano {plan}</h2>

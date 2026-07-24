@@ -6,6 +6,7 @@ import { useParams } from 'react-router-dom'
 import { ApiError } from '../../api/client'
 import { readableTextColor } from '../../lib/color'
 import { cn } from '../../lib/format'
+import { paletteToVars, resolvePalette } from '../../lib/palettes'
 import { getPublicEstablishment } from '../../api/public'
 import { ClientStep } from '../../components/booking/ClientStep'
 import { ConfirmStep } from '../../components/booking/ConfirmStep'
@@ -365,6 +366,16 @@ export function PublicBookingPage() {
   const title = STEP_TITLES[state.step]
   const isBareStep = state.step === 'welcome' || state.step === 'success'
 
+  // Paleta efetiva do link: além do `--brand` (banner/CTA de boas-vindas), injeta
+  // as vars da marca (primary/secondary/accent) para tematizar o wizard inteiro
+  // — calendário, horários, preços, botão de confirmar. Legado (palette null)
+  // mantém só o `--brand`, deixando o resto nos defaults do sistema.
+  const palette = resolvePalette(branding.palette, branding.brandColor)
+  const brandStyle = {
+    '--brand': branding.brandColor,
+    ...(palette ? paletteToVars(palette) : {}),
+  } as CSSProperties
+
   return (
     <div
       className={cn(
@@ -373,7 +384,7 @@ export function PublicBookingPage() {
         // (o miolo da confirmação rola internamente se não couber).
         state.step === 'success' ? 'h-[100dvh]' : 'min-h-screen',
       )}
-      style={{ '--brand': branding.brandColor } as CSSProperties}
+      style={brandStyle}
     >
       {/* Nas telas "bare" (boas-vindas/sucesso) o banner carrega a identidade;
           nas etapas internas mantemos um header compacto para economizar altura. */}
