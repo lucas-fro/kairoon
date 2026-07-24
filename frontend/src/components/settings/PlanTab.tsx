@@ -313,7 +313,11 @@ export function PlanTab() {
                 { name: string; monthlyCents: number; yearlyCents: number },
               ][]
             ).map(([slug, info]) => {
-              const priceCents = selectedCycle === 'yearly' ? info.yearlyCents : info.monthlyCents
+              // Sempre destaca o equivalente mensal (mesmo no ciclo anual): o
+              // total do ano some para um texto pequeno abaixo, parcelado, pra
+              // não assustar como um número grande sozinho assustaria.
+              const monthlyEquivalentCents =
+                selectedCycle === 'yearly' ? info.yearlyCents / 12 : info.monthlyCents
               const isCurrent =
                 hasActiveSub &&
                 subscription?.planSlug === slug &&
@@ -323,24 +327,26 @@ export function PlanTab() {
                 <div
                   key={slug}
                   className={cn(
-                    'flex flex-col rounded-xl border p-5',
-                    recommended ? 'border-primary shadow-soft' : 'border-line',
+                    'relative flex flex-col rounded-xl border p-5 pt-6',
+                    recommended
+                      ? 'border-2 border-primary bg-secondary-light shadow-soft'
+                      : 'border-line',
                   )}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-display text-base font-semibold text-ink">{info.name}</h3>
-                    {recommended && <Badge tone="brand">Recomendado</Badge>}
-                  </div>
+                  {recommended && (
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-1 text-xs font-bold text-white shadow-soft">
+                      Recomendado
+                    </span>
+                  )}
+                  <h3 className="font-display text-base font-semibold text-ink">{info.name}</h3>
                   <div className="mt-3">
                     <span className="font-display text-2xl font-bold text-ink">
-                      {formatBRL(priceCents)}
+                      {formatBRL(monthlyEquivalentCents)}
                     </span>
-                    <span className="text-sm text-ink-secondary">
-                      {selectedCycle === 'monthly' ? '/mês' : '/ano'}
-                    </span>
+                    <span className="text-sm text-ink-secondary">/mês</span>
                     {selectedCycle === 'yearly' && (
                       <p className="mt-0.5 text-xs text-ink-tertiary">
-                        equivale a {formatBRL(info.yearlyCents / 12)}/mês
+                        {formatBRL(info.yearlyCents)}/ano em até 12x no cartão
                       </p>
                     )}
                   </div>

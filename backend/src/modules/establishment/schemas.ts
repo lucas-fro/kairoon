@@ -31,6 +31,9 @@ export const updateEstablishmentSchema = z.object({
       whatsapp: z.string().trim().max(20).optional(),
     })
     .optional(),
+  // Exibir/ocultar as redes no link público (vale em qualquer plano).
+  showInstagram: z.boolean().optional(),
+  showWhatsapp: z.boolean().optional(),
   welcomeMessage: z.string().optional(),
   themeColor: z
     .string()

@@ -17,6 +17,8 @@ export function updateEstablishment(data: {
   state?: string
   cep?: string
   socials?: import('../types/api').Socials
+  showInstagram?: boolean
+  showWhatsapp?: boolean
   autoConfirm?: boolean
   paymentSettings?: import('../types/api').PaymentSettings
   welcomeMessage?: string

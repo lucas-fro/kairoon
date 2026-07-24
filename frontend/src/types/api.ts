@@ -54,6 +54,9 @@ export interface Establishment {
   state: string | null
   cep: string | null
   socials: Socials | null
+  /** Exibir Instagram/WhatsApp no link público (independente do plano). */
+  showInstagram: boolean
+  showWhatsapp: boolean
   autoConfirm: boolean
   paymentSettings: PaymentSettings
   quiz: Record<string, string> | null

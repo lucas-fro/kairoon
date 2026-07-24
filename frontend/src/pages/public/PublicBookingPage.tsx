@@ -278,7 +278,17 @@ export function PublicBookingPage() {
           <WelcomeStep
             establishment={establishment}
             branding={branding}
+            services={services}
+            socialLinks={socialLinks}
             onStart={() => dispatch({ type: 'start' })}
+            onPickService={(service) =>
+              dispatch({
+                type: 'selectService',
+                service,
+                employee: soleEmployee,
+                skipEmployeeStep: !hasEmployeeStep,
+              })
+            }
           />
         )
       case 'service':
@@ -365,6 +375,9 @@ export function PublicBookingPage() {
 
   const title = STEP_TITLES[state.step]
   const isBareStep = state.step === 'welcome' || state.step === 'success'
+  // Boas-vindas quebra para a largura total (banner full-bleed + microsite); as
+  // demais etapas seguem na coluna estreita.
+  const isWelcome = state.step === 'welcome'
 
   // Paleta efetiva do link: além do `--brand` (banner/CTA de boas-vindas), injeta
   // as vars da marca (primary/secondary/accent) para tematizar o wizard inteiro
@@ -424,7 +437,10 @@ export function PublicBookingPage() {
       <main
         key={state.step}
         className={cn(
-          'step-enter mx-auto flex w-full min-h-0 max-w-md flex-1 flex-col',
+          'step-enter flex w-full min-h-0 flex-1 flex-col',
+          // Welcome ocupa 100% da viewport (banner full-bleed); as demais na coluna
+          // estreita centralizada.
+          isWelcome ? 'max-w-none' : 'mx-auto max-w-md',
           // Nos passos "bare" o banner de marca precisa encostar nas laterais e no
           // topo; o padding horizontal fica por conta de cada etapa internamente.
           !isBareStep && 'px-4',
@@ -440,7 +456,8 @@ export function PublicBookingPage() {
       </main>
 
       <footer className="mx-auto w-full max-w-md px-4 pb-6 pt-5">
-        {socialLinks.length > 0 && (
+        {/* No welcome as redes já aparecem dentro do microsite; não duplica aqui. */}
+        {socialLinks.length > 0 && !isWelcome && (
           <div className="mb-4 border-t border-line-divider pt-4">
             <div className="flex flex-wrap items-center justify-center gap-3">
               {socialLinks.map((social) => (

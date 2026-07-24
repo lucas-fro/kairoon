@@ -104,6 +104,18 @@ export async function getPublicEstablishment(slug: string) {
     footerMessage: isPaid ? establishment.footerMessage : null,
   }
 
+  // Redes exibidas no link público: só as que têm valor E estão marcadas para
+  // aparecer. Filtramos aqui (no servidor) para não expor um @/telefone oculto.
+  const rawSocials = establishment.socials ?? {}
+  const visibleSocials: { instagram?: string; whatsapp?: string } = {}
+  if (establishment.showInstagram && rawSocials.instagram) {
+    visibleSocials.instagram = rawSocials.instagram
+  }
+  if (establishment.showWhatsapp && rawSocials.whatsapp) {
+    visibleSocials.whatsapp = rawSocials.whatsapp
+  }
+  const socials = visibleSocials.instagram || visibleSocials.whatsapp ? visibleSocials : null
+
   return {
     establishment: {
       id: establishment.id,
@@ -114,7 +126,7 @@ export async function getPublicEstablishment(slug: string) {
       welcomeMessage: establishment.welcomeMessage,
       phone: establishment.phone,
       businessType: establishment.businessType,
-      socials: establishment.socials,
+      socials,
       // false quando o dono está com o teste grátis expirado (somente-leitura).
       acceptingBookings: access.state !== 'trial_expired',
     },

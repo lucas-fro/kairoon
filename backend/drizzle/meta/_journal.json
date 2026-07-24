@@ -232,6 +232,13 @@
       "when": 1784898875403,
       "tag": "0032_worthless_namora",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1784915528120,
+      "tag": "0033_add_social_visibility",
+      "breakpoints": true
     }
   ]
 }

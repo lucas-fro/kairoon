@@ -4,7 +4,6 @@ import { useMutation } from '@tanstack/react-query'
 import { CheckCircle2, Copy, ExternalLink, Save, Search, XCircle } from 'lucide-react'
 import { ApiError } from '../../api/client'
 import { checkSlugAvailability, updateEstablishment, updateSlug } from '../../api/establishment'
-import { uploadImage } from '../../api/uploads'
 import { useAuth } from '../../contexts/AuthContext'
 import { FixedCostsSection } from './FixedCostsSection'
 import {
@@ -22,7 +21,6 @@ import type { Establishment, PaymentSettings } from '../../types/api'
 import { Button } from '../ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import { HelpTooltip } from '../ui/HelpTooltip'
-import { ImageUploadField } from '../ui/ImageUploadField'
 import { Input } from '../ui/Input'
 import { SelectMenu } from '../ui/SelectMenu'
 import type { SelectMenuOption } from '../ui/SelectMenu'
@@ -87,7 +85,6 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
   const [uf, setUf] = useState(establishment.state ?? '')
   const [cepStatus, setCepStatus] = useState<'idle' | 'loading' | 'notfound'>('idle')
   const cepDirty = useRef(false)
-  const [logoUrl, setLogoUrl] = useState(establishment.logoUrl ?? '')
   const [autoConfirm, setAutoConfirm] = useState(establishment.autoConfirm)
 
   // Redes sociais
@@ -251,7 +248,6 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
       neighborhood: neighborhood.trim(),
       city: city.trim(),
       state: uf.trim(),
-      logoUrl: logoUrl.trim(),
       socials: {
         instagram: instagram.trim() || undefined,
         whatsapp: onlyDigits(whatsapp) || undefined,
@@ -378,27 +374,6 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
                 placeholder="UF"
               />
             </div>
-
-            <ImageUploadField
-              label="Logo do estabelecimento (opcional)"
-              hint="PNG, JPG ou WEBP, até 5 MB. Aparece no link público e na barra lateral."
-              value={logoUrl || null}
-              name={name || establishment.name}
-              variant="circle"
-              onUpload={async (file) => {
-                const { url } = await uploadImage('logo', file, logoUrl || null)
-                setLogoUrl(url)
-                const res = await updateEstablishment({ logoUrl: url })
-                setEstablishment(res)
-                toast.success('Logo atualizado!')
-              }}
-              onRemove={async () => {
-                setLogoUrl('')
-                const res = await updateEstablishment({ logoUrl: '' })
-                setEstablishment(res)
-                toast.success('Logo removido')
-              }}
-            />
 
             {/* Redes sociais */}
             <div className="border-t border-line-divider pt-4">

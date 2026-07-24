@@ -25,8 +25,9 @@ import type { Establishment } from '../../types/api'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
-import { ImageUploadField } from '../ui/ImageUploadField'
+import { ImageEditField } from '../ui/ImageEditField'
 import { Input } from '../ui/Input'
+import { Switch } from '../ui/Switch'
 import { Textarea } from '../ui/Textarea'
 import { useToast } from '../ui/Toast'
 
@@ -58,34 +59,28 @@ function PaletteSwatch({
       onClick={onSelect}
       disabled={disabled}
       aria-pressed={selected}
+      aria-label={palette.label}
       title={palette.label}
       className={cn(
-        'flex flex-col items-center gap-1.5 rounded-lg p-1 transition-opacity',
+        'relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md ring-offset-2 ring-offset-surface transition-all',
+        selected ? 'ring-2 ring-ink' : 'ring-1 ring-line hover:ring-ink/30',
         disabled && 'cursor-not-allowed opacity-50',
       )}
+      style={{ backgroundColor: palette.primary }}
     >
-      <span
-        className={cn(
-          'relative flex h-11 w-full items-center justify-center overflow-hidden rounded-lg ring-offset-2 ring-offset-surface transition-all',
-          selected ? 'ring-2 ring-ink' : 'ring-1 ring-line hover:ring-ink/30',
-        )}
-        style={{ backgroundColor: palette.primary }}
-      >
-        {selected && (
-          <Check className="h-4 w-4" strokeWidth={3} style={{ color: readableTextColor(palette.primary) }} />
-        )}
-        <span className="absolute bottom-1 right-1 flex gap-0.5">
-          <span
-            className="h-2 w-2 rounded-full ring-1 ring-black/10"
-            style={{ backgroundColor: palette.secondary }}
-          />
-          <span
-            className="h-2 w-2 rounded-full ring-1 ring-black/10"
-            style={{ backgroundColor: palette.accent }}
-          />
-        </span>
+      {selected && (
+        <Check className="h-3.5 w-3.5" strokeWidth={3} style={{ color: readableTextColor(palette.primary) }} />
+      )}
+      <span className="absolute bottom-0.5 right-0.5 flex gap-0.5">
+        <span
+          className="h-1.5 w-1.5 rounded-full ring-1 ring-black/10"
+          style={{ backgroundColor: palette.secondary }}
+        />
+        <span
+          className="h-1.5 w-1.5 rounded-full ring-1 ring-black/10"
+          style={{ backgroundColor: palette.accent }}
+        />
       </span>
-      <span className="w-full truncate text-center text-[11px] text-ink-secondary">{palette.label}</span>
     </button>
   )
 }
@@ -119,15 +114,24 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
   const [customColor, setCustomColor] = useState(
     HEX_REGEX.test(establishment.themeColor) ? establishment.themeColor : SYSTEM_PRIMARY,
   )
+  const [logoUrl, setLogoUrl] = useState(establishment.logoUrl ?? '')
   const [bannerImageUrl, setBannerImageUrl] = useState(establishment.bannerImageUrl ?? '')
   const [footerMessage, setFooterMessage] = useState(establishment.footerMessage ?? '')
   const [welcomeMessage, setWelcomeMessage] = useState(establishment.welcomeMessage ?? '')
+  const [showInstagram, setShowInstagram] = useState(establishment.showInstagram)
+  const [showWhatsapp, setShowWhatsapp] = useState(establishment.showWhatsapp)
+
+  const hasInstagram = Boolean(establishment.socials?.instagram)
+  const hasWhatsapp = Boolean(establishment.socials?.whatsapp)
 
   const isCustom = paletteKey === CUSTOM_PALETTE_KEY
   const selectedPalette: Palette = isCustom
     ? customPaletteFromHex(HEX_REGEX.test(customColor) ? customColor : SYSTEM_PRIMARY)
     : (PALETTE_MAP[paletteKey] ?? DEFAULT_PALETTE)
 
+  // Um único save para a aba inteira. Campos de plano pago (palette/themeColor/
+  // bannerImageUrl/footerMessage) são ignorados pelo backend quando o plano não
+  // tem `personalizacao` (ver service.ts), então é seguro sempre mandar tudo.
   const mutation = useMutation({
     mutationFn: () =>
       updateEstablishment({
@@ -137,20 +141,13 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
         themeColor: selectedPalette.primary,
         bannerImageUrl: bannerImageUrl.trim(),
         footerMessage: footerMessage.trim(),
+        welcomeMessage: welcomeMessage.trim(),
+        showInstagram,
+        showWhatsapp,
       }),
     onSuccess: (res) => {
       setEstablishment(res)
       toast.success('Aparência atualizada!')
-    },
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : 'Erro inesperado'),
-  })
-
-  // Mensagem de boas-vindas: disponível em qualquer plano e salva sozinha.
-  const welcomeMutation = useMutation({
-    mutationFn: (value: string) => updateEstablishment({ welcomeMessage: value }),
-    onSuccess: (res) => {
-      setEstablishment(res)
-      toast.success('Mensagem de boas-vindas salva!')
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : 'Erro inesperado'),
   })
@@ -179,7 +176,7 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
             <span className="text-[13px] font-medium text-ink-secondary">Paleta de cores</span>
             <span className="text-xs text-ink-tertiary">Aplica ao sistema e ao link público</span>
           </div>
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+          <div className="flex flex-wrap gap-2">
             {PALETTES.map((p) => (
               <PaletteSwatch
                 key={p.key}
@@ -195,27 +192,19 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
               onClick={() => setPaletteKey(CUSTOM_PALETTE_KEY)}
               disabled={!hasPersonalizacao}
               aria-pressed={isCustom}
+              aria-label="Cor personalizada"
               title="Cor personalizada"
               className={cn(
-                'flex flex-col items-center gap-1.5 rounded-lg p-1 transition-opacity',
+                'relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md ring-offset-2 ring-offset-surface transition-all',
+                isCustom ? 'ring-2 ring-ink' : 'ring-1 ring-line hover:ring-ink/30',
                 !hasPersonalizacao && 'cursor-not-allowed opacity-50',
               )}
+              style={{
+                background:
+                  'conic-gradient(from 180deg, #ef4444, #f59e0b, #22c55e, #06b6d4, #3b82f6, #a855f7, #ec4899, #ef4444)',
+              }}
             >
-              <span
-                className={cn(
-                  'relative flex h-11 w-full items-center justify-center overflow-hidden rounded-lg ring-offset-2 ring-offset-surface transition-all',
-                  isCustom ? 'ring-2 ring-ink' : 'ring-1 ring-line hover:ring-ink/30',
-                )}
-                style={{
-                  background:
-                    'conic-gradient(from 180deg, #ef4444, #f59e0b, #22c55e, #06b6d4, #3b82f6, #a855f7, #ec4899, #ef4444)',
-                }}
-              >
-                {isCustom && <Check className="h-4 w-4 text-white drop-shadow" strokeWidth={3} />}
-              </span>
-              <span className="w-full truncate text-center text-[11px] text-ink-secondary">
-                Personalizada
-              </span>
+              {isCustom && <Check className="h-3.5 w-3.5 text-white drop-shadow" strokeWidth={3} />}
             </button>
           </div>
 
@@ -276,7 +265,7 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
           <BrandBanner
             brandColor={previewColor}
             bannerImageUrl={previewBanner}
-            logoUrl={establishment.logoUrl}
+            logoUrl={logoUrl || null}
             name={establishment.name}
           />
           <p className="text-center font-display text-lg font-semibold text-ink">
@@ -303,36 +292,43 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
         </div>
 
         {/* Mensagem de boas-vindas (topo do link público, disponível em todos os planos) */}
-        <div className="space-y-3">
-          <Textarea
-            label="Mensagem de boas-vindas"
-            value={welcomeMessage}
-            onChange={(e) => setWelcomeMessage(e.target.value)}
-            placeholder="Ex.: Bem-vindo! Escolha um horário e até já."
-            hint="Aparece no topo do seu link público."
-          />
-          <div className="flex justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => welcomeMutation.mutate(welcomeMessage.trim())}
-              isLoading={welcomeMutation.isPending}
-              leftIcon={<Save className="h-4 w-4" />}
-            >
-              Salvar mensagem
-            </Button>
-          </div>
-        </div>
+        <Textarea
+          label="Mensagem de boas-vindas"
+          value={welcomeMessage}
+          onChange={(e) => setWelcomeMessage(e.target.value)}
+          placeholder="Ex.: Bem-vindo! Escolha um horário e até já."
+          hint="Aparece no topo do seu link público."
+        />
 
-        {/* Banner e mensagem */}
-        <ImageUploadField
+        {/* Logo e banner: prévia + lápis abrem o editor (recorte/zoom/posição) */}
+        <ImageEditField
+          label="Logo do estabelecimento (opcional)"
+          hint="PNG, JPG ou WEBP. Aparece no link público."
+          value={logoUrl || null}
+          name={establishment.name}
+          shape="circle"
+          onSave={async (file) => {
+            const { url } = await uploadImage('logo', file, logoUrl || null)
+            setLogoUrl(url)
+            const res = await updateEstablishment({ logoUrl: url })
+            setEstablishment(res)
+            toast.success('Logo atualizado!')
+          }}
+          onRemove={async () => {
+            setLogoUrl('')
+            const res = await updateEstablishment({ logoUrl: '' })
+            setEstablishment(res)
+            toast.success('Logo removido')
+          }}
+        />
+        <ImageEditField
           label="Imagem do banner"
-          hint="PNG, JPG ou WEBP, até 5 MB. Sem imagem, o banner usa a cor da paleta."
+          hint="PNG, JPG ou WEBP. Sem imagem, o banner usa a cor da paleta."
           value={bannerImageUrl || null}
           name={establishment.name}
-          variant="banner"
+          shape="banner"
           disabled={!hasPersonalizacao}
-          onUpload={async (file) => {
+          onSave={async (file) => {
             const { url } = await uploadImage('banner', file, bannerImageUrl || null)
             setBannerImageUrl(url)
             const res = await updateEstablishment({ bannerImageUrl: url })
@@ -355,19 +351,58 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
           disabled={!hasPersonalizacao}
         />
 
-        {hasPersonalizacao ? (
-          <div className="flex justify-end">
-            <Button
-              onClick={() => mutation.mutate()}
-              isLoading={mutation.isPending}
-              leftIcon={<Save className="h-4 w-4" />}
-            >
-              Salvar aparência
-            </Button>
+        {/* Exibição das redes no link público (vale em qualquer plano). O @/telefone
+            é cadastrado em Configurações › Dados do estabelecimento. */}
+        <div className="space-y-3">
+          <div>
+            <p className="text-[13px] font-medium text-ink-secondary">Redes no link público</p>
+            <p className="mt-0.5 text-xs text-ink-tertiary">
+              Escolha o que aparece na página. O @ e o telefone ficam em Dados do estabelecimento.
+            </p>
           </div>
-        ) : (
-          <UpgradePrompt plan="Básico" compact />
-        )}
+          <div className="flex items-center justify-between rounded-lg border border-line px-4 py-3">
+            <span className="flex items-center gap-2.5 text-sm font-medium text-ink">
+              <img src="/instagram.svg" alt="" className="h-4 w-4" />
+              Instagram
+              {!hasInstagram && (
+                <span className="text-xs font-normal text-ink-tertiary">(nenhum cadastrado)</span>
+              )}
+            </span>
+            <Switch
+              checked={showInstagram}
+              onChange={setShowInstagram}
+              disabled={!hasInstagram}
+              aria-label="Exibir Instagram no link público"
+            />
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-line px-4 py-3">
+            <span className="flex items-center gap-2.5 text-sm font-medium text-ink">
+              <img src="/whatsapp.svg" alt="" className="h-4 w-4" />
+              WhatsApp
+              {!hasWhatsapp && (
+                <span className="text-xs font-normal text-ink-tertiary">(nenhum cadastrado)</span>
+              )}
+            </span>
+            <Switch
+              checked={showWhatsapp}
+              onChange={setShowWhatsapp}
+              disabled={!hasWhatsapp}
+              aria-label="Exibir WhatsApp no link público"
+            />
+          </div>
+        </div>
+
+        {!hasPersonalizacao && <UpgradePrompt plan="Básico" compact />}
+
+        <div className="flex justify-end">
+          <Button
+            onClick={() => mutation.mutate()}
+            isLoading={mutation.isPending}
+            leftIcon={<Save className="h-4 w-4" />}
+          >
+            Salvar aparência
+          </Button>
+        </div>
       </CardContent>
     </Card>
   )

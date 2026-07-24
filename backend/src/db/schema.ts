@@ -127,6 +127,11 @@ export const establishments = pgTable('establishments', {
     instagram?: string
     whatsapp?: string
   }>(),
+  // Exibição das redes no link público (independente do plano): o dono pode
+  // cadastrar o @/telefone e ainda assim ocultá-los da página pública. Default
+  // true preserva o comportamento antigo (mostrava sempre que havia valor).
+  showInstagram: boolean('show_instagram').notNull().default(true),
+  showWhatsapp: boolean('show_whatsapp').notNull().default(true),
   // Agendamentos do link público: true = confirmados na hora; false = ficam
   // pendentes até o estabelecimento aceitar.
   autoConfirm: boolean('auto_confirm').notNull().default(true),
