@@ -13,9 +13,11 @@ import { AgendaPage } from './pages/panel/AgendaPage'
 import { ClientDetailPage } from './pages/panel/ClientDetailPage'
 import { ClientsPage } from './pages/panel/ClientsPage'
 import { DashboardPage } from './pages/panel/DashboardPage'
+import { EmployeesPage } from './pages/panel/EmployeesPage'
 import { FinancePage } from './pages/panel/FinancePage'
 import { MarketingPage } from './pages/panel/MarketingPage'
 import { ReportsPage } from './pages/panel/ReportsPage'
+import { ServicesPage } from './pages/panel/ServicesPage'
 import { SettingsPage } from './pages/panel/SettingsPage'
 import { StockPage } from './pages/panel/StockPage'
 import { PublicBookingPage } from './pages/public/PublicBookingPage'
@@ -77,15 +79,8 @@ export function App() {
               </FeatureGate>
             }
           />
-          {/* Serviços agora vivem dentro de Configurações (aba própria) */}
-          <Route
-            path="servicos"
-            element={<Navigate to="/app/configuracoes?tab=servicos" replace />}
-          />
-          <Route
-            path="funcionarios"
-            element={<Navigate to="/app/configuracoes?tab=funcionarios" replace />}
-          />
+          <Route path="servicos" element={<ServicesPage />} />
+          <Route path="funcionarios" element={<EmployeesPage />} />
           <Route path="configuracoes" element={<SettingsPage />} />
         </Route>
 

@@ -19,6 +19,7 @@ import {
   Stamp,
   Store,
   Ticket,
+  UserCircle,
   UserCog,
   Users,
   UserX,
@@ -82,6 +83,8 @@ const NAV_GROUPS: { label: string; items: NavEntry[] }[] = [
           { tab: 'sumidos', label: 'Sumidos', icon: UserX, feature: 'clientes_crm' },
         ],
       },
+      { to: '/app/servicos', label: 'Serviços', icon: Scissors },
+      { to: '/app/funcionarios', label: 'Profissionais', icon: UserCircle },
       {
         to: '/app/fidelidade',
         label: 'Fidelidade',
@@ -110,8 +113,6 @@ const NAV_GROUPS: { label: string; items: NavEntry[] }[] = [
         defaultTab: 'estabelecimento',
         children: [
           { tab: 'estabelecimento', label: 'Estabelecimento', icon: Store },
-          { tab: 'servicos', label: 'Serviços', icon: Scissors },
-          { tab: 'funcionarios', label: 'Colaboradores', icon: Users },
           { tab: 'funcionamento', label: 'Expediente', icon: Clock },
           { tab: 'aparencia', label: 'Aparência', icon: Palette },
           { tab: 'plano', label: 'Plano', icon: Crown },

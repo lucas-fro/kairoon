@@ -352,7 +352,7 @@ function ReportLock() {
   )
 }
 
-/** Barra horizontal genérica com valores em reais (serviços, clientes, colaboradores). Preenche a altura do pai (flex-1 min-h-0). */
+/** Barra horizontal genérica com valores em reais (serviços, clientes, profissionais). Preenche a altura do pai (flex-1 min-h-0). */
 function RevenueBarChart({ data }: { data: RevenueRow[] }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -1067,17 +1067,17 @@ export function ReportsPage() {
             </CardContent>
           </Card>
 
-          {/* 7. Faturamento por colaborador */}
+          {/* 7. Faturamento por profissional */}
           <Card>
             <CardHeader>
-              <CardTitle>Faturamento por colaborador</CardTitle>
+              <CardTitle>Faturamento por profissional</CardTitle>
             </CardHeader>
             <CardContent>
               {renderChart({
                 query: revenueByEmployeeQuery,
                 locked: !advanced,
                 empty: employeeRevenueEmpty,
-                emptyDescription: 'Nenhuma receita por colaborador no intervalo selecionado.',
+                emptyDescription: 'Nenhuma receita por profissional no intervalo selecionado.',
                 children: (
                   <ChartScroll height={peopleRowHeight} minWidth={360}>
                     <RevenueBarChart data={employeeRevenueRows} />

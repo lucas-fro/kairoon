@@ -51,7 +51,7 @@ import { TBody, Table, Td, Th, THead, Tr } from '../ui/Table'
 import { useToast } from '../ui/Toast'
 
 const UPGRADE_BENEFITS = [
-  'Colaboradores ilimitados na sua equipe',
+  'Profissionais ilimitados na sua equipe',
   'Agenda individual para cada profissional',
   'Relatórios completos de desempenho',
 ]
@@ -519,7 +519,7 @@ export function EmployeesTab() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-ink-secondary">Profissionais que atendem no seu negócio.</p>
         <Button leftIcon={<Plus className="h-4 w-4" />} onClick={handleAddClick}>
-          Adicionar colaborador
+          Adicionar profissional
         </Button>
       </div>
 
@@ -543,7 +543,7 @@ export function EmployeesTab() {
           description="Adicione os profissionais da sua equipe para que os clientes possam agendar com eles"
           action={
             <Button leftIcon={<Plus className="h-4 w-4" />} onClick={handleAddClick}>
-              Adicionar colaborador
+              Adicionar profissional
             </Button>
           }
         />
