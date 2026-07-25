@@ -311,12 +311,15 @@ function SidebarContent({
             </div>
           </div>
         ))}
-      </nav>
 
-      {/* Rodapé: banner do teste grátis (some fora do teste) e, só no mobile
-          (o desktop já mostra a chamada no header), a chamada de upgrade. */}
-      <TrialBanner variant="sidebar" />
-      {mobile && <UpgradeBanner variant="sidebar" />}
+        {/* Fecham a navegação, logo depois de Configurações, e rolam junto com o
+            menu em vez de ficarem presos no rodapé. Os dois são o mesmo cartão
+            em estados diferentes de conta e nunca aparecem juntos: o do teste
+            some fora do teste, e o de upgrade só existe no Básico pago (e só no
+            mobile, porque no desktop essa chamada já fica no header). */}
+        <TrialBanner variant="sidebar" />
+        {mobile && <UpgradeBanner variant="sidebar" />}
+      </nav>
     </div>
   )
 }

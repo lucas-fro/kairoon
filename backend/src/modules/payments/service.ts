@@ -11,7 +11,6 @@ import {
 } from '../../lib/asaasClient'
 import { AppError } from '../../lib/errors'
 import { sendPaymentReceiptEmail } from '../../lib/mailer'
-import { TRIAL_DAYS } from '../../lib/plan'
 import {
   MAX_INSTALLMENTS,
   PLANS,
@@ -143,8 +142,9 @@ export async function subscribe(establishmentId: string, remoteIp: string, input
     // - Troca de plano: cobra já no ciclo atual (hoje).
     // - Assinatura nova durante o teste grátis: alinha ao fim do teste
     //   (`trialEndsAt`), reaproveita os dias que faltam, sem duplicar cortesia.
-    // - Teste já expirado: cobra no início (hoje) para reativar a conta.
-    // - Conta legada (sem teste): 14 dias de cortesia, como antes.
+    // - Teste já expirado (ou sem `trialEndsAt`, que o motor de acesso trata do
+    //   mesmo jeito): cobra hoje para reativar a conta. Conceder 14 dias de
+    //   cortesia aqui daria acesso grátis a quem já está em somente-leitura.
     let firstDue: Date
     if (isChange) {
       firstDue = new Date()
@@ -153,11 +153,10 @@ export async function subscribe(establishmentId: string, remoteIp: string, input
         columns: { trialEndsAt: true },
         where: eq(establishments.id, establishmentId),
       })
-      if (establishment?.trialEndsAt) {
-        firstDue = establishment.trialEndsAt > now ? establishment.trialEndsAt : new Date()
-      } else {
-        firstDue = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000)
-      }
+      firstDue =
+        establishment?.trialEndsAt && establishment.trialEndsAt > now
+          ? establishment.trialEndsAt
+          : new Date()
     }
     const nextDueDate = firstDue.toISOString().slice(0, 10)
 

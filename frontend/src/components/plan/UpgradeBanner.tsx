@@ -6,11 +6,12 @@ const UPGRADE_PATH = '/app/configuracoes?tab=plano'
 
 /**
  * Chamada discreta para upgrade de plano. Só aparece para quem tem pra onde
- * subir dentro do checkout (free ou básico) — teste grátis e essencial (topo)
+ * subir dentro do checkout (free ou básico). Teste grátis e essencial (topo)
  * ficam de fora, pois já têm seus próprios avisos (TrialBanner) ou não
  * precisam. `variant='header'`: pílula compacta ao lado do sino (só desktop,
- * a barra do topo não tem espaço no celular). `variant='sidebar'`: cartão no
- * rodapé da sidebar, usado só na versão mobile (drawer).
+ * a barra do topo não tem espaço no celular). `variant='sidebar'`: cartão que
+ * fecha a lista de navegação, depois de Configurações, usado só na versão
+ * mobile (drawer). O espaçamento vem do `space-y` do `nav` que o contém.
  */
 export function UpgradeBanner({ variant }: { variant: 'header' | 'sidebar' }) {
   const navigate = useNavigate()
@@ -22,7 +23,7 @@ export function UpgradeBanner({ variant }: { variant: 'header' | 'sidebar' }) {
 
   if (variant === 'sidebar') {
     return (
-      <div className="mt-3 shrink-0 rounded-lg bg-white/10 p-3">
+      <div className="rounded-lg bg-white/10 p-3">
         <div className="flex items-center gap-2 text-white">
           <Crown className="h-4 w-4 shrink-0" />
           <span className="text-xs font-semibold">Desbloqueie mais recursos</span>

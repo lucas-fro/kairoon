@@ -96,12 +96,72 @@ export async function bunnyDeleteByUrl(
     return
   }
 
+  await bunnyDeletePath(path)
+}
+
+/**
+ * DELETE cru na Storage Zone. Best-effort: nunca propaga erro (a limpeza do
+ * arquivo antigo não pode derrubar a operação que a disparou), mas registra a
+ * falha. Sem o log, um 401/404 do storage passava despercebido e o arquivo
+ * ficava órfão sem nenhum rastro.
+ */
+async function bunnyDeletePath(path: string): Promise<boolean> {
   try {
-    await fetch(storageUrl(path), {
+    const response = await fetch(storageUrl(path), {
       method: 'DELETE',
       headers: { AccessKey: env.BUNNY_STORAGE_PASSWORD! },
     })
-  } catch {
-    // Limpeza best-effort: se falhar, o arquivo antigo apenas fica órfão.
+    // 404 = já não existe, o efeito desejado; não é falha.
+    if (!response.ok && response.status !== 404) {
+      console.error(`[bunny] falha ao apagar ${path}: ${response.status} ${response.statusText}`)
+      return false
+    }
+    return true
+  } catch (err) {
+    console.error(`[bunny] erro de rede ao apagar ${path}:`, err)
+    return false
+  }
+}
+
+interface BunnyListEntry {
+  ObjectName: string
+  IsDirectory: boolean
+}
+
+/**
+ * Apaga TODOS os arquivos da pasta de um estabelecimento (`<establishmentId>/`).
+ * Usado na exclusão da conta: sem isto, logo, banner e fotos dos profissionais
+ * continuavam públicos no CDN depois de a conta ser apagada do banco.
+ * Best-effort e sempre escopado à pasta do tenant.
+ */
+export async function bunnyDeleteEstablishmentFolder(establishmentId: string): Promise<void> {
+  if (!isBunnyConfigured() || !establishmentId) return
+  // O id é um uuid gerado pelo banco; ainda assim, barra qualquer coisa fora
+  // desse formato para nunca montar um path de listagem arbitrário.
+  if (!/^[0-9a-f-]{36}$/i.test(establishmentId)) return
+
+  let entries: BunnyListEntry[]
+  try {
+    const response = await fetch(storageUrl(`${establishmentId}/`), {
+      headers: { AccessKey: env.BUNNY_STORAGE_PASSWORD! },
+    })
+    if (!response.ok) {
+      // 404 = pasta inexistente (conta que nunca subiu imagem).
+      if (response.status !== 404) {
+        console.error(
+          `[bunny] falha ao listar a pasta ${establishmentId}: ${response.status} ${response.statusText}`,
+        )
+      }
+      return
+    }
+    entries = (await response.json()) as BunnyListEntry[]
+  } catch (err) {
+    console.error(`[bunny] erro ao listar a pasta ${establishmentId}:`, err)
+    return
+  }
+
+  for (const entry of entries) {
+    if (entry.IsDirectory || !entry.ObjectName || entry.ObjectName.includes('/')) continue
+    await bunnyDeletePath(`${establishmentId}/${entry.ObjectName}`)
   }
 }

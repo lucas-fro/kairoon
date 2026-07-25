@@ -13,8 +13,14 @@ import {
   getSubscription,
 } from '../../api/payments'
 import { useAuth } from '../../contexts/AuthContext'
-import { cn, formatBRL, formatDate } from '../../lib/format'
-import type { BillingCycle, PlanSlug } from '../../types/api'
+import { cn, formatBRL } from '../../lib/format'
+import type {
+  BillingCycle,
+  PlanFeatureKey,
+  PlanInfo,
+  PlanSlug,
+  Subscription,
+} from '../../types/api'
 import { BillingCycleToggle, getAnnualDiscountPercent } from '../payments/BillingCycleToggle'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
@@ -25,17 +31,53 @@ import { DialogActions } from '../ui/DialogActions'
 import { Skeleton } from '../ui/Skeleton'
 import { useToast } from '../ui/Toast'
 
-// Recursos de contas legadas (criadas antes do sistema de teste, sem
-// trialEndsAt): é o único caso em que o plano 'free' é de fato utilizável para
-// sempre (ver lib/plan.ts#getAccessState). Não representa um "plano grátis"
-// oferecido hoje: contas novas só têm o teste de 14 dias e, sem assinatura
-// depois dele, ficam em somente-leitura (state 'trial_expired').
-const LEGACY_FREE_FEATURES = [
-  '1 profissional',
-  'Agenda e agendamentos ilimitados',
-  'Link público de agendamento',
-  'Cadastro de clientes e histórico',
+// Rótulo de cada recurso gateável. A lista do plano ATUAL é derivada do mapa
+// `features` que o backend devolve, nunca de um mapa fixo por slug: era assim
+// que o plano Profissional (ilimitado) acabava anunciando "Até 10 profissionais".
+const FEATURE_LABELS: [PlanFeatureKey, string][] = [
+  ['personalizacao', 'Página de agendamento personalizada'],
+  ['estoque', 'Controle de estoque'],
+  ['fidelidade', 'Fidelidade e programa de pontos'],
+  ['financeiro', 'Controle financeiro'],
+  ['relatorios', 'Relatórios essenciais'],
+  ['relatorios_avancados', 'Relatórios avançados'],
+  ['cupons', 'Cupons e campanhas de marketing'],
+  ['clientes_crm', 'CRM de clientes (aniversários e sumidos)'],
 ]
+
+// Espelha UNLIMITED (999) de backend/src/lib/plans.ts: o limite trafega como
+// número, então "ilimitado" é qualquer teto absurdamente alto.
+const UNLIMITED_EMPLOYEES = 90
+
+function employeesLabel(limit: number): string {
+  if (limit >= UNLIMITED_EMPLOYEES) return 'Profissionais ilimitados'
+  return limit === 1 ? '1 profissional' : `Até ${limit} profissionais`
+}
+
+/** O que a conta REALMENTE tem agora, montado a partir da resposta de getPlan. */
+function currentPlanFeatures(access: PlanInfo): string[] {
+  return [
+    employeesLabel(access.limits.employees),
+    ...FEATURE_LABELS.filter(([key]) => access.features[key]).map(([, label]) => label),
+  ]
+}
+
+/**
+ * Rótulo do badge, calculado só com o plano JÁ carregado. Derivar de um fallback
+ * fazia a tela afirmar "Plano Free" (um plano que nem existe no catálogo)
+ * enquanto a query estava em voo, e para sempre se ela falhasse.
+ */
+function planBadgeLabel(access: PlanInfo, hadSubscription: boolean): string {
+  switch (access.state) {
+    case 'trial':
+      return 'Teste grátis'
+    case 'trial_expired':
+      // Quem já assinou não teve um "teste" encerrado: teve a assinatura encerrada.
+      return hadSubscription ? 'Assinatura encerrada' : 'Teste encerrado'
+    case 'paid':
+      return `Plano ${access.planName}`
+  }
+}
 
 // Destaques por plano, mostrados nos dois cards do diálogo de upgrade.
 const PLAN_HIGHLIGHTS: Record<PlanSlug, string[]> = {
@@ -55,10 +97,6 @@ const PLAN_HIGHLIGHTS: Record<PlanSlug, string[]> = {
   ],
 }
 
-function isPlanSlug(value: string): value is PlanSlug {
-  return value === 'basico' || value === 'essencial'
-}
-
 const STATUS_LABEL: Record<string, string> = {
   pending: 'Aguardando confirmação do pagamento',
   active: 'Ativa',
@@ -66,8 +104,42 @@ const STATUS_LABEL: Record<string, string> = {
   canceled: 'Cancelada',
 }
 
-function toIsoDate(value: string): string {
-  return value.slice(0, 10)
+/**
+ * Timestamp ISO (UTC) → 'DD/MM/AAAA' no fuso do usuário. Fatiar a string ISO
+ * mostrava o dia seguinte para compras feitas à noite no horário de Brasília.
+ */
+function formatTimestamp(iso: string): string {
+  return new Date(iso).toLocaleDateString('pt-BR')
+}
+
+function isPast(iso: string): boolean {
+  return new Date(iso).getTime() <= Date.now()
+}
+
+/**
+ * Texto do período pago. Compara a data com o presente: antes, "acesso pago
+ * disponível até X" e "próxima cobrança em X" continuavam no presente mesmo
+ * depois de X ter passado.
+ */
+function subscriptionPeriodLabel(subscription: Subscription): string | null {
+  const end = subscription.currentPeriodEnd
+  if (!end) return null
+  const date = formatTimestamp(end)
+  const ended = isPast(end)
+
+  if (subscription.status === 'canceled') {
+    return ended ? `Acesso pago encerrado em ${date}.` : `Acesso pago disponível até ${date}.`
+  }
+  if ((subscription.installments ?? 0) >= 2) {
+    return ended
+      ? `Plano anual parcelado em ${subscription.installments}x · acesso pago encerrado em ${date}.`
+      : `Plano anual parcelado em ${subscription.installments}x · acesso pago até ${date}.`
+  }
+  // Recorrente: o webhook PAYMENT_CONFIRMED avança o período a cada cobrança
+  // confirmada, então uma data no passado significa renovação ainda em curso.
+  return ended
+    ? `Renovação em processamento (vencimento em ${date}).`
+    : `Próxima cobrança em ${date}.`
 }
 
 export function PlanTab() {
@@ -103,7 +175,10 @@ export function PlanTab() {
       queryClient.invalidateQueries({ queryKey: ['payments', 'subscription'] })
       queryClient.invalidateQueries({ queryKey: ['plan'] })
     },
-    onError: () => toast.error('Não foi possível cancelar a assinatura. Tente novamente.'),
+    onError: (err) =>
+      toast.error(
+        err instanceof ApiError ? err.message : 'Não foi possível cancelar a assinatura. Tente novamente.',
+      ),
   })
 
   const changeMutation = useMutation({
@@ -129,36 +204,23 @@ export function PlanTab() {
   const access = planQuery.data
   const trialState = access?.state
   const trialDaysLeft = access?.trialDaysLeft ?? 0
-  const planName = access?.plan ?? 'free'
-  // Durante o teste o plano efetivo é 'essencial'; rotulamos como teste para não
-  // dar a impressão de que já é uma assinatura paga.
-  const planLabel =
-    trialState === 'trial'
-      ? 'Teste grátis'
-      : trialState === 'trial_expired'
-        ? 'Teste encerrado'
-        : `Plano ${planName.charAt(0).toUpperCase()}${planName.slice(1)}`
-
-  // Recursos exibidos abaixo do badge: reflete o que a conta TEM agora, não uma
-  // lista fixa de "grátis". No teste o efetivo é o essencial; em trial_expired
-  // não mostramos nada (a conta está em somente-leitura, o aviso abaixo já
-  // explica); 'profissional' (plano sob consulta) cai no highlight do
-  // essencial, do qual é superset.
-  const planFeaturesList: string[] | null =
-    trialState === undefined
-      ? null
-      : trialState === 'free'
-        ? LEGACY_FREE_FEATURES
-        : trialState === 'trial_expired'
-          ? null
-          : trialState === 'trial'
-            ? PLAN_HIGHLIGHTS.essencial
-            : isPlanSlug(planName)
-              ? PLAN_HIGHLIGHTS[planName]
-              : PLAN_HIGHLIGHTS.essencial
 
   const subscription = subscriptionQuery.data?.subscription ?? null
-  const hasSubscriptionRecord = subscription !== null
+  // A escolha entre troca tokenizada e checkout depende deste dado. Enquanto ele
+  // não chega (ou falha), tratar como "sem assinatura" mandaria um assinante pro
+  // checkout e o cobraria de novo, por isso os botões esperam.
+  const subscriptionReady = subscriptionQuery.isSuccess
+  const hadSubscription = subscription !== null
+
+  const planLabel = access ? planBadgeLabel(access, hadSubscription) : null
+
+  // Recursos exibidos abaixo do badge: o que a conta TEM agora, derivado do
+  // payload. Em trial_expired (travada) e free (sem assinatura) não há lista de
+  // benefícios a exibir: o aviso logo abaixo explica o estado.
+  const planFeaturesList =
+    access && (access.state === 'paid' || access.state === 'trial')
+      ? currentPlanFeatures(access)
+      : null
   // Anual parcelado: as parcelas já foram compradas; não há assinatura pra
   // cancelar nem cartão tokenizado pra trocar de plano. Um registro parcelado
   // (installments>=2) é diferente da assinatura recorrente.
@@ -171,11 +233,25 @@ export function PlanTab() {
     subscription?.status !== 'canceled' &&
     !!subscription?.currentPeriodEnd &&
     new Date(subscription.currentPeriodEnd) > new Date()
-  const canCancel = subscription !== null && subscription.status !== 'canceled' && !installmentTermActive
+  // Exige também acesso pago vigente: quando o período vence, o registro ainda
+  // pode chegar como 'active' de /payments/subscription enquanto o motor de
+  // acesso já o encerrou, e o cancelamento então falharia com 404.
+  const canCancel =
+    access?.state === 'paid' &&
+    subscription !== null &&
+    subscription.status !== 'canceled' &&
+    !installmentTermActive
   // Assinatura viva = cartão tokenizado no Asaas: dá pra trocar de plano sem
   // pedir o cartão de novo. Sem ela (free/cancelada/parcelada), cai no checkout.
   const hasActiveSub = subscription !== null && subscription.status !== 'canceled'
   const canTokenizedChange = hasActiveSub && !isInstallmentRecord
+
+  // Abre o diálogo no ciclo que a conta já assina: abrir sempre no anual fazia o
+  // card do plano atual aparecer como "Assinar", com um preço que ela não paga.
+  function openUpgrade() {
+    if (subscription?.billingCycle) setSelectedCycle(subscription.billingCycle)
+    setUpgradeOpen(true)
+  }
 
   function handlePickPlan(planSlug: PlanSlug) {
     if (installmentTermActive) {
@@ -204,19 +280,41 @@ export function PlanTab() {
       : confirmInfo.monthlyCents
     : 0
   const savedCard = paymentMethodQuery.data ?? null
+  const periodLabel = subscription ? subscriptionPeriodLabel(subscription) : null
+  // Só anuncia a data da próxima cobrança se ela ainda estiver no futuro.
   const nextChargeLabel =
-    subscription?.currentPeriodEnd && subscription.status !== 'canceled'
-      ? formatDate(toIsoDate(subscription.currentPeriodEnd))
+    subscription?.currentPeriodEnd &&
+    subscription.status !== 'canceled' &&
+    !isPast(subscription.currentPeriodEnd)
+      ? formatTimestamp(subscription.currentPeriodEnd)
       : null
+
+  // A copy antiga ("Assine para desbloquear os recursos pagos") era falsa em dois
+  // estados: no teste tudo já está liberado, e quem já paga não tem nada travado.
+  const upgradeDescription =
+    trialState === 'trial'
+      ? `Escolha um plano para não perder o acesso quando o teste acabar (faltam ${trialDaysLeft} ${
+          trialDaysLeft === 1 ? 'dia' : 'dias'
+        }).`
+      : trialState === 'paid'
+        ? 'Compare os planos e altere sua assinatura quando quiser.'
+        : trialState === 'trial_expired'
+          ? 'Assine um plano para voltar a criar e editar na sua conta.'
+          : 'Assine um plano para liberar todos os recursos do Kairoon.'
 
   return (
     <Card>
       <CardHeader className="flex-wrap">
         <CardTitle>Seu plano</CardTitle>
-        <Badge tone="brand">
-          <Crown className="h-3 w-3" />
-          {planLabel}
-        </Badge>
+        {/* Sem dado carregado não há rótulo: o badge não pode "chutar" um plano. */}
+        {planQuery.isPending ? (
+          <Skeleton className="h-6 w-32 rounded-full" />
+        ) : planLabel ? (
+          <Badge tone="brand">
+            <Crown className="h-3 w-3" />
+            {planLabel}
+          </Badge>
+        ) : null}
       </CardHeader>
       <CardContent>
         {planFeaturesList && (
@@ -234,7 +332,7 @@ export function PlanTab() {
           {planQuery.isPending && <Skeleton className="h-5 w-48" />}
           {planQuery.isError && (
             <span className="text-sm text-ink-secondary">
-              Não foi possível carregar o uso do plano.{' '}
+              Não foi possível carregar o seu plano.{' '}
               <button
                 type="button"
                 onClick={() => planQuery.refetch()}
@@ -244,72 +342,88 @@ export function PlanTab() {
               </button>
             </span>
           )}
-          {planQuery.data && (
+          {access && (
             <span className="flex items-center gap-2 text-sm text-ink-secondary">
               <UserCircle className="h-4 w-4 text-primary" />
-              {planQuery.data.limits.employees >= 90
-                ? `Profissionais cadastrados: ${planQuery.data.usage.employees}`
-                : `Profissionais: ${planQuery.data.usage.employees} de ${planQuery.data.limits.employees}`}
+              {/* Em somente-leitura o limite não é capacidade disponível: nenhum
+                  cadastro passa, então anunciar "3 de 10" prometia 7 vagas. */}
+              {!access.canWrite
+                ? `Profissionais cadastrados: ${access.usage.employees} · novos cadastros bloqueados`
+                : access.limits.employees >= UNLIMITED_EMPLOYEES
+                  ? `Profissionais cadastrados: ${access.usage.employees}`
+                  : `Profissionais: ${access.usage.employees} de ${access.limits.employees}`}
             </span>
           )}
         </div>
 
-        {(trialState === 'trial' || trialState === 'trial_expired') && (
+        {access && access.state !== 'paid' && (
           <div
             className={`mt-3 rounded-lg px-4 py-3 text-sm ${
-              trialState === 'trial_expired'
+              access.state === 'trial_expired'
                 ? 'bg-error-light text-error-dark'
                 : 'bg-secondary-light text-ink-secondary'
             }`}
           >
-            {trialState === 'trial'
+            {access.state === 'trial'
               ? `Teste grátis com tudo desbloqueado. Faltam ${trialDaysLeft} ${
                   trialDaysLeft === 1 ? 'dia' : 'dias'
                 }. Assine para não perder o acesso.`
-              : 'Seu teste grátis acabou. A conta está em somente-leitura até você assinar um plano.'}
+              : hadSubscription
+                ? 'Sua assinatura terminou. A conta está em somente-leitura até você assinar de novo.'
+                : 'Seu teste grátis acabou. A conta está em somente-leitura até você assinar um plano.'}
           </div>
         )}
 
-        {hasSubscriptionRecord && subscription && (
+        {/* Falha aqui fazia a página parecer "sem assinatura": o bloco de status
+            sumia sem aviso e a compra era desviada pro checkout. */}
+        {subscriptionQuery.isError && (
+          <div className="mt-3 rounded-lg bg-background px-4 py-3 text-sm text-ink-secondary">
+            Não foi possível carregar sua assinatura.{' '}
+            <button
+              type="button"
+              onClick={() => subscriptionQuery.refetch()}
+              className="font-medium text-primary underline-offset-2 hover:underline"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
+
+        {subscription && (
           <div className="mt-3 rounded-lg bg-background px-4 py-3 text-sm text-ink-secondary">
             <p>
               Status:{' '}
               <span className="font-medium text-ink">{STATUS_LABEL[subscription.status] ?? subscription.status}</span>
             </p>
-            {subscription.status === 'canceled' && subscription.currentPeriodEnd && (
-              <p className="mt-1">
-                Acesso pago disponível até {formatDate(toIsoDate(subscription.currentPeriodEnd))}.
-              </p>
-            )}
-            {subscription.status !== 'canceled' && subscription.currentPeriodEnd && (
-              <p className="mt-1">
-                {isInstallmentRecord
-                  ? `Plano anual parcelado em ${subscription.installments}x · acesso pago até ${formatDate(
-                      toIsoDate(subscription.currentPeriodEnd),
-                    )}.`
-                  : `Próxima cobrança em ${formatDate(toIsoDate(subscription.currentPeriodEnd))}.`}
-              </p>
-            )}
+            {periodLabel && <p className="mt-1">{periodLabel}</p>}
           </div>
         )}
 
-        <div className="mt-6 flex flex-wrap justify-end gap-2">
+        <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
           {canCancel && (
             <Button type="button" variant="outline" onClick={() => setCancelOpen(true)}>
               Cancelar assinatura
             </Button>
           )}
-          <Button type="button" onClick={() => setUpgradeOpen(true)}>
-            Fazer upgrade
-          </Button>
+          {/* Acima do catálogo (Profissional) o diálogo só teria planos
+              INFERIORES: "Fazer upgrade" ali levava a um downgrade cobrado. */}
+          {access?.isAboveCatalog ? (
+            <p className="text-sm text-ink-secondary">
+              Você está no plano mais completo. Fale com o suporte para alterar sua assinatura.
+            </p>
+          ) : (
+            <Button type="button" onClick={openUpgrade} disabled={!subscriptionReady}>
+              {trialState === 'paid' ? 'Mudar de plano' : 'Assinar um plano'}
+            </Button>
+          )}
         </div>
       </CardContent>
 
       <Dialog
         open={upgradeOpen}
         onClose={() => setUpgradeOpen(false)}
-        title="Escolha seu plano"
-        description="Assine para desbloquear os recursos pagos do Kairoon."
+        title={trialState === 'paid' ? 'Mudar de plano' : 'Escolha seu plano'}
+        description={upgradeDescription}
         maxWidth="max-w-2xl"
       >
         {/* Ciclo de cobrança (mensal / anual) no topo */}
@@ -347,11 +461,11 @@ export function PlanTab() {
               // não assustar como um número grande sozinho assustaria.
               const monthlyEquivalentCents =
                 selectedCycle === 'yearly' ? info.yearlyCents / 12 : info.monthlyCents
-              const isCurrent =
-                hasActiveSub &&
-                subscription?.planSlug === slug &&
-                subscription?.billingCycle === selectedCycle
-              const recommended = slug === 'essencial'
+              // O plano assinado é o mesmo independentemente do ciclo escolhido
+              // no toggle; só o botão muda (trocar de ciclo vs já é o atual).
+              const isCurrentPlan = hasActiveSub && subscription?.planSlug === slug
+              const isCurrentCycle = isCurrentPlan && subscription?.billingCycle === selectedCycle
+              const recommended = slug === 'essencial' && !isCurrentPlan
               return (
                 <div
                   key={slug}
@@ -367,7 +481,14 @@ export function PlanTab() {
                       Recomendado
                     </span>
                   )}
-                  <h3 className="font-display text-base font-semibold text-ink">{info.name}</h3>
+                  <h3 className="font-display text-base font-semibold text-ink">
+                    {info.name}
+                    {isCurrentPlan && (
+                      <span className="ml-2 text-xs font-medium text-primary">
+                        Plano atual ({subscription?.billingCycle === 'yearly' ? 'anual' : 'mensal'})
+                      </span>
+                    )}
+                  </h3>
                   <div className="mt-3">
                     <span className="font-display text-2xl font-bold text-ink">
                       {formatBRL(monthlyEquivalentCents)}
@@ -375,7 +496,11 @@ export function PlanTab() {
                     <span className="text-sm text-ink-secondary">/mês</span>
                     {selectedCycle === 'yearly' && (
                       <p className="mt-0.5 text-xs text-ink-tertiary">
-                        {formatBRL(info.yearlyCents)}/ano em até 12x no cartão
+                        {/* Parcelar só existe no checkout: a troca tokenizada
+                            (changePlan) faz uma cobrança anual única. */}
+                        {canTokenizedChange
+                          ? `${formatBRL(info.yearlyCents)} cobrados uma vez por ano`
+                          : `${formatBRL(info.yearlyCents)}/ano em até 12x no cartão`}
                       </p>
                     )}
                   </div>
@@ -387,14 +512,27 @@ export function PlanTab() {
                       </li>
                     ))}
                   </ul>
+                  {/* O motivo aparece no card, não num toast depois do clique. */}
+                  {installmentTermActive && subscription?.currentPeriodEnd && (
+                    <p className="mt-3 text-xs text-ink-tertiary">
+                      Troca disponível ao fim do período pago, em{' '}
+                      {formatTimestamp(subscription.currentPeriodEnd)}.
+                    </p>
+                  )}
                   <Button
                     type="button"
                     variant={recommended ? 'primary' : 'outline'}
                     className="mt-5 w-full"
-                    disabled={isCurrent}
+                    disabled={isCurrentCycle || installmentTermActive}
                     onClick={() => handlePickPlan(slug)}
                   >
-                    {isCurrent ? 'Plano atual' : 'Assinar'}
+                    {isCurrentCycle
+                      ? 'Plano atual'
+                      : installmentTermActive
+                        ? 'Indisponível agora'
+                        : isCurrentPlan
+                          ? 'Mudar para este ciclo'
+                          : 'Assinar'}
                   </Button>
                 </div>
               )

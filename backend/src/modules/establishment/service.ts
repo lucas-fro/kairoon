@@ -1,10 +1,11 @@
 import { and, asc, eq, ne, sql } from 'drizzle-orm'
 import { db } from '../../db'
 import { employees, establishments, timeBlocks, users, workingHours } from '../../db/schema'
+import { bunnyDeleteByUrl, bunnyDeleteEstablishmentFolder } from '../../lib/bunnyStorage'
 import { timeToMinutes } from '../../lib/datetime'
 import { AppError } from '../../lib/errors'
 import { getAccessState, getEffectivePlan } from '../../lib/plan'
-import { planFeatureMap, planHasFeature, planTier } from '../../lib/plans'
+import { planFeatureMap, planHasFeature, planIsAboveCatalog, planTier } from '../../lib/plans'
 import type {
   CreateTimeBlockInput,
   UpdateEstablishmentInput,
@@ -47,13 +48,38 @@ export async function updateEstablishment(
   const stillHasChanges = Object.values(data).some((value) => value !== undefined)
   if (!stillHasChanges) return getEstablishment(establishmentId)
 
+  // Guarda as imagens atuais para apagar as substituídas DEPOIS de gravar. A
+  // limpeza mora aqui, e não no upload, por dois motivos: o backend sabe qual é
+  // a URL atual (o cliente poderia forjar) e, se a gravação falhar, o arquivo
+  // antigo continua existindo, sem deixar o banco apontando para um arquivo
+  // inexistente. Cobre também a REMOÇÃO (novo valor vazio), que antes só
+  // limpava a coluna e deixava o arquivo no CDN para sempre.
+  const before = await db.query.establishments.findFirst({
+    columns: { logoUrl: true, bannerImageUrl: true },
+    where: eq(establishments.id, establishmentId),
+  })
+
   const [updated] = await db
     .update(establishments)
     .set(data)
     .where(eq(establishments.id, establishmentId))
     .returning()
   if (!updated) throw new AppError('Estabelecimento não encontrado', 404)
+
+  await deleteReplacedImage(before?.logoUrl, updated.logoUrl, establishmentId)
+  await deleteReplacedImage(before?.bannerImageUrl, updated.bannerImageUrl, establishmentId)
+
   return updated
+}
+
+/** Apaga a imagem antiga quando ela deixou de ser referenciada pelo registro. */
+async function deleteReplacedImage(
+  previous: string | null | undefined,
+  next: string | null | undefined,
+  establishmentId: string,
+): Promise<void> {
+  if (!previous || previous === next) return
+  await bunnyDeleteByUrl(previous, establishmentId)
 }
 
 export async function updateSlug(establishmentId: string, slug: string) {
@@ -141,6 +167,12 @@ export async function getPlan(establishmentId: string) {
 
   return {
     plan: access.plan,
+    // Nome exibível do plano efetivo: a UI não deve capitalizar o slug (viraria
+    // "Basico" sem acento, ou "Free", que não é um plano oferecido).
+    planName: tier.label,
+    // Acima do que o checkout vende (Profissional): a UI não pode oferecer
+    // "upgrade" para planos inferiores nesse caso.
+    isAboveCatalog: planIsAboveCatalog(access.plan),
     // Estado de acesso para a UI (banners de teste + modo somente-leitura).
     state: access.state,
     canWrite: access.canWrite,
@@ -153,8 +185,20 @@ export async function getPlan(establishmentId: string) {
 }
 
 export async function deleteAccount(userId: string) {
+  // Coleta os estabelecimentos ANTES do delete: depois do cascade não há mais
+  // como saber quais pastas do CDN limpar, e as imagens ficariam públicas para
+  // sempre, contradizendo a promessa de exclusão definitiva.
+  const owned = await db.query.establishments.findMany({
+    columns: { id: true },
+    where: eq(establishments.ownerId, userId),
+  })
+
   const deleted = await db.delete(users).where(eq(users.id, userId)).returning({ id: users.id })
   if (deleted.length === 0) throw new AppError('Usuário não encontrado', 404)
+
+  for (const est of owned) {
+    await bunnyDeleteEstablishmentFolder(est.id)
+  }
 }
 
 export async function listTimeBlocks(establishmentId: string) {

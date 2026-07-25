@@ -39,6 +39,9 @@ async function main() {
       name: 'Barbearia Navalha de Ouro',
       slug: 'navalha-de-ouro',
       businessType: 'barbearia',
+      // Sem isto a conta nasce como teste vencido (somente-leitura), já que
+      // trialEndsAt null não concede mais acesso gravável.
+      trialEndsAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
       phone: '11987654321',
       document: '12.345.678/0001-90',
       address: 'Av. Paulista, 1000 · Bela Vista, São Paulo/SP',

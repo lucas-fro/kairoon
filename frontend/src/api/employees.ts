@@ -3,7 +3,6 @@ import { api } from './client'
 
 export interface EmployeePayload {
   name: string
-  photoUrl?: string
   email?: string
   phone?: string
   birthDate?: string

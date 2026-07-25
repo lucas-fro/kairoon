@@ -23,7 +23,6 @@ import {
 import type { EmployeePayload } from '../../api/employees'
 import { getPlan } from '../../api/establishment'
 import { listServices } from '../../api/services'
-import { uploadImage } from '../../api/uploads'
 import { WEEKDAY_LABELS_SHORT } from '../../lib/dates'
 import {
   cn,
@@ -43,7 +42,6 @@ import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { Dialog } from '../ui/Dialog'
 import { DialogActions } from '../ui/DialogActions'
 import { EmptyState } from '../ui/EmptyState'
-import { ImageUploadField } from '../ui/ImageUploadField'
 import { Input } from '../ui/Input'
 import { SelectMenu } from '../ui/SelectMenu'
 import type { SelectMenuOption } from '../ui/SelectMenu'
@@ -103,7 +101,6 @@ function parseCommissionValue(raw: string, type: CommissionType): number {
 
 interface FormState {
   name: string
-  photoUrl: string
   email: string
   phone: string
   birthDate: string
@@ -132,7 +129,6 @@ interface FormState {
 
 const EMPTY_FORM: FormState = {
   name: '',
-  photoUrl: '',
   email: '',
   phone: '',
   birthDate: '',
@@ -325,7 +321,6 @@ export function EmployeesTab() {
     setEditing(employee)
     setForm({
       name: employee.name,
-      photoUrl: employee.photoUrl ?? '',
       email: employee.email ?? '',
       phone: formatPhone(employee.phone ?? ''),
       birthDate: isoToDateBR(employee.birthDate),
@@ -566,7 +561,6 @@ export function EmployeesTab() {
       id: editing?.id,
       data: {
         name: form.name.trim(),
-        photoUrl: form.photoUrl.trim() || undefined,
         email: form.email.trim(),
         phone: onlyDigits(form.phone),
         birthDate: dateBRToIso(form.birthDate),
@@ -670,17 +664,9 @@ export function EmployeesTab() {
                 <Tr key={employee.id}>
                   <Td>
                     <div className="flex items-center gap-3">
-                      {employee.photoUrl ? (
-                        <img
-                          src={employee.photoUrl}
-                          alt={employee.name}
-                          className="h-9 w-9 shrink-0 rounded-lg object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-semibold text-primary">
-                          {getInitials(employee.name)}
-                        </div>
-                      )}
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-semibold text-primary">
+                        {getInitials(employee.name)}
+                      </div>
                       <span className="font-medium text-ink">{employee.name}</span>
                       {employee.isOwner && (
                         <span
@@ -885,22 +871,6 @@ export function EmployeesTab() {
                 options={GENDER_OPTIONS}
               />
             </div>
-            <ImageUploadField
-              label="Foto do profissional (opcional)"
-              hint="PNG, JPG ou WEBP, até 5 MB."
-              value={form.photoUrl || null}
-              name={form.name || 'Profissional'}
-              variant="circle"
-              onUpload={async (file) => {
-                // Sem `replaces`: a foto só é persistida ao salvar o profissional
-                // (não no upload). Apagar a foto antiga aqui deixaria o registro
-                // apontando para um arquivo inexistente se o usuário cancelar.
-                const { url } = await uploadImage('photo', file)
-                setForm((f) => ({ ...f, photoUrl: url }))
-              }}
-              onRemove={() => setForm((f) => ({ ...f, photoUrl: '' }))}
-            />
-
             {error && <p className="text-xs text-error-dark">{error}</p>}
 
             <DialogActions className="pt-2">

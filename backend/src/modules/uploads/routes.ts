@@ -8,9 +8,9 @@ export async function uploadsRoutes(app: FastifyInstance) {
 
   /**
    * Recebe uma imagem (multipart) e devolve a URL pública na Bunny CDN. Não
-   * persiste nada: o frontend grava a URL no campo certo (logoUrl / bannerImageUrl
-   * / photoUrl) pelos endpoints já existentes. Banner segue o gate de plano
-   * `personalizacao` (logo e foto são liberados em qualquer plano, como hoje).
+   * persiste nada: o frontend grava a URL no campo certo (logoUrl /
+   * bannerImageUrl) pelo endpoint de estabelecimento. Banner segue o gate de
+   * plano `personalizacao` (logo é liberado em qualquer plano, como hoje).
    * É um POST mutante, então o gate global de somente-leitura já barra contas
    * com teste expirado.
    */
@@ -19,7 +19,7 @@ export async function uploadsRoutes(app: FastifyInstance) {
     // sobrescrever), então limita a taxa para conter abuso de storage/custo.
     config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
   }, async (request) => {
-    const { kind, replaces } = uploadImageQuerySchema.parse(request.query)
+    const { kind } = uploadImageQuerySchema.parse(request.query)
     if (kind === 'banner') {
       await assertFeature(request.user.establishmentId, 'personalizacao')
     }
@@ -28,7 +28,6 @@ export async function uploadsRoutes(app: FastifyInstance) {
       establishmentId: request.user.establishmentId,
       kind,
       image,
-      replaces,
     })
     return { url }
   })

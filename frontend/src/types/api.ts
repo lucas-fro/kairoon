@@ -133,7 +133,6 @@ export interface Employee {
   id: string
   establishmentId: string
   name: string
-  photoUrl: string | null
   email: string | null
   phone: string | null
   birthDate: string | null
@@ -583,11 +582,21 @@ export type PlanFeatureKey =
   | 'cupons'
   | 'clientes_crm'
 
-/** Estado de acesso da conta (ver backend lib/plan.ts#getAccessState). */
-export type AccessState = 'paid' | 'trial' | 'trial_expired' | 'free'
+/**
+ * Estado de acesso da conta (ver backend lib/plan.ts#getAccessState). Não há
+ * estado gratuito permanente: ou é assinatura paga, ou teste, ou somente-leitura.
+ */
+export type AccessState = 'paid' | 'trial' | 'trial_expired'
 
 export interface PlanInfo {
   plan: string
+  /** Nome exibível do plano efetivo ("Básico", "Essencial", "Profissional"). */
+  planName: string
+  /**
+   * true quando o plano atual está acima de tudo que o checkout vende (hoje só
+   * o Profissional): não há upgrade a oferecer, só downgrades.
+   */
+  isAboveCatalog: boolean
   /** Estado de acesso, usado nos banners de teste e no modo somente-leitura. */
   state: AccessState
   /** false quando o teste grátis acabou sem assinatura: conta em somente-leitura. */
@@ -689,7 +698,7 @@ export interface PublicEstablishment {
     isPackage: boolean
     originalPriceCents: number | null
   }[]
-  employees: { id: string; name: string; photoUrl: string | null }[]
+  employees: { id: string; name: string }[]
   workingHours: WorkingHour[]
 }
 

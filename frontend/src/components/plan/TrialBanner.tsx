@@ -8,9 +8,10 @@ const UPGRADE_PATH = '/app/configuracoes?tab=plano'
 
 /**
  * Banner do teste grátis: contagem regressiva durante o teste e aviso de
- * somente-leitura quando expira. Renderiza `null` fora do teste (planos pagos /
- * free legado). `variant='sidebar'` é a versão compacta (rodapé da sidebar);
- * `variant='page'` é a versão destacada (topo do dashboard).
+ * somente-leitura quando expira. Renderiza `null` fora do teste (planos pagos).
+ * `variant='sidebar'` é a versão compacta, último item da navegação (o
+ * espaçamento vem do `space-y` do `nav` que a contém); `variant='page'` é a
+ * versão destacada (topo do dashboard).
  */
 export function TrialBanner({ variant = 'page' }: { variant?: 'page' | 'sidebar' }) {
   const navigate = useNavigate()
@@ -25,7 +26,7 @@ export function TrialBanner({ variant = 'page' }: { variant?: 'page' | 'sidebar'
 
   if (variant === 'sidebar') {
     return (
-      <div className="mt-3 shrink-0 rounded-lg bg-white/10 p-3">
+      <div className="rounded-lg bg-white/10 p-3">
         <div className="flex items-center gap-2 text-white">
           {expired ? <Lock className="h-4 w-4 shrink-0" /> : <Clock className="h-4 w-4 shrink-0" />}
           <span className="text-xs font-semibold">

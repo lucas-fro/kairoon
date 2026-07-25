@@ -1,14 +1,6 @@
 import { z } from 'zod'
 import { DATE_REGEX, TIME_REGEX, isValidDateStr } from '../../lib/datetime'
 
-// URL válida ou string vazia (vazia → null). Ausente → undefined (não altera no update).
-const photoUrlSchema = z
-  .string()
-  .url('URL da foto inválida')
-  .or(z.literal(''))
-  .optional()
-  .transform((value) => (value === undefined ? undefined : value === '' ? null : value))
-
 // Campo de texto opcional: ausente → não altera, vazio → limpa (null)
 const emptyToNull = <T extends z.ZodTypeAny>(schema: T) =>
   schema
@@ -18,7 +10,6 @@ const emptyToNull = <T extends z.ZodTypeAny>(schema: T) =>
 
 export const createEmployeeSchema = z.object({
   name: z.string().min(2, 'Informe o nome do profissional (mínimo 2 caracteres)'),
-  photoUrl: photoUrlSchema,
   email: emptyToNull(z.string().trim().email('E-mail inválido')),
   phone: emptyToNull(z.string().trim().max(20, 'Telefone inválido')),
   birthDate: emptyToNull(

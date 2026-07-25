@@ -921,7 +921,11 @@ async function main() {
     name: 'Barbearia Navalha de Ouro',
     slug: 'navalha-de-ouro',
     businessType: 'barbearia',
-    plan: 'pro',
+    // 'pro' não existe em PLAN_TIERS (lib/plans.ts): caía no tier free, com 1
+    // profissional e nenhum recurso liberado, o oposto do que a demo quer.
+    plan: 'profissional',
+    // Conta de demonstração não deve expirar durante o uso.
+    trialEndsAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
     phone: '11987654321',
     email: 'contato@navalhadeouro.com',
     document: '12.345.678/0001-90',

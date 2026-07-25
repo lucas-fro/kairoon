@@ -264,74 +264,83 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
             logo abre o editor de recorte/zoom/posição. */}
         <div className="rounded-xl border border-line-divider bg-background p-4">
           <p className="mb-2 text-xs font-medium text-ink-tertiary">Prévia do link público</p>
-          <div className="relative w-full pb-14">
-            {/* Banner */}
-            <div
-              className="relative h-32 w-full overflow-hidden rounded-2xl"
-              style={{ backgroundColor: previewColor }}
-            >
-              {previewBanner && (
-                <img src={previewBanner} alt="" className="h-full w-full object-cover" />
-              )}
-              <button
-                type="button"
-                onClick={() => setEditing('banner')}
-                disabled={!hasPersonalizacao}
-                aria-label="Editar banner"
-                title={hasPersonalizacao ? 'Editar banner' : 'Disponível no plano Básico'}
-                className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-ink/55 text-white shadow-sm backdrop-blur-sm transition-colors enabled:hover:bg-ink/75 disabled:cursor-not-allowed disabled:opacity-50"
+          {/* Coluna com largura de celular: em tela larga o preview esticava e o
+              banner virava uma tira baixa, sugerindo um recorte que não é o que
+              o visitante vê. */}
+          <div className="mx-auto w-full max-w-[320px]">
+            <div className="relative w-full pb-14">
+              {/* Banner: mesma proporção do link público no celular (40dvh de
+                  altura numa viewport de 390x844), então o recorte da imagem
+                  aparece aqui como vai aparecer lá. */}
+              <div
+                className="relative aspect-[390/338] w-full overflow-hidden rounded-2xl"
+                style={{ backgroundColor: previewColor }}
               >
-                <Pencil className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Logo transpassando a borda inferior do banner */}
-            <div className="absolute left-1/2 top-32 h-24 w-24 -translate-x-1/2 -translate-y-1/2">
-              <div className="h-full w-full overflow-hidden rounded-full border-4 border-surface bg-surface shadow-card">
-                {logoUrl ? (
-                  <img
-                    src={logoUrl}
-                    alt={establishment.name}
-                    className="h-full w-full rounded-full object-cover"
-                  />
-                ) : (
-                  // Sem logo do estabelecimento: usa a marca da Kairoon.
-                  <div className="flex h-full w-full items-center justify-center rounded-full bg-surface">
-                    <img src="/logo.svg" alt="Kairoon" className="h-9 w-auto" />
-                  </div>
+                {previewBanner && (
+                  <img src={previewBanner} alt="" className="h-full w-full object-cover" />
                 )}
+                <button
+                  type="button"
+                  onClick={() => setEditing('banner')}
+                  disabled={!hasPersonalizacao}
+                  aria-label="Editar banner"
+                  title={hasPersonalizacao ? 'Editar banner' : 'Disponível no plano Básico'}
+                  className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-ink/55 text-white shadow-sm backdrop-blur-sm transition-colors enabled:hover:bg-ink/75 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setEditing('logo')}
-                aria-label="Editar logo"
-                title="Editar logo"
-                className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-ink/70 text-white shadow-sm ring-2 ring-surface transition-colors hover:bg-ink/85"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </button>
+
+              {/* Logo transpassando a borda inferior do banner. A posição segue a
+                  borda (100% menos o pb-14 do wrapper) porque a altura do banner
+                  agora é proporcional à largura, não mais fixa. */}
+              <div className="absolute left-1/2 top-[calc(100%-3.5rem)] h-24 w-24 -translate-x-1/2 -translate-y-1/2">
+                <div className="h-full w-full overflow-hidden rounded-full border-4 border-surface bg-surface shadow-card">
+                  {logoUrl ? (
+                    <img
+                      src={logoUrl}
+                      alt={establishment.name}
+                      className="h-full w-full rounded-full object-cover"
+                    />
+                  ) : (
+                    // Sem logo do estabelecimento: usa a marca da Kairoon.
+                    <div className="flex h-full w-full items-center justify-center rounded-full bg-surface">
+                      <img src="/logo.svg" alt="Kairoon" className="h-9 w-auto" />
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditing('logo')}
+                  aria-label="Editar logo"
+                  title="Editar logo"
+                  className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-ink/70 text-white shadow-sm ring-2 ring-surface transition-colors hover:bg-ink/85"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
-          </div>
-          <p className="text-center font-display text-lg font-semibold text-ink">
-            {establishment.name}
-          </p>
-          {welcomeMessage.trim() && (
-            <p className="mt-1 text-center text-sm text-ink-secondary">{welcomeMessage.trim()}</p>
-          )}
-          <div className="mt-3 text-center text-xs text-ink-tertiary">
-            {hasPersonalizacao ? (
-              footerMessage.trim() ? (
-                <span className="text-ink-secondary">{footerMessage.trim()}</span>
-              ) : (
-                <span>Sem marca Kairoon</span>
-              )
-            ) : (
-              <span className="inline-flex items-center gap-1.5">
-                Agendamento feito pela
-                <KairoonMark className="h-3 w-auto" />
-                Kairoon
-              </span>
+            <p className="text-center font-display text-lg font-semibold text-ink">
+              {establishment.name}
+            </p>
+            {welcomeMessage.trim() && (
+              <p className="mt-1 text-center text-sm text-ink-secondary">{welcomeMessage.trim()}</p>
             )}
+            <div className="mt-3 text-center text-xs text-ink-tertiary">
+              {hasPersonalizacao ? (
+                footerMessage.trim() ? (
+                  <span className="text-ink-secondary">{footerMessage.trim()}</span>
+                ) : (
+                  <span>Sem marca Kairoon</span>
+                )
+              ) : (
+                <span className="inline-flex items-center gap-1.5">
+                  Agendamento feito pela
+                  <KairoonMark className="h-3 w-auto" />
+                  Kairoon
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -354,7 +363,7 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
           name={establishment.name}
           shape="circle"
           onSave={async (file) => {
-            const { url } = await uploadImage('logo', file, logoUrl || null)
+            const { url } = await uploadImage('logo', file)
             setLogoUrl(url)
             const res = await updateEstablishment({ logoUrl: url })
             setEstablishment(res)
@@ -376,7 +385,7 @@ export function AppearanceTab({ establishment }: AppearanceTabProps) {
           name={establishment.name}
           shape="banner"
           onSave={async (file) => {
-            const { url } = await uploadImage('banner', file, bannerImageUrl || null)
+            const { url } = await uploadImage('banner', file)
             setBannerImageUrl(url)
             const res = await updateEstablishment({ bannerImageUrl: url })
             setEstablishment(res)

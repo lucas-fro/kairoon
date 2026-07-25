@@ -43,17 +43,9 @@ export function EmployeeStep({ employees, onSelect }: EmployeeStepProps) {
             pendingId === employee.id ? 'ring-2 ring-secondary' : 'hover:shadow-soft',
           )}
         >
-          {employee.photoUrl ? (
-            <img
-              src={employee.photoUrl}
-              alt={employee.name}
-              className="h-11 w-11 shrink-0 rounded-full object-cover"
-            />
-          ) : (
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-secondary-light text-base font-semibold text-primary">
-              {employee.name.charAt(0).toUpperCase()}
-            </div>
-          )}
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-secondary-light text-base font-semibold text-primary">
+            {employee.name.charAt(0).toUpperCase()}
+          </div>
           <p className="min-w-0 truncate text-sm font-medium text-ink">{employee.name}</p>
         </button>
       ))}

@@ -186,17 +186,9 @@ export function AgendaPage() {
         key: emp.id,
         header: (
           <div className="flex flex-col items-center gap-1">
-            {emp.photoUrl ? (
-              <img
-                src={emp.photoUrl}
-                alt={emp.name}
-                className="h-7 w-7 rounded-full object-cover"
-              />
-            ) : (
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-white">
-                {emp.name.charAt(0).toUpperCase()}
-              </div>
-            )}
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-white">
+              {emp.name.charAt(0).toUpperCase()}
+            </div>
             <span className="w-full truncate text-[11px] font-medium text-ink">{emp.name}</span>
           </div>
         ),

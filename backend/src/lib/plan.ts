@@ -10,7 +10,13 @@ export const TRIAL_DAYS = 14
 /** Plano efetivo durante o teste grátis: tudo liberado. */
 export const TRIAL_PLAN = 'essencial'
 
-export type AccessState = 'paid' | 'trial' | 'trial_expired' | 'free'
+/**
+ * Não existe estado gratuito permanente: ou a conta tem assinatura paga, ou está
+ * no teste, ou o teste acabou e ela é somente-leitura. A coluna
+ * `establishments.plan` ainda usa 'free' como valor de rebaixamento, mas isso
+ * não é um plano utilizável: é a ausência de um.
+ */
+export type AccessState = 'paid' | 'trial' | 'trial_expired'
 
 export interface AccountAccess {
   /** Plano efetivo para gating de features/limites (leitura). */
@@ -83,10 +89,9 @@ function daysUntil(date: Date): number {
  * permissão de escrita. Ordem de prioridade:
  *   1. Assinatura paga ativa → plano pago, gravável.
  *   2. Teste grátis em andamento → plano de teste (essencial), gravável.
- *   3. Teste grátis expirado (sem assinatura) → somente-leitura. O plano efetivo
- *      segue alto SÓ para leitura (ver dados/relatórios); a escrita é barrada
- *      globalmente pelo hook em app.ts.
- *   4. Conta legada (sem teste, trialEndsAt null) → 'free' gravável (como antes).
+ *   3. Teste grátis expirado, ausente (trialEndsAt null) ou assinatura encerrada
+ *      → somente-leitura. O plano efetivo segue alto SÓ para leitura (ver
+ *      dados/relatórios); a escrita é barrada globalmente pelo hook em app.ts.
  *
  * `preloaded` evita uma query extra quando o chamador já carregou o
  * estabelecimento (ex.: página pública).
@@ -108,11 +113,10 @@ export async function getAccessState(
     return { plan: paidPlan, canWrite: true, state: 'paid', trialEndsAt: est.trialEndsAt, trialDaysLeft: null }
   }
 
-  if (est.trialEndsAt === null) {
-    return { plan: 'free', canWrite: true, state: 'free', trialEndsAt: null, trialDaysLeft: null }
-  }
-
-  if (Date.now() < est.trialEndsAt.getTime()) {
+  // trialEndsAt null (conta anterior à 0030, ou linha criada fora do cadastro)
+  // NÃO ganha acesso gratuito vitalício: vale a mesma regra de teste vencido. A
+  // migration 0036 preencheu as linhas existentes; isto cobre o resto.
+  if (est.trialEndsAt !== null && Date.now() < est.trialEndsAt.getTime()) {
     return {
       plan: TRIAL_PLAN,
       canWrite: true,

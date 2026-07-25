@@ -155,10 +155,10 @@ export const establishments = pgTable('establishments', {
     }),
   quiz: jsonb('quiz').$type<Record<string, string>>(),
   plan: text('plan').notNull().default('free'),
-  // Fim do teste grátis (sem cartão) concedido no cadastro. Null = conta legada
-  // (anterior ao trial): tratada como 'free' gravável. Enquanto now < trialEndsAt
-  // o acesso efetivo é o plano de teste; depois, sem assinatura paga, a conta
-  // fica somente-leitura (ver lib/plan.ts#getAccessState).
+  // Fim do teste grátis (sem cartão) concedido no cadastro. Enquanto
+  // now < trialEndsAt o acesso efetivo é o plano de teste; depois, sem
+  // assinatura paga, a conta fica somente-leitura. Null é tratado como teste
+  // vencido: não existe acesso gratuito vitalício (ver lib/plan.ts).
   trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
@@ -204,7 +204,6 @@ export const employees = pgTable('employees', {
     .notNull()
     .references(() => establishments.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
-  photoUrl: text('photo_url'),
   email: text('email'),
   phone: text('phone'),
   birthDate: date('birth_date', { mode: 'string' }),

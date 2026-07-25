@@ -33,7 +33,7 @@ const BUSINESS_TYPE_LABELS: Record<string, string> = {
 
 /**
  * Primeira tela do link público: um microsite do estabelecimento. Banner full-bleed
- * (50vh no mobile/tablet, 30vh no desktop) com o logo ampliado transpassando sua
+ * (40dvh no mobile/tablet, 30vh no desktop) com o logo ampliado transpassando sua
  * borda, nome + mensagem, CTA de agendamento e um cardápio de serviços. Bonito no
  * celular, com cara de site nas telas maiores.
  */
@@ -55,7 +55,7 @@ export function WelcomeStep({
       {/* HERO full-bleed: cor de marca sólida ou imagem de banner. */}
       <div className="relative w-full">
         <div
-          className="relative h-[50vh] max-h-[460px] min-h-[16rem] w-full overflow-hidden lg:h-[30vh] lg:max-h-[400px] lg:min-h-[14rem]"
+          className="relative h-[40dvh] max-h-[460px] min-h-[16rem] w-full overflow-hidden lg:h-[30vh] lg:max-h-[400px] lg:min-h-[14rem]"
           style={{ backgroundColor: branding.brandColor }}
         >
           {branding.bannerImageUrl && (

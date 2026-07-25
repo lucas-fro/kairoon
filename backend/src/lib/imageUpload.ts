@@ -5,18 +5,17 @@ import type { FastifyRequest } from 'fastify'
 import { db } from '../db'
 import { establishments } from '../db/schema'
 import { AppError } from './errors'
-import { bunnyDeleteByUrl, bunnyPut } from './bunnyStorage'
+import { bunnyPut } from './bunnyStorage'
 
 /** Teto de tamanho por imagem. Espelha o `limits.fileSize` do @fastify/multipart. */
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
-export type UploadKind = 'logo' | 'banner' | 'photo'
+export type UploadKind = 'logo' | 'banner'
 
-/** Rótulo do tipo usado no nome do arquivo (foto de profissional = "perfil"). */
+/** Rótulo do tipo usado no nome do arquivo. */
 const KIND_LABELS: Record<UploadKind, string> = {
   logo: 'logo',
   banner: 'banner',
-  photo: 'perfil',
 }
 
 /**
@@ -27,7 +26,6 @@ const KIND_LABELS: Record<UploadKind, string> = {
 const MAX_DIMENSIONS: Record<UploadKind, { width: number; height: number }> = {
   logo: { width: 512, height: 512 },
   banner: { width: 1600, height: 600 },
-  photo: { width: 400, height: 400 },
 }
 
 /**
@@ -130,16 +128,19 @@ export async function readImageUpload(request: FastifyRequest): Promise<Validate
 /**
  * Otimiza e sobe a imagem para a Bunny numa PASTA por estabelecimento e devolve
  * a URL pública. Caminho: `<establishmentId>/<slug>-<tipo>-<timestamp>.webp`. A
- * pasta (id) isola o tenant (facilita apagar tudo ao excluir a conta e escopa a
- * exclusão do arquivo antigo), o timestamp garante nome único (o CDN nunca serve
- * cache velho) e o slug deixa legível. Quando `replaces` aponta para um arquivo
- * do próprio tenant, ele é apagado depois (best-effort) para não acumular órfãos.
+ * pasta (id) isola o tenant (permite apagar tudo ao excluir a conta e escopa a
+ * exclusão de arquivo), o timestamp garante nome único (o CDN nunca serve cache
+ * velho) e o slug deixa legível.
+ *
+ * O upload NÃO apaga a imagem anterior: quem faz isso são os serviços que
+ * gravam a URL (establishment.updateEstablishment, employees.updateEmployee),
+ * depois de a troca ser efetivada no banco. Apagar aqui deixava o registro
+ * apontando para um arquivo inexistente quando a gravação seguinte falhava.
  */
 export async function storeImage(opts: {
   establishmentId: string
   kind: UploadKind
   image: ValidatedImage
-  replaces?: string | null
 }): Promise<string> {
   const est = await db.query.establishments.findFirst({
     columns: { slug: true },
@@ -148,7 +149,5 @@ export async function storeImage(opts: {
   const optimized = await optimizeImage(opts.image.buffer, opts.kind)
   const slug = fileNameSlug(est?.slug)
   const path = `${opts.establishmentId}/${slug}-${KIND_LABELS[opts.kind]}-${Date.now()}.${optimized.ext}`
-  const url = await bunnyPut(path, optimized.buffer, optimized.contentType)
-  if (opts.replaces) await bunnyDeleteByUrl(opts.replaces, opts.establishmentId)
-  return url
+  return bunnyPut(path, optimized.buffer, optimized.contentType)
 }

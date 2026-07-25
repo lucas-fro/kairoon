@@ -37,6 +37,12 @@ export const UNLIMITED = 999
 
 interface PlanTier {
   rank: number
+  /**
+   * Nome exibido ao usuário. O slug cru NUNCA deve ir pra tela: 'basico' vira
+   * "Basico" (sem acento) e 'free' vira "Free", que sugere um plano gratuito
+   * inexistente: a conta sem assinatura fica somente-leitura, não "no Free".
+   */
+  label: string
   /** Máximo de profissionais cadastráveis (UNLIMITED = ilimitado). */
   employees: number
   features: PlanFeature[]
@@ -54,14 +60,18 @@ const ALL_FEATURES: PlanFeature[] = [
 ]
 
 export const PLAN_TIERS: Record<'free' | PlanSlug | 'profissional', PlanTier> = {
-  free: { rank: 0, employees: 1, features: [] },
+  // Não é um plano vendido: é o estado de quem não tem assinatura ativa. Só é
+  // gravável em conta legada (ver lib/plan.ts#getAccessState).
+  free: { rank: 0, label: 'Sem plano ativo', employees: 1, features: [] },
   basico: {
     rank: 1,
+    label: PLANS.basico.name,
     employees: 5,
     features: ['personalizacao', 'estoque', 'fidelidade', 'financeiro', 'relatorios'],
   },
   essencial: {
     rank: 2,
+    label: PLANS.essencial.name,
     employees: 10,
     features: ALL_FEATURES,
   },
@@ -69,9 +79,24 @@ export const PLAN_TIERS: Record<'free' | PlanSlug | 'profissional', PlanTier> = 
   // não passa pelo checkout): tudo do Essencial + profissionais ilimitados.
   profissional: {
     rank: 3,
+    label: 'Profissional',
     employees: UNLIMITED,
     features: ALL_FEATURES,
   },
+}
+
+/**
+ * Maior rank vendido no checkout. Acima dele (hoje só o 'profissional') não
+ * existe upgrade possível pela UI: o diálogo de planos só ofereceria opções
+ * INFERIORES, e assinar uma delas seria um downgrade silencioso.
+ */
+const MAX_CATALOG_RANK = Math.max(
+  ...(Object.keys(PLANS) as PlanSlug[]).map((slug) => PLAN_TIERS[slug].rank),
+)
+
+/** O plano atual está acima de tudo que o checkout vende? */
+export function planIsAboveCatalog(plan: string): boolean {
+  return planTier(plan).rank > MAX_CATALOG_RANK
 }
 
 export function planTier(plan: string): PlanTier {

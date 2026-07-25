@@ -155,7 +155,7 @@ export async function getPublicEstablishment(slug: string) {
         originalPriceCents: fullPrice > s.priceCents ? fullPrice : null,
       }
     }),
-    employees: activeEmployees.map((e) => ({ id: e.id, name: e.name, photoUrl: e.photoUrl })),
+    employees: activeEmployees.map((e) => ({ id: e.id, name: e.name })),
     workingHours: hours.map((h) => ({
       dayOfWeek: h.dayOfWeek,
       opensAt: h.opensAt,
