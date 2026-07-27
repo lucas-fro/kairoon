@@ -12,10 +12,12 @@ import {
   services,
   transactions,
 } from '../../db/schema'
-import { addMinutesToTime, addMonthsClamped, todayStr } from '../../lib/datetime'
+import { addMinutesToTime, addMonthsClamped, minutesUntil, todayStr } from '../../lib/datetime'
 import { lockClientLoyalty, lockEmployeeDay } from '../../lib/locks'
 import { isValidPhone, normalizePhone, timesOverlap } from '../../lib/slots'
 import { AppError } from '../../lib/errors'
+import type { AuthContext } from '../../plugins/auth'
+import { notifyAppointmentById } from '../../notifications/appointment'
 import { resolveCouponForCheckout } from '../coupons/service'
 import { syncLoyaltyStamp } from '../loyalty/service'
 import { syncPointsEntry } from '../points/service'
@@ -216,12 +218,36 @@ export async function assertNoConflict(
   if (hasConflict) throw new AppError('Já existe um agendamento neste horário', 409)
 }
 
-export async function listAppointments(establishmentId: string, query: ListAppointmentsQuery) {
+/**
+ * Restrição de quem não tem `agenda.view_all`: enxerga só a própria agenda.
+ *
+ * Aplicada AQUI, no serviço, e nunca a partir do query param: o filtro por
+ * profissional da tela é conveniência do usuário, esta é a regra. Somando as
+ * duas condições, pedir a agenda de outro simplesmente não retorna nada.
+ */
+function agendaScope(auth: AuthContext) {
+  return auth.agendaScopeEmployeeId
+    ? eq(appointments.employeeId, auth.agendaScopeEmployeeId)
+    : undefined
+}
+
+/** O agendamento está fora do escopo de quem pediu? */
+function outOfScope(auth: AuthContext, employeeId: string) {
+  return auth.agendaScopeEmployeeId !== null && auth.agendaScopeEmployeeId !== employeeId
+}
+
+export async function listAppointments(
+  establishmentId: string,
+  query: ListAppointmentsQuery,
+  auth: AuthContext,
+) {
   const conditions = [
     eq(appointments.establishmentId, establishmentId),
     gte(appointments.date, query.start),
     lte(appointments.date, query.end),
   ]
+  const scope = agendaScope(auth)
+  if (scope) conditions.push(scope)
   if (query.employeeId) conditions.push(eq(appointments.employeeId, query.employeeId))
   if (query.status) conditions.push(eq(appointments.status, query.status))
 
@@ -241,6 +267,7 @@ export async function listAppointments(establishmentId: string, query: ListAppoi
 export async function listRecentAppointments(
   establishmentId: string,
   query: RecentAppointmentsQuery,
+  auth: AuthContext,
 ) {
   const since = new Date(Date.now() - query.sinceHours * 3_600_000)
   const rows = await db.query.appointments.findMany({
@@ -248,6 +275,7 @@ export async function listRecentAppointments(
       eq(appointments.establishmentId, establishmentId),
       gte(appointments.createdAt, since),
       ne(appointments.status, 'cancelled'),
+      agendaScope(auth),
     ),
     with: joinedWith,
     orderBy: [desc(appointments.createdAt)],
@@ -256,7 +284,11 @@ export async function listRecentAppointments(
   return rows.map(toJoinedAppointment)
 }
 
-export async function searchAppointments(establishmentId: string, query: SearchAppointmentsQuery) {
+export async function searchAppointments(
+  establishmentId: string,
+  query: SearchAppointmentsQuery,
+  auth: AuthContext,
+) {
   const term = query.q.trim()
   const digits = normalizePhone(term)
 
@@ -277,6 +309,7 @@ export async function searchAppointments(establishmentId: string, query: SearchA
         appointments.clientId,
         matchingClients.map((c) => c.id),
       ),
+      agendaScope(auth),
     ),
     with: joinedWith,
     orderBy: [desc(appointments.date), desc(appointments.startTime)],
@@ -285,6 +318,7 @@ export async function searchAppointments(establishmentId: string, query: SearchA
   return rows.map(toJoinedAppointment)
 }
 
+/** Uso INTERNO (fila de espera, link público): sem escopo de usuário. */
 export async function getAppointment(establishmentId: string, id: string) {
   const row = await db.query.appointments.findFirst({
     where: and(eq(appointments.id, id), eq(appointments.establishmentId, establishmentId)),
@@ -294,7 +328,31 @@ export async function getAppointment(establishmentId: string, id: string) {
   return toJoinedAppointment(row)
 }
 
-export async function createAppointment(establishmentId: string, input: CreateAppointmentInput) {
+/**
+ * Versão para o painel: fora do escopo responde 404, não 403, para não confirmar
+ * que o agendamento existe na agenda de outro profissional.
+ */
+export async function getAppointmentForUser(
+  establishmentId: string,
+  id: string,
+  auth: AuthContext,
+) {
+  const appointment = await getAppointment(establishmentId, id)
+  if (outOfScope(auth, appointment.employee.id)) {
+    throw new AppError('Agendamento não encontrado', 404)
+  }
+  return appointment
+}
+
+export async function createAppointment(
+  establishmentId: string,
+  input: CreateAppointmentInput,
+  auth: AuthContext,
+) {
+  if (outOfScope(auth, input.employeeId)) {
+    throw new AppError('Você só pode criar agendamentos na sua própria agenda.', 403, 'FORBIDDEN')
+  }
+
   const service = await db.query.services.findFirst({
     where: and(eq(services.id, input.serviceId), eq(services.establishmentId, establishmentId)),
   })
@@ -374,14 +432,50 @@ export async function createAppointment(establishmentId: string, input: CreateAp
     return appointment
   })
 
+  // Confirmação para o cliente. Só para atendimentos futuros: o painel também
+  // registra walk-in em horário já passado, e avisar "seu horário está
+  // reservado" depois do atendimento não faz sentido.
+  if (minutesUntil(created.date, created.startTime) > 0) {
+    void notifyAppointmentById('appointment_confirmed', created.id)
+  }
+
   return getAppointment(establishmentId, created.id)
+}
+
+/**
+ * Cancelar, remarcar e fechar comanda são poderes diferentes, mas chegam todos
+ * por este mesmo PATCH. Por isso a permissão fina é decidida pelo CONTEÚDO da
+ * alteração, aqui no serviço, e não por uma anotação de rota.
+ */
+function assertUpdatePermission(auth: AuthContext, input: UpdateAppointmentInput) {
+  const required =
+    input.status === 'cancelled'
+      ? 'agenda.cancel'
+      : // Fechar a comanda gera receita, comissão e baixa de estoque: é outra
+        // categoria de poder, não "editar". Pagamento sem status também cai aqui.
+        input.status === 'completed' || input.payments !== undefined
+        ? 'agenda.complete'
+        : 'agenda.edit'
+
+  if (!auth.permissions.has(required)) {
+    const message =
+      required === 'agenda.cancel'
+        ? 'Você não tem permissão para cancelar agendamentos.'
+        : required === 'agenda.complete'
+          ? 'Você não tem permissão para finalizar atendimentos.'
+          : 'Você não tem permissão para alterar agendamentos.'
+    throw new AppError(message, 403, 'FORBIDDEN')
+  }
 }
 
 export async function updateAppointment(
   establishmentId: string,
   id: string,
   input: UpdateAppointmentInput,
+  auth: AuthContext,
 ) {
+  assertUpdatePermission(auth, input)
+
   const appointment = await db.query.appointments.findFirst({
     where: and(eq(appointments.id, id), eq(appointments.establishmentId, establishmentId)),
     with: {
@@ -390,6 +484,15 @@ export async function updateAppointment(
     },
   })
   if (!appointment) throw new AppError('Agendamento não encontrado', 404)
+
+  // Fora do escopo: 404, mesma resposta de quem não existe.
+  if (outOfScope(auth, appointment.employeeId)) {
+    throw new AppError('Agendamento não encontrado', 404)
+  }
+  // Passar o atendimento para outro profissional exige enxergar a agenda dele.
+  if (input.employeeId && outOfScope(auth, input.employeeId)) {
+    throw new AppError('Você só pode mexer na sua própria agenda.', 403, 'FORBIDDEN')
+  }
 
   if (input.employeeId && input.employeeId !== appointment.employeeId) {
     const employee = await db.query.employees.findFirst({
@@ -556,6 +659,8 @@ export async function updateAppointment(
         saleServices: saleServicesToStore,
         debtCents: debtCentsToStore,
         tipCents: tipCentsToStore,
+        // Remarcar reabre o direito ao lembrete: o horário novo merece o seu.
+        ...(rescheduled ? { reminderSentAt: null } : {}),
       })
       .where(and(eq(appointments.id, id), eq(appointments.establishmentId, establishmentId)))
       .returning()

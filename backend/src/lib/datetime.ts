@@ -62,6 +62,40 @@ export function endOfMonth(dateStr: string): string {
   return toDateStr(new Date(year, month, 0))
 }
 
+/**
+ * Constrói o Date local a partir de 'YYYY-MM-DD'. Existe para não cair no
+ * `new Date('YYYY-MM-DD')`, que parseia em UTC e desloca o dia em fusos
+ * negativos (o Brasil inteiro).
+ */
+export function parseDateStr(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+/**
+ * Minutos entre agora e o instante ('YYYY-MM-DD' + 'HH:mm'), negativo se já
+ * passou. Tudo em hora local: os agendamentos guardam data e hora em colunas
+ * separadas, e fazer essa conta em UTC deslocaria o dia.
+ */
+export function minutesUntil(dateStr: string, time: string, now: Date = new Date()): number {
+  const daysApart = Math.round(
+    (parseDateStr(dateStr).getTime() - parseDateStr(toDateStr(now)).getTime()) / 86_400_000,
+  )
+  return daysApart * 1440 + timeToMinutes(time) - (now.getHours() * 60 + now.getMinutes())
+}
+
+/** 'YYYY-MM-DD' → '28/07' */
+export function formatDayMonthBr(dateStr: string): string {
+  const [, month, day] = dateStr.split('-')
+  return `${day}/${month}`
+}
+
+/** 'YYYY-MM-DD' → 'Sexta-feira' (capitalizado, pt-BR) */
+export function weekdayNamePt(dateStr: string): string {
+  const name = parseDateStr(dateStr).toLocaleDateString('pt-BR', { weekday: 'long' })
+  return name.charAt(0).toUpperCase() + name.slice(1)
+}
+
 export const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
 export const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/
 

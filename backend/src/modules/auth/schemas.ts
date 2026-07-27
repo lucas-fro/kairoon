@@ -97,6 +97,11 @@ export const updateProfileSchema = z.object({
   cpf: emptyToNull(cpfSchema),
 })
 
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Informe a senha atual'),
+  newPassword: z.string().min(6, 'A senha deve ter no mínimo 6 caracteres'),
+})
+
 const resetCodeSchema = z.string().trim().regex(/^\d{6}$/, 'O código deve ter 6 dígitos')
 
 // Recuperação de senha pública (por e-mail), em três passos: pedir código,
@@ -119,3 +124,4 @@ export const forgotPasswordResetSchema = z.object({
 export type RegisterInput = z.infer<typeof registerSchema>
 export type LoginInput = z.infer<typeof loginSchema>
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>

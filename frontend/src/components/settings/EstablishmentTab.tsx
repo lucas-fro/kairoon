@@ -5,6 +5,7 @@ import { CheckCircle2, Copy, ExternalLink, Save, Search, XCircle } from 'lucide-
 import { ApiError } from '../../api/client'
 import { checkSlugAvailability, updateEstablishment, updateSlug } from '../../api/establishment'
 import { useAuth } from '../../contexts/AuthContext'
+import { useFeature } from '../../hooks/usePlan'
 import { FixedCostsSection } from './FixedCostsSection'
 import {
   formatCep,
@@ -86,6 +87,8 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
   const [cepStatus, setCepStatus] = useState<'idle' | 'loading' | 'notfound'>('idle')
   const cepDirty = useRef(false)
   const [autoConfirm, setAutoConfirm] = useState(establishment.autoConfirm)
+  const [notifyWhatsapp, setNotifyWhatsapp] = useState(establishment.notifyWhatsapp)
+  const hasWhatsApp = useFeature('whatsapp').allowed
 
   // Redes sociais
   const [instagram, setInstagram] = useState(establishment.socials?.instagram ?? '')
@@ -186,6 +189,23 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
   function handleToggleAutoConfirm(value: boolean) {
     setAutoConfirm(value)
     autoConfirmMutation.mutate(value)
+  }
+
+  const notifyWhatsappMutation = useMutation({
+    mutationFn: (value: boolean) => updateEstablishment({ notifyWhatsapp: value }),
+    onSuccess: (res) => {
+      setEstablishment(res)
+      toast.success(res.notifyWhatsapp ? 'Lembrete de véspera ativado' : 'Lembrete de véspera desativado')
+    },
+    onError: (err) => {
+      setNotifyWhatsapp((v) => !v)
+      toast.error(err instanceof ApiError ? err.message : 'Erro inesperado')
+    },
+  })
+
+  function handleToggleNotifyWhatsapp(value: boolean) {
+    setNotifyWhatsapp(value)
+    notifyWhatsappMutation.mutate(value)
   }
 
   // Formas de pagamento
@@ -498,6 +518,28 @@ export function EstablishmentTab({ establishment }: EstablishmentTabProps) {
               onChange={handleToggleAutoConfirm}
               disabled={autoConfirmMutation.isPending}
               aria-label="Confirmar agendamentos automaticamente"
+            />
+          </div>
+
+          {/* Lembrete de véspera. Vale para todos os planos por e-mail; o canal
+              WhatsApp é que é exclusivo do Essencial (ver PLAN_FEATURES). */}
+          <div className="flex items-center justify-between gap-4 border-t border-line-divider pt-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-ink">Lembrete na véspera</p>
+              <p className="mt-0.5 text-xs text-ink-tertiary">
+                Envia ao cliente, um dia antes, um lembrete com o horário e o link para cancelar ou
+                remarcar.{' '}
+                {hasWhatsApp
+                  ? 'Vai por WhatsApp e também por e-mail, quando ele informou um.'
+                  : 'Vai por e-mail para quem informou um. O envio por WhatsApp está no plano Essencial.'}{' '}
+                A confirmação no momento do agendamento é enviada sempre.
+              </p>
+            </div>
+            <Switch
+              checked={notifyWhatsapp}
+              onChange={handleToggleNotifyWhatsapp}
+              disabled={notifyWhatsappMutation.isPending}
+              aria-label="Lembrete na véspera"
             />
           </div>
         </CardContent>

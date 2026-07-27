@@ -7,8 +7,13 @@ import {
 } from './schemas'
 import * as publicService from './service'
 
+/**
+ * Link público de agendamento: tudo aqui é 'public' porque quem chama é o
+ * cliente final, sem conta no sistema. O que protege estas rotas é o rate limit
+ * por IP e as checagens dentro do service, não o gate de permissão.
+ */
 export async function publicRoutes(app: FastifyInstance) {
-  app.get('/:slug', async (request) => {
+  app.get('/:slug', { config: { permission: 'public' } }, async (request) => {
     const { slug } = slugParamSchema.parse(request.params)
     return publicService.getPublicEstablishment(slug)
   })
@@ -17,7 +22,7 @@ export async function publicRoutes(app: FastifyInstance) {
   // massa (scraping) sem custo.
   app.get(
     '/:slug/availability',
-    { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    { config: { permission: 'public', rateLimit: { max: 30, timeWindow: '1 minute' } } },
     async (request) => {
       const { slug } = slugParamSchema.parse(request.params)
       const query = availabilityQuerySchema.parse(request.query)
@@ -29,7 +34,7 @@ export async function publicRoutes(app: FastifyInstance) {
   // e descobrir nomes de clientes da base (PII) por força bruta.
   app.post(
     '/:slug/identify',
-    { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    { config: { permission: 'public', rateLimit: { max: 10, timeWindow: '1 minute' } } },
     async (request) => {
       const { slug } = slugParamSchema.parse(request.params)
       const { phone } = identifyClientSchema.parse(request.body)
@@ -41,7 +46,7 @@ export async function publicRoutes(app: FastifyInstance) {
   // estabelecimento com agendamentos e clientes falsos.
   app.post(
     '/:slug/appointments',
-    { config: { rateLimit: { max: 15, timeWindow: '1 minute' } } },
+    { config: { permission: 'public', rateLimit: { max: 15, timeWindow: '1 minute' } } },
     async (request, reply) => {
       const { slug } = slugParamSchema.parse(request.params)
       const input = createBookingSchema.parse(request.body)

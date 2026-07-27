@@ -1,12 +1,18 @@
 export interface DashboardMonthSummary {
-  revenueCents: number
+  /**
+   * null quando quem pediu não tem `finance.view`: o dashboard é a página
+   * inicial de todo mundo, então em vez de barrar a tela inteira devolvemos
+   * null nos números de dinheiro e a UI simplesmente não mostra o cartão.
+   */
+  revenueCents: number | null
   /** variação vs. mesmo período do mês anterior; null sem base de comparação */
   revenueChangePct: number | null
   /** atendimentos concluídos no período (denominador do ticket médio) */
   completedCount: number
   appointmentsCount: number
   appointmentsChangePct: number | null
-  newClients: number
+  /** null sem `clients.view` (mesma lógica do faturamento) */
+  newClients: number | null
   newClientsChangePct: number | null
   /** 0–1, mês corrente */
   occupancyRate: number

@@ -1,8 +1,9 @@
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, isNull, or } from 'drizzle-orm'
 import { db } from '../../db'
 import { appointments, clients, employees, services, waitlistEntries } from '../../db/schema'
 import { addMinutesToTime, todayStr } from '../../lib/datetime'
 import { AppError } from '../../lib/errors'
+import type { AuthContext } from '../../plugins/auth'
 import { assertNoConflict, getAppointment } from '../appointments/service'
 import type { CreateWaitlistInput, ListWaitlistQuery, PromoteWaitlistInput } from './schemas'
 
@@ -12,10 +13,29 @@ const joinedWith = {
   preferredEmployee: { columns: { id: true, name: true } },
 } as const
 
-export async function listWaitlist(establishmentId: string, query: ListWaitlistQuery) {
+/**
+ * A fila é um pedaço da agenda: quem não enxerga a dos colegas também não deve
+ * enxergar a fila deles (nome e telefone do cliente estão aqui). Entrada sem
+ * profissional preferido é de todo mundo, então continua visível.
+ */
+function waitlistScope(auth: AuthContext) {
+  if (!auth.agendaScopeEmployeeId) return undefined
+  return or(
+    isNull(waitlistEntries.preferredEmployeeId),
+    eq(waitlistEntries.preferredEmployeeId, auth.agendaScopeEmployeeId),
+  )
+}
+
+export async function listWaitlist(
+  establishmentId: string,
+  query: ListWaitlistQuery,
+  auth: AuthContext,
+) {
   const conditions = [eq(waitlistEntries.establishmentId, establishmentId)]
   conditions.push(eq(waitlistEntries.status, query.status ?? 'waiting'))
   if (query.date) conditions.push(eq(waitlistEntries.targetDate, query.date))
+  const scope = waitlistScope(auth)
+  if (scope) conditions.push(scope)
 
   const rows = await db.query.waitlistEntries.findMany({
     where: and(...conditions),
@@ -35,7 +55,21 @@ export async function listWaitlist(establishmentId: string, query: ListWaitlistQ
   }))
 }
 
-export async function createWaitlistEntry(establishmentId: string, input: CreateWaitlistInput) {
+/** Fora do escopo de agenda de quem pediu? Mesmo critério do módulo de agenda. */
+function outOfScope(auth: AuthContext, employeeId: string) {
+  return auth.agendaScopeEmployeeId !== null && auth.agendaScopeEmployeeId !== employeeId
+}
+
+export async function createWaitlistEntry(
+  establishmentId: string,
+  input: CreateWaitlistInput,
+  auth: AuthContext,
+) {
+  // Sem ver a agenda dos outros, a espera só pode ser para si mesmo (ou geral).
+  if (input.preferredEmployeeId && outOfScope(auth, input.preferredEmployeeId)) {
+    throw new AppError('Você só pode usar a fila da sua própria agenda.', 403, 'FORBIDDEN')
+  }
+
   const client = await db.query.clients.findFirst({
     where: and(eq(clients.id, input.clientId), eq(clients.establishmentId, establishmentId)),
   })
@@ -71,10 +105,22 @@ export async function createWaitlistEntry(establishmentId: string, input: Create
   return entry
 }
 
-export async function deleteWaitlistEntry(establishmentId: string, id: string) {
+export async function deleteWaitlistEntry(
+  establishmentId: string,
+  id: string,
+  auth: AuthContext,
+) {
   const [deleted] = await db
     .delete(waitlistEntries)
-    .where(and(eq(waitlistEntries.id, id), eq(waitlistEntries.establishmentId, establishmentId)))
+    .where(
+      and(
+        eq(waitlistEntries.id, id),
+        eq(waitlistEntries.establishmentId, establishmentId),
+        // Escopo junto da condição: apagar o que não se enxerga responde 404,
+        // igual ao módulo de agenda.
+        waitlistScope(auth),
+      ),
+    )
     .returning({ id: waitlistEntries.id })
   if (!deleted) throw new AppError('Item da fila não encontrado', 404)
 }
@@ -83,15 +129,26 @@ export async function promoteWaitlistEntry(
   establishmentId: string,
   id: string,
   input: PromoteWaitlistInput,
+  auth: AuthContext,
 ) {
   const entry = await db.query.waitlistEntries.findFirst({
-    where: and(eq(waitlistEntries.id, id), eq(waitlistEntries.establishmentId, establishmentId)),
+    where: and(
+      eq(waitlistEntries.id, id),
+      eq(waitlistEntries.establishmentId, establishmentId),
+      waitlistScope(auth),
+    ),
   })
   if (!entry) throw new AppError('Item da fila não encontrado', 404)
   if (entry.status !== 'waiting') throw new AppError('Este item já foi encaixado', 409)
 
   const employeeId = input.employeeId ?? entry.preferredEmployeeId
   if (!employeeId) throw new AppError('Escolha o profissional para encaixar', 400)
+
+  // Encaixar CRIA agendamento: sem esta trava, a fila seria um atalho para
+  // gravar na agenda de um colega, furando o escopo do módulo de agenda.
+  if (outOfScope(auth, employeeId)) {
+    throw new AppError('Você só pode encaixar na sua própria agenda.', 403, 'FORBIDDEN')
+  }
 
   const employee = await db.query.employees.findFirst({
     where: and(eq(employees.id, employeeId), eq(employees.establishmentId, establishmentId)),

@@ -14,6 +14,12 @@ interface TimeStepProps {
   date: string
   onSelect: (time: string) => void
   onPickAnotherDate: () => void
+  /**
+   * Origem alternativa dos horários livres. Existe para a página de remarcação
+   * reusar esta etapa: lá a consulta vai pelo token do agendamento (e exclui o
+   * horário atual do próprio cliente dos ocupados), não pelo serviço.
+   */
+  loadSlots?: () => Promise<{ slots: string[] }>
 }
 
 export function TimeStep({
@@ -23,6 +29,7 @@ export function TimeStep({
   date,
   onSelect,
   onPickAnotherDate,
+  loadSlots,
 }: TimeStepProps) {
   const [pendingSlot, setPendingSlot] = useState<string | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout>>()
@@ -30,8 +37,8 @@ export function TimeStep({
   useEffect(() => () => clearTimeout(timerRef.current), [])
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['availability', slug, serviceId, date, employeeId ?? 'any'],
-    queryFn: () => getAvailability(slug, { serviceId, date, employeeId }),
+    queryKey: ['availability', slug, serviceId, date, employeeId ?? 'any', Boolean(loadSlots)],
+    queryFn: () => (loadSlots ? loadSlots() : getAvailability(slug, { serviceId, date, employeeId })),
   })
 
   function handlePick(slot: string) {

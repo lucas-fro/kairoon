@@ -30,6 +30,7 @@ import type { PendingAppointmentView } from '../../components/realtime/PendingAp
 import { Button } from '../../components/ui/Button'
 import { DropdownItem, DropdownMenu } from '../../components/ui/DropdownMenu'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { useAuth } from '../../contexts/AuthContext'
 import { useHeaderSlot } from '../../contexts/HeaderSlotContext'
 import { SelectMenu } from '../../components/ui/SelectMenu'
 import { Skeleton } from '../../components/ui/Skeleton'
@@ -86,6 +87,16 @@ function GridSkeleton() {
 }
 
 export function AgendaPage() {
+  // Ação bloqueada por permissão some da tela: não existe upgrade que resolva,
+  // então mostrar botão que o servidor vai recusar só frustra.
+  const { can, user } = useAuth()
+  const canCreate = can('agenda.create')
+  const canViewAll = can('agenda.view_all')
+  // O popup de pendente só oferece aceitar e recusar; sem os dois poderes ele
+  // não serve, e os detalhes já mostram apenas o que a pessoa pode fazer.
+  const canApprovePending = can('agenda.edit') && can('agenda.cancel')
+  const ownEmployeeId = user?.employeeId
+
   const [view, setView] = useState<ViewMode>('day')
   const [refDate, setRefDate] = useState(() => todayStr())
   const [employeeFilter, setEmployeeFilter] = useState('')
@@ -130,6 +141,8 @@ export function AgendaPage() {
   const waitlistQuery = useQuery({
     queryKey: ['waitlist'],
     queryFn: () => listWaitlist({ status: 'waiting' }),
+    // A fila só aparece no menu de novo agendamento; sem criar, nem buscamos.
+    enabled: canCreate,
   })
   const waitlistCount = waitlistQuery.data?.length ?? 0
 
@@ -169,6 +182,11 @@ export function AgendaPage() {
 
   const employees = employeesQuery.data ?? []
   const activeEmployees = employees.filter((e) => e.active)
+  // Quem só enxerga a própria agenda também só encaixa nela: o servidor recusa
+  // encaixe na agenda de colega (403), então o seletor não pode oferecer.
+  const schedulableEmployees = canViewAll
+    ? employees
+    : employees.filter((e) => e.id === ownEmployeeId)
   const isLoading = workingHoursQuery.isPending || appointmentsQuery.isPending
 
   // Colunas da grade: na visão semana, uma por dia; na visão dia, uma por
@@ -179,7 +197,10 @@ export function AgendaPage() {
     const active = (employeesQuery.data ?? []).filter((e) => e.active)
 
     if (view === 'day') {
-      const cols = employeeFilter ? active.filter((e) => e.id === employeeFilter) : active
+      // Sem agenda.view_all o servidor devolve só a agenda da própria pessoa:
+      // as colunas dos colegas viriam vazias, então nem desenhamos.
+      const scoped = canViewAll ? active : active.filter((e) => e.id === ownEmployeeId)
+      const cols = employeeFilter ? scoped.filter((e) => e.id === employeeFilter) : scoped
       const weekday = getDayOfWeek(refDate)
       const establishmentClosed = closedWeekdays.has(weekday)
       return cols.map((emp) => ({
@@ -196,7 +217,11 @@ export function AgendaPage() {
         isClosed: establishmentClosed || !emp.workDays.includes(weekday),
         isToday: refDate === today,
         slotLabel: emp.name,
-        onSlotClick: (time: string) => setNewDialog({ date: refDate, time, employeeId: emp.id }),
+        // Sem agenda.create o horário vago deixa de ser clicável (não abre o
+        // modal de novo agendamento).
+        onSlotClick: canCreate
+          ? (time: string) => setNewDialog({ date: refDate, time, employeeId: emp.id })
+          : undefined,
       }))
     }
 
@@ -223,14 +248,28 @@ export function AgendaPage() {
         isClosed: closedWeekdays.has(getDayOfWeek(date)),
         isToday,
         slotLabel: formatDate(date),
-        onSlotClick: (time: string) =>
-          setNewDialog({ date, time, employeeId: employeeFilter || undefined }),
+        onSlotClick: canCreate
+          ? (time: string) => setNewDialog({ date, time, employeeId: employeeFilter || undefined })
+          : undefined,
       }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, range.days, appointmentsQuery.data, employeesQuery.data, employeeFilter, closedWeekdays, refDate])
+  }, [
+    view,
+    range.days,
+    appointmentsQuery.data,
+    employeesQuery.data,
+    employeeFilter,
+    closedWeekdays,
+    refDate,
+    canCreate,
+    canViewAll,
+    ownEmployeeId,
+  ])
 
-  const showEmployeeInBlock = view === 'week' && activeEmployees.length > 1 && !employeeFilter
+  // Sem ver a agenda dos outros, todo bloco é dela: o nome viraria repetição.
+  const showEmployeeInBlock =
+    view === 'week' && canViewAll && activeEmployees.length > 1 && !employeeFilter
 
   function navigate(delta: number) {
     if (view === 'day') setRefDate((d) => addDays(d, delta))
@@ -240,7 +279,8 @@ export function AgendaPage() {
 
   // Pendente abre o popup de aprovação (aceitar/recusar); os demais, os detalhes.
   function openAppointment(appointment: Appointment) {
-    if (appointment.status === 'pending') setPendingAppt(toPendingView(appointment))
+    if (appointment.status === 'pending' && canApprovePending)
+      setPendingAppt(toPendingView(appointment))
     else setSelectedAppointment(appointment)
   }
 
@@ -252,12 +292,16 @@ export function AgendaPage() {
         : `${MONTH_LABELS[Number(refDate.slice(5, 7)) - 1]} de ${refDate.slice(0, 4)}`
 
   // Busca de agendamentos vive na barra do topo (AppHeader), via slot.
-  const handleSearchSelect = useCallback((appointment: Appointment) => {
-    setRefDate(appointment.date)
-    setView('week')
-    if (appointment.status === 'pending') setPendingAppt(toPendingView(appointment))
-    else setSelectedAppointment(appointment)
-  }, [])
+  const handleSearchSelect = useCallback(
+    (appointment: Appointment) => {
+      setRefDate(appointment.date)
+      setView('week')
+      if (appointment.status === 'pending' && canApprovePending)
+        setPendingAppt(toPendingView(appointment))
+      else setSelectedAppointment(appointment)
+    },
+    [canApprovePending],
+  )
   const searchNode = useMemo(
     () => <AppointmentSearch onSelect={handleSearchSelect} />,
     [handleSearchSelect],
@@ -320,8 +364,10 @@ export function AgendaPage() {
     </div>
   )
 
+  // Só faz sentido para quem vê a agenda de todos: sem isso o servidor já
+  // devolve apenas a própria, e o seletor não teria o que filtrar.
   const renderEmployeeFilter = (full: boolean) =>
-    activeEmployees.length > 1 ? (
+    canViewAll && activeEmployees.length > 1 ? (
       <div className={full ? 'w-full' : 'w-44'}>
         <SelectMenu
           triggerClassName="!h-8 !text-[13px]"
@@ -338,8 +384,9 @@ export function AgendaPage() {
       </div>
     ) : null
 
-  // Botão principal "Agendamento" (split) + menu com Fila de espera / Atender agora.
-  const newAppointment = (
+  // Botão principal "Agendamento" (split) + menu com Fila de espera / Atender
+  // agora. Tudo ali dentro cria agendamento, então some inteiro sem a permissão.
+  const newAppointment = !canCreate ? null : (
     <DropdownMenu
       align="end"
       renderTrigger={({ open, toggle }) => (
@@ -390,7 +437,7 @@ export function AgendaPage() {
         </span>
         {renderViewToggle(false)}
         {renderEmployeeFilter(false)}
-        <div className="ml-auto">{newAppointment}</div>
+        {newAppointment && <div className="ml-auto">{newAppointment}</div>}
       </div>
 
       {/* Toolbar tablet/mobile: funil · navegação de data · agendamento */}
@@ -428,7 +475,7 @@ export function AgendaPage() {
           </span>
         </div>
 
-        <div className="shrink-0">{newAppointment}</div>
+        {newAppointment && <div className="shrink-0">{newAppointment}</div>}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col">
@@ -470,7 +517,7 @@ export function AgendaPage() {
         open={newDialog !== null}
         onClose={() => setNewDialog(null)}
         services={servicesQuery.data ?? []}
-        employees={employees}
+        employees={schedulableEmployees}
         startMinutes={startMinutes}
         endMinutes={endMinutes}
         defaultDate={newDialog?.date}
@@ -482,7 +529,7 @@ export function AgendaPage() {
         open={walkInOpen}
         onClose={() => setWalkInOpen(false)}
         services={servicesQuery.data ?? []}
-        employees={employees}
+        employees={schedulableEmployees}
         defaultEmployeeId={employeeFilter || undefined}
       />
 
@@ -490,7 +537,7 @@ export function AgendaPage() {
         open={waitlistOpen}
         onClose={() => setWaitlistOpen(false)}
         services={servicesQuery.data ?? []}
-        employees={employees}
+        employees={schedulableEmployees}
         onPromote={(entry) => {
           setWaitlistOpen(false)
           setPromoteEntry(entry)
@@ -501,7 +548,7 @@ export function AgendaPage() {
         <WaitlistPromoteDialog
           entry={promoteEntry}
           onClose={() => setPromoteEntry(null)}
-          employees={employees}
+          employees={schedulableEmployees}
           startMinutes={startMinutes}
           endMinutes={endMinutes}
         />

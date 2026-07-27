@@ -1,4 +1,4 @@
-import { relations } from 'drizzle-orm'
+import { relations, sql } from 'drizzle-orm'
 import {
   boolean,
   date,
@@ -73,11 +73,23 @@ export const paymentStatusEnum = pgEnum('payment_status', [
   'failed',
 ])
 
+/**
+ * Conta de login. Guarda SÓ identidade: quem é a pessoa e como ela entra.
+ *
+ * O vínculo com o estabelecimento (e com as permissões) NÃO mora aqui, e sim na
+ * ficha de `employees` que aponta para este usuário. Isso evita a FK circular
+ * users <-> establishments e deixa a linha de employee ser, na prática, a
+ * associação pessoa-estabelecimento: no dia em que um profissional precisar
+ * atender em dois lugares, basta remover o índice único de `employees.userId`.
+ */
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
   email: text('email').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
+  // Desligar sem apagar: bloqueia o login no próximo request, preservando a
+  // ficha e o histórico. O acesso também cai quando a ficha vira inativa.
+  active: boolean('active').notNull().default(true),
   // Dados pessoais do contratante (dono da conta)
   phone: text('phone'),
   birthDate: date('birth_date', { mode: 'string' }),
@@ -94,11 +106,11 @@ export const users = pgTable('users', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
+// O dono NÃO é uma coluna daqui: é o employee com isOwner = true deste
+// estabelecimento (índice único parcial), e a conta de login dele é o
+// employees.userId correspondente. Um caminho só para "quem manda aqui".
 export const establishments = pgTable('establishments', {
   id: uuid('id').primaryKey().defaultRandom(),
-  ownerId: uuid('owner_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   slug: text('slug').notNull().unique(),
   logoUrl: text('logo_url'),
@@ -135,6 +147,9 @@ export const establishments = pgTable('establishments', {
   // Agendamentos do link público: true = confirmados na hora; false = ficam
   // pendentes até o estabelecimento aceitar.
   autoConfirm: boolean('auto_confirm').notNull().default(true),
+  // Lembrete de WhatsApp na véspera do atendimento. A confirmação no ato do
+  // agendamento NÃO é afetada por este flag: só o lembrete de 24h antes.
+  notifyWhatsapp: boolean('notify_whatsapp').notNull().default(true),
   // Formas de pagamento aceitas no fechamento do serviço. Para crédito,
   // guarda apenas o máximo de parcelas (sem distinguir bandeira do cartão).
   paymentSettings: jsonb('payment_settings')
@@ -198,51 +213,112 @@ export const services = pgTable('services', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
-export const employees = pgTable('employees', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  establishmentId: uuid('establishment_id')
-    .notNull()
-    .references(() => establishments.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  email: text('email'),
-  phone: text('phone'),
-  birthDate: date('birth_date', { mode: 'string' }),
-  gender: text('gender'),
-  // Jornada do profissional: horário de entrada/saída, almoço e dias que
-  // trabalha (0=domingo … 6=sábado). Usados no cálculo de disponibilidade.
-  workStart: text('work_start').notNull().default('09:00'),
-  workEnd: text('work_end').notNull().default('18:00'),
-  lunchStart: text('lunch_start'),
-  lunchEnd: text('lunch_end'),
-  workDays: jsonb('work_days').$type<number[]>().notNull().default([1, 2, 3, 4, 5, 6]),
-  active: boolean('active').notNull().default(true),
-  // O dono do estabelecimento também é um profissional (criado no cadastro).
-  // Exatamente um por estabelecimento. Marcado aqui para: exibir a coroa no
-  // painel, impedir a exclusão (todo estabelecimento tem no mínimo o dono) e
-  // limitar a edição ao que faz sentido para o dono (jornada e ativo/inativo).
-  isOwner: boolean('is_owner').notNull().default(false),
-  // Comissão do profissional: se habilitada, o tipo ('percent' | 'fixed') define
-  // como interpretar os valores por serviço em employee_commissions.
-  commissionEnabled: boolean('commission_enabled').notNull().default(false),
-  commissionType: text('commission_type').notNull().default('percent'),
-  // Folha de pagamento: usada na previsão de custos fixos e na futura folha
-  // salarial. Valores em centavos; bônus é uma lista de itens nomeados.
-  salaryCents: integer('salary_cents'),
-  bonuses: jsonb('bonuses')
-    .$type<{ label: string; amountCents: number }[]>()
-    .notNull()
-    .default([]),
-  vrCents: integer('vr_cents'),
-  vtCents: integer('vt_cents'),
-  vaCents: integer('va_cents'),
-  // 1 ou 2 dias de pagamento no mês; cada um com o valor pago naquele dia
-  // (ex.: bônus no dia 20 e salário no dia 5). Vazio = não entra na folha.
-  paymentDays: jsonb('payment_days')
-    .$type<{ day: number; amountCents: number }[]>()
-    .notNull()
-    .default([]),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
+export const employees = pgTable(
+  'employees',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    establishmentId: uuid('establishment_id')
+      .notNull()
+      .references(() => establishments.id, { onDelete: 'cascade' }),
+    // Conta de login vinculada a esta ficha. null = funcionário sem acesso ao
+    // painel (o padrão: só passa a ter quando o dono envia o convite e ele
+    // aceita). `set null` porque revogar o acesso não pode apagar a ficha nem o
+    // histórico de agendamentos dela.
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    // Permissões concedidas pelo dono (ver lib/permissions.ts). Moram aqui, e
+    // não em `users`, para o dono poder configurá-las ANTES do convite ser
+    // aceito e para não existir estado duplicado a sincronizar. Ignoradas quando
+    // isOwner: o dono tem tudo por definição.
+    permissions: jsonb('permissions').$type<string[]>().notNull().default([]),
+    // Atende clientes? false tira da agenda e do link público sem tirar o
+    // login: é o caso da recepcionista, que precisa de ficha (para receber o
+    // convite) mas não é profissional agendável.
+    bookable: boolean('bookable').notNull().default(true),
+    name: text('name').notNull(),
+    email: text('email'),
+    phone: text('phone'),
+    birthDate: date('birth_date', { mode: 'string' }),
+    gender: text('gender'),
+    // Jornada do profissional: horário de entrada/saída, almoço e dias que
+    // trabalha (0=domingo … 6=sábado). Usados no cálculo de disponibilidade.
+    workStart: text('work_start').notNull().default('09:00'),
+    workEnd: text('work_end').notNull().default('18:00'),
+    lunchStart: text('lunch_start'),
+    lunchEnd: text('lunch_end'),
+    workDays: jsonb('work_days').$type<number[]>().notNull().default([1, 2, 3, 4, 5, 6]),
+    active: boolean('active').notNull().default(true),
+    // O dono do estabelecimento também é um profissional (criado no cadastro).
+    // Exatamente um por estabelecimento (índice único parcial abaixo). Marcado
+    // aqui para: exibir a coroa no painel, impedir a exclusão (todo
+    // estabelecimento tem no mínimo o dono), limitar a edição ao que faz sentido
+    // para o dono (jornada e ativo/inativo) e identificar a conta dona.
+    isOwner: boolean('is_owner').notNull().default(false),
+    // Comissão do profissional: se habilitada, o tipo ('percent' | 'fixed') define
+    // como interpretar os valores por serviço em employee_commissions.
+    commissionEnabled: boolean('commission_enabled').notNull().default(false),
+    commissionType: text('commission_type').notNull().default('percent'),
+    // Folha de pagamento: usada na previsão de custos fixos e na futura folha
+    // salarial. Valores em centavos; bônus é uma lista de itens nomeados.
+    salaryCents: integer('salary_cents'),
+    bonuses: jsonb('bonuses')
+      .$type<{ label: string; amountCents: number }[]>()
+      .notNull()
+      .default([]),
+    vrCents: integer('vr_cents'),
+    vtCents: integer('vt_cents'),
+    vaCents: integer('va_cents'),
+    // 1 ou 2 dias de pagamento no mês; cada um com o valor pago naquele dia
+    // (ex.: bônus no dia 20 e salário no dia 5). Vazio = não entra na folha.
+    paymentDays: jsonb('payment_days')
+      .$type<{ day: number; amountCents: number }[]>()
+      .notNull()
+      .default([]),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // Uma conta de login pertence a UMA ficha (logo, a um estabelecimento). É
+    // este índice que se remove no dia do multi-estabelecimento.
+    uniqueIndex('employees_user_idx').on(t.userId),
+    // Exatamente um dono por estabelecimento, garantido pelo banco.
+    uniqueIndex('employees_owner_idx').on(t.establishmentId).where(sql`${t.isOwner}`),
+  ],
+)
+
+/**
+ * Convite de acesso ao painel enviado pelo dono para a ficha de um funcionário.
+ *
+ * O token é aleatório e guardado como hash (nunca em claro): convite precisa
+ * expirar, ser de uso único e ser revogável, o que exige estado, diferente do
+ * token HMAC stateless do link de gerenciamento do cliente final
+ * (lib/appointmentToken.ts).
+ */
+export const staffInvites = pgTable(
+  'staff_invites',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    establishmentId: uuid('establishment_id')
+      .notNull()
+      .references(() => establishments.id, { onDelete: 'cascade' }),
+    employeeId: uuid('employee_id')
+      .notNull()
+      .references(() => employees.id, { onDelete: 'cascade' }),
+    // Destino do convite, congelado no envio: se o e-mail da ficha mudar depois,
+    // o link já enviado continua valendo para quem o recebeu.
+    email: text('email').notNull(),
+    tokenHash: text('token_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('staff_invites_token_idx').on(t.tokenHash),
+    // No máximo um convite ABERTO por ficha: reenviar revoga o anterior.
+    uniqueIndex('staff_invites_open_employee_idx')
+      .on(t.employeeId)
+      .where(sql`${t.acceptedAt} is null and ${t.revokedAt} is null`),
+  ],
+)
 
 // Comissão de um profissional por serviço. value: se commissionType do
 // profissional é 'percent', é a porcentagem inteira (0–100); se 'fixed', é o
@@ -319,6 +395,10 @@ export const clients = pgTable(
     email: text('email'),
     birthDate: date('birth_date', { mode: 'string' }),
     gender: text('gender'),
+    // LGPD: o cliente pediu para não receber mais WhatsApp (link de descadastro
+    // na página pública de gerenciamento). Silencia lembretes E confirmações
+    // deste cliente, em qualquer estabelecimento onde ele tenha marcado isso.
+    whatsappOptOut: boolean('whatsapp_opt_out').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('clients_establishment_phone_idx').on(t.establishmentId, t.phone)],
@@ -371,6 +451,11 @@ export const appointments = pgTable(
     debtCents: integer('debt_cents').notNull().default(0),
     // Gorjeta recebida no fechamento (valor pago acima do total devido).
     tipCents: integer('tip_cents').notNull().default(0),
+    // Quando o lembrete de véspera (WhatsApp) foi entregue. Null = ainda
+    // elegível. É o que garante "no máximo um lembrete por agendamento": a
+    // varredura só considera linhas com null, e remarcar volta para null
+    // (o novo horário merece novo lembrete). Ver workers/reminder.scheduler.ts.
+    reminderSentAt: timestamp('reminder_sent_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('appointments_establishment_date_idx').on(t.establishmentId, t.date)],
@@ -784,12 +869,13 @@ export const payments = pgTable(
   ],
 )
 
+// A ficha é o vínculo: hoje `many` devolve no máximo uma linha (índice único em
+// employees.userId), e o dia em que o índice cair já sai correto sem mudança.
 export const usersRelations = relations(users, ({ many }) => ({
-  establishments: many(establishments),
+  employees: many(employees),
 }))
 
-export const establishmentsRelations = relations(establishments, ({ one, many }) => ({
-  owner: one(users, { fields: [establishments.ownerId], references: [users.id] }),
+export const establishmentsRelations = relations(establishments, ({ many }) => ({
   workingHours: many(workingHours),
   services: many(services),
   employees: many(employees),
@@ -808,6 +894,7 @@ export const establishmentsRelations = relations(establishments, ({ one, many })
   pointsRewards: many(pointsRewards),
   pointsEntries: many(pointsEntries),
   subscriptions: many(subscriptions),
+  staffInvites: many(staffInvites),
 }))
 
 export const productsRelations = relations(products, ({ one }) => ({
@@ -845,8 +932,18 @@ export const employeesRelations = relations(employees, ({ one, many }) => ({
     fields: [employees.establishmentId],
     references: [establishments.id],
   }),
+  user: one(users, { fields: [employees.userId], references: [users.id] }),
   appointments: many(appointments),
   commissions: many(employeeCommissions),
+  invites: many(staffInvites),
+}))
+
+export const staffInvitesRelations = relations(staffInvites, ({ one }) => ({
+  establishment: one(establishments, {
+    fields: [staffInvites.establishmentId],
+    references: [establishments.id],
+  }),
+  employee: one(employees, { fields: [staffInvites.employeeId], references: [employees.id] }),
 }))
 
 export const employeeCommissionsRelations = relations(employeeCommissions, ({ one }) => ({

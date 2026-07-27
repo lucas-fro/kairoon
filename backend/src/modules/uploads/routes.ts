@@ -17,7 +17,11 @@ export async function uploadsRoutes(app: FastifyInstance) {
   app.post('/image', {
     // Cada upload grava um objeto novo na Storage Zone (nome único, sem
     // sobrescrever), então limita a taxa para conter abuso de storage/custo.
-    config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+    // O `kind` aceito hoje é só logo e banner, ambos aparência do
+    // estabelecimento, daí o gate único. Quando entrar foto de profissional,
+    // ela deve exigir 'employees.manage' e a checagem passa a ser por kind
+    // dentro do handler.
+    config: { permission: 'settings.manage', rateLimit: { max: 30, timeWindow: '1 minute' } },
   }, async (request) => {
     const { kind } = uploadImageQuerySchema.parse(request.query)
     if (kind === 'banner') {

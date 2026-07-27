@@ -14,6 +14,8 @@ export interface EmployeePayload {
   workDays?: number[]
   applyScheduleToAll?: boolean
   active?: boolean
+  /** Atende clientes? false tira da agenda e do link público, sem tirar o login. */
+  bookable?: boolean
   commissionEnabled?: boolean
   commissionType?: 'percent' | 'fixed'
   commissions?: { serviceId: string; value: number }[]

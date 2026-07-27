@@ -20,6 +20,7 @@ export function updateEstablishment(data: {
   showInstagram?: boolean
   showWhatsapp?: boolean
   autoConfirm?: boolean
+  notifyWhatsapp?: boolean
   paymentSettings?: import('../types/api').PaymentSettings
   welcomeMessage?: string
   themeColor?: string

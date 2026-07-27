@@ -26,7 +26,7 @@ import { useToast } from '../ui/Toast'
 const EMAIL_REGEX = /^\S+@\S+\.\S+$/
 
 export function AccountTab() {
-  const { user, setUser, logout } = useAuth()
+  const { user, setUser, logout, isOwner } = useAuth()
   const navigate = useNavigate()
   const toast = useToast()
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -62,6 +62,8 @@ export function AccountTab() {
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
+    // A equipe só enxerga o cadastro; o backend recusaria a edição de qualquer jeito.
+    if (!isOwner) return
     const next: typeof errors = {}
     if (name.trim().length < 2) next.name = 'Informe seu nome'
     if (!EMAIL_REGEX.test(email.trim())) next.email = 'E-mail inválido'
@@ -83,9 +85,16 @@ export function AccountTab() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Dados do contratante</CardTitle>
+          <CardTitle>{isOwner ? 'Dados do contratante' : 'Meus dados'}</CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Para a equipe o cadastro é só consulta: quem corrige é o responsável. */}
+          {!isOwner && (
+            <p className="mb-4 text-sm text-ink-secondary">
+              Seus dados cadastrais são atualizados pelo responsável pelo estabelecimento. Se algo
+              estiver errado, peça a correção a ele.
+            </p>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Input
@@ -93,6 +102,7 @@ export function AccountTab() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 error={errors.name}
+                disabled={!isOwner}
               />
               <Input
                 label="E-mail"
@@ -100,6 +110,7 @@ export function AccountTab() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 error={errors.email}
+                disabled={!isOwner}
               />
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -111,6 +122,7 @@ export function AccountTab() {
                 value={phone}
                 onChange={(e) => setPhone(formatPhone(e.target.value))}
                 error={errors.phone}
+                disabled={!isOwner}
               />
               <Input
                 label="Data de nascimento"
@@ -118,6 +130,7 @@ export function AccountTab() {
                 placeholder="DD/MM/AAAA"
                 value={birthDate}
                 onChange={(e) => setBirthDate(maskDateBR(e.target.value))}
+                disabled={!isOwner}
               />
             </div>
             <Input
@@ -127,16 +140,19 @@ export function AccountTab() {
               value={cpf}
               onChange={(e) => setCpf(formatCpf(e.target.value))}
               error={errors.cpf}
+              disabled={!isOwner}
             />
-            <div className="flex justify-end pt-2">
-              <Button
-                type="submit"
-                isLoading={profileMutation.isPending}
-                leftIcon={<Save className="h-4 w-4" />}
-              >
-                Salvar
-              </Button>
-            </div>
+            {isOwner && (
+              <div className="flex justify-end pt-2">
+                <Button
+                  type="submit"
+                  isLoading={profileMutation.isPending}
+                  leftIcon={<Save className="h-4 w-4" />}
+                >
+                  Salvar
+                </Button>
+              </div>
+            )}
           </form>
         </CardContent>
       </Card>
@@ -168,48 +184,51 @@ export function AccountTab() {
         </CardContent>
       </Card>
 
-      <Card className="border border-error/30">
-        <CardContent>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-error-light text-error-dark">
-                <AlertTriangle className="h-5 w-5" strokeWidth={1.9} />
+      {/* Excluir a conta apaga o estabelecimento inteiro: só o dono vê isto. */}
+      {isOwner && (
+        <Card className="border border-error/30">
+          <CardContent>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-error-light text-error-dark">
+                  <AlertTriangle className="h-5 w-5" strokeWidth={1.9} />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-display text-base font-semibold text-error-dark">
+                    Zona de perigo
+                  </p>
+                  <p className="mt-0.5 text-sm text-ink-secondary">
+                    Excluir sua conta remove permanentemente o estabelecimento, agendamentos,
+                    clientes, serviços, funcionários e todo o histórico financeiro. Essa ação não
+                    pode ser desfeita.
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="font-display text-base font-semibold text-error-dark">
-                  Zona de perigo
-                </p>
-                <p className="mt-0.5 text-sm text-ink-secondary">
-                  Excluir sua conta remove permanentemente o estabelecimento, agendamentos,
-                  clientes, serviços, funcionários e todo o histórico financeiro. Essa ação não
-                  pode ser desfeita.
-                </p>
-              </div>
+              <Button
+                type="button"
+                variant="danger"
+                onClick={() => setConfirmOpen(true)}
+                leftIcon={<Trash2 className="h-4 w-4" />}
+                className="shrink-0"
+              >
+                Excluir conta
+              </Button>
             </div>
-            <Button
-              type="button"
-              variant="danger"
-              onClick={() => setConfirmOpen(true)}
-              leftIcon={<Trash2 className="h-4 w-4" />}
-              className="shrink-0"
-            >
-              Excluir conta
-            </Button>
-          </div>
-        </CardContent>
+          </CardContent>
 
-        <ConfirmDialog
-          open={confirmOpen}
-          onClose={() => setConfirmOpen(false)}
-          onConfirm={() => deleteMutation.mutate()}
-          title="Excluir conta permanentemente?"
-          description="Esta ação é irreversível. Todos os seus dados (agendamentos, clientes, serviços, funcionários e histórico financeiro) serão apagados definitivamente e você perderá o acesso ao seu link público."
-          confirmLabel="Sim, excluir tudo"
-          cancelLabel="Cancelar"
-          danger
-          isLoading={deleteMutation.isPending}
-        />
-      </Card>
+          <ConfirmDialog
+            open={confirmOpen}
+            onClose={() => setConfirmOpen(false)}
+            onConfirm={() => deleteMutation.mutate()}
+            title="Excluir conta permanentemente?"
+            description="Esta ação é irreversível. Todos os seus dados (agendamentos, clientes, serviços, funcionários e histórico financeiro) serão apagados definitivamente e você perderá o acesso ao seu link público."
+            confirmLabel="Sim, excluir tudo"
+            cancelLabel="Cancelar"
+            danger
+            isLoading={deleteMutation.isPending}
+          />
+        </Card>
+      )}
     </div>
   )
 }

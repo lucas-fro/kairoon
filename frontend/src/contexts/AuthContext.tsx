@@ -1,8 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import * as authApi from '../api/auth'
 import type { RegisterPayload } from '../api/auth'
 import { clearToken, getToken, setToken } from '../api/client'
+import type { AnyPermission } from '../lib/permissions'
 import type { Establishment, User } from '../types/api'
 
 interface AuthContextValue {
@@ -10,8 +11,17 @@ interface AuthContextValue {
   establishment: Establishment | null
   isLoading: boolean
   isAuthenticated: boolean
+  /**
+   * A sessão tem esta permissão? O dono passa em tudo. É SÓ UX: a regra que
+   * vale é a do servidor, que rejeita a chamada de qualquer jeito.
+   */
+  can: (permission: AnyPermission) => boolean
+  /** Dono da conta: plano, exclusão da conta e gestão de acessos são só dele. */
+  isOwner: boolean
   login: (email: string, password: string) => Promise<void>
   register: (payload: RegisterPayload) => Promise<void>
+  /** Entra direto com a sessão devolvida pelo aceite de convite. */
+  adoptSession: (token: string, user: User, establishment: Establishment) => void
   logout: () => void
   /** Sincroniza o establishment no contexto após edições em Configurações */
   setEstablishment: (establishment: Establishment) => void
@@ -76,6 +86,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setEstablishmentState(null)
   }, [])
 
+  const adoptSession = useCallback(
+    (token: string, nextUser: User, nextEstablishment: Establishment) => {
+      setToken(token)
+      setUser(nextUser)
+      setEstablishmentState(nextEstablishment)
+    },
+    [],
+  )
+
   const setEstablishment = useCallback((value: Establishment) => {
     setEstablishmentState(value)
   }, [])
@@ -84,6 +103,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(value)
   }, [])
 
+  // Set em vez de array: `can` é chamado em toda renderização da navegação.
+  const granted = useMemo(() => new Set(user?.permissions ?? []), [user])
+  const can = useCallback(
+    (permission: AnyPermission) => Boolean(user?.isOwner) || granted.has(permission),
+    [granted, user],
+  )
+
   return (
     <AuthContext.Provider
       value={{
@@ -91,8 +117,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         establishment,
         isLoading,
         isAuthenticated: Boolean(user),
+        can,
+        isOwner: Boolean(user?.isOwner),
         login,
         register,
+        adoptSession,
         logout,
         setEstablishment,
         setUser: updateUser,

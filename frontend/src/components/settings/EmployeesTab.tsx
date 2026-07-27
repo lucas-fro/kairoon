@@ -34,7 +34,10 @@ import {
   onlyDigits,
   parseBRLToCents,
 } from '../../lib/format'
+import { useAuth } from '../../contexts/AuthContext'
 import type { CommissionType, Employee } from '../../types/api'
+import { EmployeeAccessCell } from '../team/EmployeeAccessCell'
+import { PermissionsDialog } from '../team/PermissionsDialog'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
@@ -57,6 +60,13 @@ const UPGRADE_BENEFITS = [
 ]
 
 const STEPS = ['Dados', 'Jornada', 'Comissão', 'Remuneração']
+
+/**
+ * Comissão e remuneração são folha de pagamento: exigem `finance.payroll`. Sem
+ * ela o servidor redige esses campos na leitura E ignora na escrita, então o
+ * assistente para na Jornada, em vez de mostrar campos vazios que não salvam.
+ */
+const PAYROLL_STEPS = 2
 
 const PAY_DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => i + 1)
 
@@ -111,6 +121,8 @@ interface FormState {
   lunchEnd: string
   workDays: number[]
   applyToAll: boolean
+  /** Atende clientes? false some da agenda e do link público (ex.: recepção). */
+  bookable: boolean
   commissionEnabled: boolean
   commissionType: CommissionType
   applyCommissionToAll: boolean
@@ -139,6 +151,7 @@ const EMPTY_FORM: FormState = {
   lunchEnd: '',
   workDays: [1, 2, 3, 4, 5, 6],
   applyToAll: false,
+  bookable: true,
   commissionEnabled: false,
   commissionType: 'percent',
   applyCommissionToAll: false,
@@ -245,6 +258,9 @@ export function EmployeesTab() {
   const queryClient = useQueryClient()
   const toast = useToast()
   const navigate = useNavigate()
+  const { can, isOwner } = useAuth()
+  const canPayroll = can('finance.payroll')
+  const steps = canPayroll ? STEPS : STEPS.slice(0, PAYROLL_STEPS)
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [step, setStep] = useState(1)
@@ -255,6 +271,8 @@ export function EmployeesTab() {
   const [error, setError] = useState<string | undefined>()
   const [deleting, setDeleting] = useState<Employee | null>(null)
   const [upgradeOpen, setUpgradeOpen] = useState(false)
+  // Ficha cuja permissão está sendo editada (null = diálogo fechado).
+  const [managingPermissions, setManagingPermissions] = useState<Employee | null>(null)
 
   const employeesQuery = useQuery({ queryKey: ['employees'], queryFn: listEmployees })
   const planQuery = useQuery({ queryKey: ['plan'], queryFn: getPlan })
@@ -331,6 +349,7 @@ export function EmployeesTab() {
       lunchEnd: employee.lunchEnd ?? '',
       workDays: employee.workDays,
       applyToAll: false,
+      bookable: employee.bookable,
       commissionEnabled: employee.commissionEnabled,
       commissionType: employee.commissionType,
       applyCommissionToAll: false,
@@ -427,7 +446,8 @@ export function EmployeesTab() {
   /** Navegação livre pelo topo (clicando na etapa) */
   function goToStep(target: number) {
     setError(undefined)
-    setStep(target)
+    // Clique na faixa não pode pular para etapa que nem existe nesta sessão.
+    setStep(Math.min(target, steps.length))
   }
 
   function goToSchedule() {
@@ -571,6 +591,7 @@ export function EmployeesTab() {
         lunchEnd: form.lunchEnd,
         workDays: form.workDays,
         applyScheduleToAll: form.applyToAll,
+        bookable: form.bookable,
         commissionEnabled: form.commissionEnabled,
         commissionType: form.commissionType,
         commissions,
@@ -606,6 +627,9 @@ export function EmployeesTab() {
         lunchEnd: form.lunchEnd,
         workDays: form.workDays,
         applyScheduleToAll: form.applyToAll,
+        // O dono também pode administrar sem atender: sair da agenda não tem
+        // nada a ver com deixar de ser dono.
+        bookable: form.bookable,
       },
     })
   }
@@ -656,6 +680,9 @@ export function EmployeesTab() {
                 <Th>Contato</Th>
                 <Th>Jornada</Th>
                 <Th>Status</Th>
+                {/* Convite e permissões são exclusivos do dono, e o servidor nem
+                    manda a situação do acesso para os outros. */}
+                {isOwner && <Th>Acesso ao painel</Th>}
                 <Th className="text-right">Ações</Th>
               </Tr>
             </THead>
@@ -698,6 +725,15 @@ export function EmployeesTab() {
                       {employee.active ? 'Ativo' : 'Inativo'}
                     </Badge>
                   </Td>
+                  {isOwner && (
+                    <Td>
+                      <EmployeeAccessCell
+                        employee={employee}
+                        onManagePermissions={setManagingPermissions}
+                        onChanged={invalidateAll}
+                      />
+                    </Td>
+                  )}
                   <Td className="text-right">
                     <div className="inline-flex items-center justify-end gap-1">
                       <Button
@@ -786,7 +822,7 @@ export function EmployeesTab() {
         {/* Etapas clicáveis: navegue direto por qualquer uma. No mobile a faixa
             rola horizontalmente (scroll só nas etapas), sem estourar o diálogo. */}
         <div className="mb-5 flex items-stretch gap-2 overflow-x-auto">
-          {STEPS.map((label, i) => {
+          {steps.map((label, i) => {
             const n = i + 1
             const active = n === step
             const done = n < step
@@ -889,6 +925,24 @@ export function EmployeesTab() {
               onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
             />
 
+            {/* Recepção, gerente e afins têm ficha (para receber o convite de
+                acesso) mas não atendem: desligar aqui os tira da agenda e do
+                link público sem tirar o login. */}
+            <div className="flex items-start justify-between gap-4 rounded-lg border border-line p-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-ink">Atende clientes</p>
+                <p className="text-xs leading-snug text-ink-secondary">
+                  Desligado, some da agenda e da página pública de agendamento. Use para quem
+                  trabalha no salão sem atender, como a recepção.
+                </p>
+              </div>
+              <Switch
+                checked={form.bookable}
+                onChange={(bookable) => setForm((f) => ({ ...f, bookable }))}
+                aria-label="Atende clientes"
+              />
+            </div>
+
             {error && <p className="text-xs text-error-dark">{error}</p>}
 
             <DialogActions className="pt-2">
@@ -903,9 +957,16 @@ export function EmployeesTab() {
               >
                 Voltar
               </Button>
-              <Button type="button" onClick={goToCommission}>
-                Próximo
-              </Button>
+              {/* Sem acesso à folha, a Jornada é a última etapa. */}
+              {canPayroll ? (
+                <Button type="button" onClick={goToCommission}>
+                  Próximo
+                </Button>
+              ) : (
+                <Button type="button" onClick={handleSave} isLoading={saveMutation.isPending}>
+                  Salvar
+                </Button>
+              )}
             </DialogActions>
           </div>
         ) : step === 3 ? (
@@ -1333,6 +1394,13 @@ export function EmployeesTab() {
         confirmLabel="Excluir"
         danger
         isLoading={deleteMutation.isPending}
+      />
+
+      <PermissionsDialog
+        employee={managingPermissions}
+        open={managingPermissions !== null}
+        onClose={() => setManagingPermissions(null)}
+        onSaved={invalidateAll}
       />
     </div>
   )

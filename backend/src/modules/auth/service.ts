@@ -1,11 +1,12 @@
 import { randomBytes, randomInt } from 'node:crypto'
 import bcrypt from 'bcryptjs'
-import { and, eq, inArray, ne } from 'drizzle-orm'
+import { and, eq, ne } from 'drizzle-orm'
 import { db } from '../../db'
 import { employees, establishments, users, workingHours } from '../../db/schema'
 import { AppError } from '../../lib/errors'
-import { sendPasswordResetEmail, sendWelcomeEmail } from '../../lib/mailer'
 import { TRIAL_DAYS } from '../../lib/plan'
+import { resolvePermissions } from '../../lib/permissions'
+import { notify } from '../../notifications/dispatcher'
 import type { LoginInput, RegisterInput, UpdateProfileInput } from './schemas'
 
 /** Nome da constraint violada quando o erro é 23505 (unique); null caso contrário. */
@@ -48,7 +49,15 @@ const DEFAULT_WORKING_HOURS = [
   { dayOfWeek: 6, opensAt: '09:00', closesAt: '18:00', isClosed: false },
 ]
 
-function sanitizeUser(user: typeof users.$inferSelect) {
+type EmployeeRow = typeof employees.$inferSelect
+
+/**
+ * Payload do usuário logado. Vai junto o que a sessão precisa saber sobre
+ * poderes: se é o dono, qual ficha é a dele e a lista EFETIVA de permissões (já
+ * com as implícitas expandidas), para o frontend só checar pertencimento sem
+ * reimplementar as regras de dedução.
+ */
+function sanitizeUser(user: typeof users.$inferSelect, employee: EmployeeRow) {
   return {
     id: user.id,
     name: user.name,
@@ -56,7 +65,18 @@ function sanitizeUser(user: typeof users.$inferSelect) {
     phone: user.phone,
     birthDate: user.birthDate,
     cpf: user.cpf,
+    isOwner: employee.isOwner,
+    employeeId: employee.id,
+    permissions: [...resolvePermissions(employee.permissions, { isOwner: employee.isOwner })],
   }
+}
+
+/** Ficha vinculada à conta. É por ela que se chega ao estabelecimento. */
+async function findEmployeeByUserId(userId: string) {
+  return db.query.employees.findFirst({
+    where: eq(employees.userId, userId),
+    with: { establishment: true },
+  })
 }
 
 export async function isSlugAvailable(slug: string) {
@@ -106,22 +126,12 @@ export async function registerOwner(input: RegisterInput) {
     const slug = business ? business.slug : provisionalSlug()
     try {
       const result = await db.transaction(async (tx) => {
-        const [user] = await tx
-          .insert(users)
-          .values({
-            name: input.name.trim(),
-            email,
-            passwordHash,
-            cpf: input.cpf,
-            phone: input.phone,
-            termsAcceptedAt: now,
-          })
-          .returning()
-
+        // Ordem: estabelecimento, conta, ficha do dono. É linear porque o dono
+        // não é mais coluna do estabelecimento: quem aponta para quem é sempre
+        // employees -> (establishment, user).
         const [establishment] = await tx
           .insert(establishments)
           .values({
-            ownerId: user.id,
             name: businessName,
             slug,
             businessType: business?.businessType ?? 'outro',
@@ -145,23 +155,48 @@ export async function registerOwner(input: RegisterInput) {
           DEFAULT_WORKING_HOURS.map((wh) => ({ ...wh, establishmentId: establishment.id })),
         )
 
-        // O primeiro (e único, no início) profissional é o próprio dono.
-        // isOwner: aparece com a coroa no painel, não pode ser excluído e só
-        // tem jornada/ativo editáveis (ver modules/employees/service.ts).
-        await tx
-          .insert(employees)
-          .values({ establishmentId: establishment.id, name: input.name.trim(), isOwner: true })
+        const [user] = await tx
+          .insert(users)
+          .values({
+            name: input.name.trim(),
+            email,
+            passwordHash,
+            cpf: input.cpf,
+            phone: input.phone,
+            termsAcceptedAt: now,
+          })
+          .returning()
 
-        return { user: sanitizeUser(user), establishment }
+        // O primeiro (e único, no início) profissional é o próprio dono.
+        // isOwner: aparece com a coroa no painel, não pode ser excluído, só tem
+        // jornada/ativo editáveis (ver modules/employees/service.ts) e é por
+        // esta linha que a conta chega ao estabelecimento.
+        const [employee] = await tx
+          .insert(employees)
+          .values({
+            establishmentId: establishment.id,
+            userId: user.id,
+            name: input.name.trim(),
+            isOwner: true,
+          })
+          .returning()
+
+        return { user: sanitizeUser(user, employee), establishment }
       })
 
-      // E-mail de boas-vindas: fire-and-forget (nunca trava nem falha o cadastro).
-      // Sem negócio informado (fluxo em etapas), não cita o nome placeholder.
-      void sendWelcomeEmail(
-        result.user.email,
-        result.user.name,
-        business ? result.establishment.name : null,
-      ).catch((err) => console.error('[auth] falha ao enviar e-mail de boas-vindas:', err))
+      // Boas-vindas: fire-and-forget (nunca trava nem falha o cadastro). O
+      // `notify` já enfileira best-effort e nunca rejeita, então dispensa
+      // .catch(). Sem negócio informado (fluxo em etapas), não cita o nome
+      // placeholder.
+      void notify(
+        'welcome',
+        { email: result.user.email },
+        {
+          name: result.user.name,
+          establishmentName: business ? result.establishment.name : null,
+        },
+        { key: `welcome:${result.user.id}` },
+      )
 
       return result
     } catch (err) {
@@ -183,7 +218,13 @@ export async function registerOwner(input: RegisterInput) {
   throw lastError ?? new AppError('Não foi possível criar a conta. Tente novamente.', 500)
 }
 
-export async function authenticateOwner(input: LoginInput) {
+/**
+ * Login de QUALQUER conta do painel, dono ou equipe: o caminho é sempre
+ * conta -> ficha -> estabelecimento. Conta ou ficha desativada não entra, e a
+ * mensagem diferencia os dois casos (senão o funcionário desligado fica achando
+ * que errou a senha).
+ */
+export async function authenticate(input: LoginInput) {
   const user = await db.query.users.findFirst({
     where: eq(users.email, input.email.toLowerCase().trim()),
   })
@@ -191,15 +232,26 @@ export async function authenticateOwner(input: LoginInput) {
 
   const passwordMatches = await bcrypt.compare(input.password, user.passwordHash)
   if (!passwordMatches) throw new AppError('E-mail ou senha incorretos', 401)
+  if (!user.active) throw new AppError('Esta conta está desativada', 403)
 
-  const establishment = await db.query.establishments.findFirst({
-    where: eq(establishments.ownerId, user.id),
-  })
-  if (!establishment) throw new AppError('Nenhum estabelecimento vinculado a esta conta', 404)
+  const employee = await findEmployeeByUserId(user.id)
+  if (!employee?.establishment) {
+    throw new AppError('Nenhum estabelecimento vinculado a esta conta', 404)
+  }
+  // Mesma exceção do plugins/auth: ficha inativa desliga a equipe, mas para o
+  // dono só quer dizer que ele não atende clientes.
+  if (!employee.active && !employee.isOwner) {
+    throw new AppError('Seu acesso a este estabelecimento foi desativado', 403)
+  }
 
-  return { user: sanitizeUser(user), establishment }
+  return { user: sanitizeUser(user, employee), establishment: employee.establishment }
 }
 
+/**
+ * Dados cadastrais da conta. Rota exclusiva do dono: o funcionário vê os
+ * próprios dados mas quem edita a ficha dele é o dono (só a senha é dele, ver
+ * `changePassword`).
+ */
 export async function updateProfile(userId: string, input: UpdateProfileInput) {
   const data: Partial<typeof users.$inferInsert> = {}
   if (input.name !== undefined) data.name = input.name.trim()
@@ -228,33 +280,45 @@ export async function updateProfile(userId: string, input: UpdateProfileInput) {
     await db
       .update(employees)
       .set({ name: data.name })
-      .where(
-        and(
-          eq(employees.isOwner, true),
-          inArray(
-            employees.establishmentId,
-            db
-              .select({ id: establishments.id })
-              .from(establishments)
-              .where(eq(establishments.ownerId, userId)),
-          ),
-        ),
-      )
+      .where(and(eq(employees.userId, userId), eq(employees.isOwner, true)))
   }
 
-  return sanitizeUser(updated)
+  const employee = await findEmployeeByUserId(userId)
+  if (!employee) throw new AppError('Nenhum acesso vinculado a esta conta', 404)
+  return sanitizeUser(updated, employee)
+}
+
+/**
+ * Troca da própria senha. É a ÚNICA escrita liberada a qualquer sessão: sem
+ * ela, o funcionário ficaria preso para sempre à senha criada no convite.
+ * Exige a senha atual (uma sessão sequestrada não consegue trocá-la sozinha).
+ */
+export async function changePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+) {
+  const user = await db.query.users.findFirst({ where: eq(users.id, userId) })
+  if (!user) throw new AppError('Usuário não encontrado', 404)
+
+  const matches = await bcrypt.compare(currentPassword, user.passwordHash)
+  if (!matches) throw new AppError('Senha atual incorreta', 400)
+
+  const passwordHash = await bcrypt.hash(newPassword, 10)
+  await db.update(users).set({ passwordHash }).where(eq(users.id, userId))
+  return { ok: true as const }
 }
 
 export async function getProfile(userId: string) {
   const user = await db.query.users.findFirst({ where: eq(users.id, userId) })
   if (!user) throw new AppError('Usuário não encontrado', 404)
 
-  const establishment = await db.query.establishments.findFirst({
-    where: eq(establishments.ownerId, userId),
-  })
-  if (!establishment) throw new AppError('Nenhum estabelecimento vinculado a esta conta', 404)
+  const employee = await findEmployeeByUserId(userId)
+  if (!employee?.establishment) {
+    throw new AppError('Nenhum estabelecimento vinculado a esta conta', 404)
+  }
 
-  return { user: sanitizeUser(user), establishment }
+  return { user: sanitizeUser(user, employee), establishment: employee.establishment }
 }
 
 /**
@@ -278,8 +342,13 @@ export async function requestPasswordResetByEmail(email: string) {
       .set({ passwordResetCodeHash, passwordResetExpiresAt, passwordResetAttempts: 0 })
       .where(eq(users.id, user.id))
 
-    void sendPasswordResetEmail(user.email, user.name, code).catch((err) =>
-      console.error('[auth] falha ao enviar código de redefinição:', err),
+    // A chave inclui o vencimento: cada novo pedido gera um jobId diferente, e
+    // dois cliques no mesmo pedido continuam deduplicados.
+    void notify(
+      'password_reset',
+      { email: user.email },
+      { name: user.name, code },
+      { key: `password_reset:${user.id}:${passwordResetExpiresAt.getTime()}` },
     )
   } else {
     // Roda um bcrypt "à toa" quando a conta não existe, para o tempo de resposta

@@ -2,7 +2,7 @@ import { LegalPageLayout } from './LegalPageLayout'
 
 export function PrivacyPolicyPage() {
   return (
-    <LegalPageLayout current="privacidade" title="Política de Privacidade" updatedAt="17 de julho de 2026">
+    <LegalPageLayout current="privacidade" title="Política de Privacidade" updatedAt="27 de julho de 2026">
       <p>
         Esta Política de Privacidade explica como a Kairoon coleta, usa, armazena, compartilha e
         protege dados pessoais, em conformidade com a Lei Geral de Proteção de Dados (Lei nº
@@ -40,7 +40,9 @@ export function PrivacyPolicyPage() {
         <strong>3.2 Dos clientes finais</strong> (coletados através do link público de agendamento):
         nome, telefone, e-mail, data de nascimento e gênero (quando informados), além do histórico
         de agendamentos, serviços escolhidos, presenças e observações registradas pelo
-        estabelecimento.
+        estabelecimento. O telefone é usado também para enviar as mensagens de agendamento descritas
+        no item 5.1, e registramos a preferência do cliente final que pede para não receber mais
+        essas mensagens.
       </p>
       <p>
         <strong>3.3 Dados de pagamento:</strong> ao assinar um plano pago, coletamos nome do titular
@@ -76,13 +78,33 @@ export function PrivacyPolicyPage() {
           essenciais.
         </li>
       </ul>
+      <p>
+        As mensagens de confirmação, lembrete e cancelamento enviadas ao cliente final (item 5.1)
+        são transacionais e se apoiam na execução do agendamento por ele solicitado, e não em
+        consentimento para marketing. Ainda assim, o cliente final pode recusá-las a qualquer
+        momento, conforme o item 5.2.
+      </p>
 
       <h2>5. Como usamos os dados</h2>
       <p>
         Usamos os dados para viabilizar o funcionamento da agenda, autenticar o acesso à conta,
-        processar assinaturas e pagamentos, enviar notificações e lembretes de agendamento, enviar
-        comprovantes e comunicações transacionais, gerar relatórios financeiros e de desempenho para
-        o estabelecimento, prevenir fraudes e prestar suporte quando solicitado.
+        processar assinaturas e pagamentos, enviar as mensagens de agendamento descritas no item
+        5.1, enviar comprovantes e comunicações transacionais, gerar relatórios financeiros e de
+        desempenho para o estabelecimento, prevenir fraudes e prestar suporte quando solicitado.
+      </p>
+      <p>
+        <strong>5.1 Mensagens aos clientes finais.</strong> Enviamos ao cliente final, por WhatsApp
+        e, quando ele informa um e-mail, também por e-mail, mensagens relacionadas exclusivamente ao
+        agendamento que ele próprio realizou: a confirmação do horário, um lembrete na véspera do
+        atendimento e o aviso de cancelamento. São mensagens <strong>transacionais</strong>,
+        necessárias à execução do agendamento, e não comunicação de marketing. A plataforma não
+        permite ao estabelecimento usar esse canal para propaganda ou promoções.
+      </p>
+      <p>
+        <strong>5.2 Como recusar.</strong> O cliente final pode, a qualquer momento, pedir para não
+        receber mais mensagens de WhatsApp, pelo link disponível na página de gerenciamento do seu
+        agendamento. O pedido passa a valer imediatamente, para todas as mensagens seguintes daquele
+        estabelecimento.
       </p>
 
       <h2>6. Compartilhamento com terceiros</h2>
@@ -103,9 +125,22 @@ export function PrivacyPolicyPage() {
           e avisos.
         </li>
         <li>
+          <strong>Provedor de mensagens de WhatsApp:</strong> envio das mensagens de agendamento
+          descritas no item 5.1. Recebe o telefone do cliente final e o conteúdo da mensagem (que
+          inclui nome, data, horário, serviço e profissional do agendamento).
+        </li>
+        <li>
+          <strong>Provedor de armazenamento e distribuição de imagens:</strong> hospedagem das
+          imagens enviadas pelo estabelecimento, como logo, banner e fotos da equipe.
+        </li>
+        <li>
           <strong>Serviço de consulta de CEP:</strong> preenchimento automático de endereço.
         </li>
       </ul>
+      <p>
+        O envio das mensagens de WhatsApp depende do próprio WhatsApp, operado pela Meta, cujo
+        tratamento de dados é regido pelas políticas dela.
+      </p>
       <p>
         Também podemos compartilhar dados para cumprir obrigação legal, ordem de autoridade
         competente ou para exercer e defender direitos.
@@ -151,7 +186,9 @@ export function PrivacyPolicyPage() {
         <strong>Exclusão de Conta</strong>) ou solicitada pelo e-mail{' '}
         <strong>contato@kairoon.com.br</strong>. Se você é um
         cliente final, direcione seus pedidos ao estabelecimento, que é o controlador desses dados;
-        podemos apoiá-lo tecnicamente quando necessário.
+        podemos apoiá-lo tecnicamente quando necessário. Para deixar de receber as mensagens de
+        WhatsApp você não precisa de nenhum pedido: use o link na página de gerenciamento do seu
+        agendamento, conforme o item 5.2.
       </p>
 
       <h2>12. Dados de crianças e adolescentes</h2>

@@ -57,6 +57,9 @@ export const updateEstablishmentSchema = z.object({
   footerMessage: optionalText(120, 'Mensagem muito longa'),
   businessType: z.enum(['barbearia', 'salao', 'clinica', 'outro']).optional(),
   autoConfirm: z.boolean().optional(),
+  // Lembrete de WhatsApp na véspera. Não afeta a confirmação no ato do
+  // agendamento, que sai sempre.
+  notifyWhatsapp: z.boolean().optional(),
   paymentSettings: z
     .object({
       cash: z.boolean(),

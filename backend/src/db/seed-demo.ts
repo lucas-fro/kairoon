@@ -893,7 +893,7 @@ async function wipeDatabase() {
     'coupon_redemptions', 'coupons',
     'commission_entries', 'transactions', 'recurring_expenses',
     'waitlist_entries', 'appointments', 'time_blocks',
-    'employee_commissions', 'employees', 'services', 'products',
+    'employee_commissions', 'staff_invites', 'employees', 'services', 'products',
     'clients', 'working_hours', 'establishments', 'users',
   ]
   await db.execute(sql.raw(`TRUNCATE TABLE ${tables.map((t) => `"${t}"`).join(', ')} RESTART IDENTITY CASCADE`))
@@ -917,7 +917,6 @@ async function main() {
 
   await db.insert(schema.establishments).values({
     id: estId,
-    ownerId: userId,
     name: 'Barbearia Navalha de Ouro',
     slug: 'navalha-de-ouro',
     businessType: 'barbearia',
@@ -969,9 +968,11 @@ async function main() {
 
   // O dono da conta também é um profissional (isOwner): aparece com a coroa, não
   // pode ser excluído e só tem jornada/status editáveis. Sem comissão/folha nem
-  // agenda (o dono aqui administra). Inserido primeiro, como no cadastro real.
+  // agenda (o dono aqui administra). É esta ficha que liga a conta ao
+  // estabelecimento: não existe mais establishments.ownerId.
   await db.insert(schema.employees).values({
     establishmentId: estId,
+    userId,
     name: 'Lucas Oliveira',
     isOwner: true,
     workStart: '09:00',

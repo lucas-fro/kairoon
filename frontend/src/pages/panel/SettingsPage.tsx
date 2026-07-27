@@ -13,10 +13,10 @@ import { useAuth } from '../../contexts/AuthContext'
 // aqui só validamos o ?tab= e renderizamos a seção ativa.
 const TABS = ['estabelecimento', 'funcionamento', 'aparencia', 'plano', 'conta'] as const
 
-const DEFAULT_TAB = 'estabelecimento'
+type SettingsTab = (typeof TABS)[number]
 
 export function SettingsPage() {
-  const { establishment } = useAuth()
+  const { establishment, can, isOwner } = useAuth()
   const [searchParams] = useSearchParams()
 
   const tabParam = searchParams.get('tab')
@@ -26,7 +26,19 @@ export function SettingsPage() {
   if (tabParam === 'servicos') return <Navigate to="/app/servicos" replace />
   if (tabParam === 'funcionarios') return <Navigate to="/app/funcionarios" replace />
 
-  const activeTab = TABS.some((tab) => tab === tabParam) ? (tabParam as string) : DEFAULT_TAB
+  // Bloqueio por permissão não tem upgrade que resolva: a aba simplesmente não
+  // existe para quem não pode. "Conta" fica livre porque são dados próprios.
+  function isAllowed(tab: SettingsTab) {
+    if (tab === 'conta') return true
+    if (tab === 'plano') return isOwner
+    return can('settings.manage')
+  }
+
+  // Sem DEFAULT_TAB fixo: a padrão é a primeira permitida (para o profissional
+  // comum, "conta"). Um ?tab= proibido cai aqui também, em vez de renderizar
+  // uma seção cujas chamadas o backend recusaria.
+  const allowedTabs = TABS.filter(isAllowed)
+  const activeTab = allowedTabs.find((tab) => tab === tabParam) ?? allowedTabs[0]
 
   if (!establishment) return <PageLoader />
 
@@ -38,7 +50,11 @@ export function SettingsPage() {
       {activeTab === 'funcionamento' && (
         <div className="space-y-6">
           <WorkingHoursTab />
-          <TimeBlocksCard />
+          {/* Bloqueio é agenda, não configuração: as rotas de time-blocks pedem
+              agenda.view/agenda.edit, e a lista de profissionais pede
+              employees.view (que agenda.view já implica). Sem esta checagem o
+              card monta com settings.manage e dispara duas queries 403. */}
+          {can('agenda.view') && <TimeBlocksCard />}
         </div>
       )}
       {activeTab === 'aparencia' && <AppearanceTab establishment={establishment} />}

@@ -25,6 +25,7 @@ import {
 } from 'recharts'
 import { Link, useNavigate } from 'react-router-dom'
 import { getDashboardSummary } from '../../api/dashboard'
+import { useAuth } from '../../contexts/AuthContext'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
@@ -103,11 +104,25 @@ function StatCard({ icon: Icon, label, value, sub, changePct, current }: StatCar
   )
 }
 
-function DashboardSkeleton() {
+/**
+ * Colunas da 1ª linha conforme quantos KPIs sobraram: sem permissão de
+ * financeiro e/ou de clientes os cartões somem, e o grid precisa fechar o buraco
+ * em vez de deixar célula vazia. Classes inteiras porque o Tailwind não monta
+ * nome de classe em tempo de execução.
+ */
+const STAT_GRID_COLS: Record<number, string> = {
+  2: 'sm:grid-cols-2',
+  3: 'sm:grid-cols-2 xl:grid-cols-3',
+  4: 'sm:grid-cols-2 xl:grid-cols-4',
+}
+
+/** `statCount` vem das permissões da sessão, não da resposta: assim o esqueleto
+ *  já reserva o número de cartões que vai sobrar e a tela não pula ao carregar. */
+function DashboardSkeleton({ statCount }: { statCount: number }) {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }, (_, i) => (
+      <div className={`grid grid-cols-1 gap-4 ${STAT_GRID_COLS[statCount]}`}>
+        {Array.from({ length: statCount }, (_, i) => (
           <Card key={i}>
             <CardContent>
               <div className="flex items-center justify-between gap-2">
@@ -145,9 +160,11 @@ function DashboardSkeleton() {
 interface TrendTooltipProps {
   active?: boolean
   payload?: { payload?: DashboardTrendPoint }[]
+  /** quando a série de novos clientes some, o tooltip não pode citá-la */
+  showNewClients?: boolean
 }
 
-function TrendTooltip({ active, payload }: TrendTooltipProps) {
+function TrendTooltip({ active, payload, showNewClients }: TrendTooltipProps) {
   if (!active || !payload || payload.length === 0 || !payload[0].payload) return null
   const datum = payload[0].payload
   return (
@@ -164,14 +181,16 @@ function TrendTooltip({ active, payload }: TrendTooltipProps) {
           />
           {datum.appointmentsCount} {datum.appointmentsCount === 1 ? 'agendamento' : 'agendamentos'}
         </p>
-        <p className="flex items-center gap-1.5 text-ink-secondary">
-          <span
-            className="h-2 w-2 shrink-0 rounded-full"
-            style={{ backgroundColor: CHART_COLORS.expense }}
-            aria-hidden="true"
-          />
-          {datum.newClientsCount} {datum.newClientsCount === 1 ? 'novo cliente' : 'novos clientes'}
-        </p>
+        {showNewClients ? (
+          <p className="flex items-center gap-1.5 text-ink-secondary">
+            <span
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ backgroundColor: CHART_COLORS.expense }}
+              aria-hidden="true"
+            />
+            {datum.newClientsCount} {datum.newClientsCount === 1 ? 'novo cliente' : 'novos clientes'}
+          </p>
+        ) : null}
       </div>
     </div>
   )
@@ -179,8 +198,18 @@ function TrendTooltip({ active, payload }: TrendTooltipProps) {
 
 const AXIS_TICK = { fill: CHART_COLORS.axisText, fontSize: 12 }
 
-function ActivityTrendCard({ trend }: { trend: DashboardTrendPoint[] }) {
-  const empty = trend.every((point) => point.appointmentsCount === 0 && point.newClientsCount === 0)
+function ActivityTrendCard({
+  trend,
+  showNewClients,
+}: {
+  trend: DashboardTrendPoint[]
+  showNewClients: boolean
+}) {
+  // Com a série de clientes escondida, o "vazio" passa a olhar só agendamentos:
+  // do contrário o gráfico ficaria em branco por causa de dados que ninguém vê.
+  const empty = trend.every(
+    (point) => point.appointmentsCount === 0 && (!showNewClients || point.newClientsCount === 0),
+  )
 
   const renderLegendText = (value: string) => (
     <span className="text-xs" style={{ color: CHART_COLORS.axisText }}>
@@ -191,14 +220,20 @@ function ActivityTrendCard({ trend }: { trend: DashboardTrendPoint[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Agendamentos e novos clientes no mês</CardTitle>
+        <CardTitle>
+          {showNewClients ? 'Agendamentos e novos clientes no mês' : 'Agendamentos no mês'}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         {empty ? (
           <EmptyState
             icon={TrendingUp}
             title="Sem atividade este mês"
-            description="Assim que houver agendamentos ou novos clientes, o gráfico aparece aqui."
+            description={
+              showNewClients
+                ? 'Assim que houver agendamentos ou novos clientes, o gráfico aparece aqui.'
+                : 'Assim que houver agendamentos, o gráfico aparece aqui.'
+            }
           />
         ) : (
           <div className="overflow-x-auto">
@@ -223,7 +258,7 @@ function ActivityTrendCard({ trend }: { trend: DashboardTrendPoint[] }) {
                 />
                 <Tooltip
                   cursor={{ stroke: CHART_COLORS.grid, strokeWidth: 1 }}
-                  content={<TrendTooltip />}
+                  content={<TrendTooltip showNewClients={showNewClients} />}
                 />
                 <Legend iconType="circle" iconSize={8} verticalAlign="bottom" formatter={renderLegendText} />
                 <Line
@@ -235,15 +270,17 @@ function ActivityTrendCard({ trend }: { trend: DashboardTrendPoint[] }) {
                   dot={false}
                   activeDot={{ r: 4 }}
                 />
-                <Line
-                  type="monotone"
-                  dataKey="newClientsCount"
-                  name="Novos clientes"
-                  stroke={CHART_COLORS.expense}
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                />
+                {showNewClients ? (
+                  <Line
+                    type="monotone"
+                    dataKey="newClientsCount"
+                    name="Novos clientes"
+                    stroke={CHART_COLORS.expense}
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                  />
+                ) : null}
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -258,6 +295,10 @@ function ActivityTrendCard({ trend }: { trend: DashboardTrendPoint[] }) {
 
 export function DashboardPage() {
   const navigate = useNavigate()
+  // Sem `agenda.view` a rota /app/agenda devolve a pessoa para cá (PermissionRoute),
+  // então os atalhos para a agenda seriam link morto: só aparecem para quem entra.
+  const { can } = useAuth()
+  const canViewAgenda = can('agenda.view')
   const { data, isPending, isError, refetch, isRefetching } = useQuery({
     queryKey: ['dashboard'],
     queryFn: getDashboardSummary,
@@ -274,10 +315,13 @@ export function DashboardPage() {
   )
 
   if (isPending) {
+    // Mesma conta do statCount de baixo, só que a partir da sessão: agendamentos
+    // e ocupação sempre existem, faturamento e clientes dependem da permissão.
+    const expectedStats = 2 + (can('finance.view') ? 1 : 0) + (can('clients.view') ? 1 : 0)
     return (
       <div>
         {header}
-        <DashboardSkeleton />
+        <DashboardSkeleton statCount={expectedStats} />
       </div>
     )
   }
@@ -306,29 +350,40 @@ export function DashboardPage() {
   }
 
   const month = data.month
+  // O backend devolve null nesses dois quando a sessão não pode ver financeiro
+  // ou clientes. Aqui isso não vira zero nem traço: o indicador simplesmente
+  // não é renderizado, porque não existe upgrade que destrave permissão.
+  const revenueCents = month.revenueCents
+  const newClients = month.newClients
   const avgTicketCents =
-    month.completedCount > 0 ? Math.round(month.revenueCents / month.completedCount) : 0
+    revenueCents !== null && month.completedCount > 0
+      ? Math.round(revenueCents / month.completedCount)
+      : 0
   const daysElapsed = Number(today.slice(8, 10))
   const dailyAvgAppointments = daysElapsed > 0 ? month.appointmentsCount / daysElapsed : 0
-  const dailyAvgNewClients = daysElapsed > 0 ? month.newClients / daysElapsed : 0
+  const dailyAvgNewClients = newClients !== null && daysElapsed > 0 ? newClients / daysElapsed : 0
   const occupancyPct = Math.round(month.occupancyRate * 100)
   const todayOccupancyPct = Math.round(month.todayOccupancyRate * 100)
+  // Agendamentos e ocupação sempre aparecem; os outros dois são condicionais.
+  const statCount = 2 + (revenueCents !== null ? 1 : 0) + (newClients !== null ? 1 : 0)
 
   return (
     <div>
       {header}
 
       <div className="space-y-6">
-        {/* 1ª linha: 4 KPIs do mês, com média/total e variação vs. mês anterior */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            icon={Wallet}
-            label="Faturamento do mês"
-            value={formatBRL(month.revenueCents)}
-            sub={`Ticket médio: ${formatBRL(avgTicketCents)}`}
-            changePct={month.revenueChangePct}
-            current={month.revenueCents}
-          />
+        {/* 1ª linha: KPIs do mês, com média/total e variação vs. mês anterior */}
+        <div className={`grid grid-cols-1 gap-4 ${STAT_GRID_COLS[statCount]}`}>
+          {revenueCents !== null ? (
+            <StatCard
+              icon={Wallet}
+              label="Faturamento do mês"
+              value={formatBRL(revenueCents)}
+              sub={`Ticket médio: ${formatBRL(avgTicketCents)}`}
+              changePct={month.revenueChangePct}
+              current={revenueCents}
+            />
+          ) : null}
           <StatCard
             icon={CalendarCheck}
             label="Agendamentos do mês"
@@ -337,14 +392,16 @@ export function DashboardPage() {
             changePct={month.appointmentsChangePct}
             current={month.appointmentsCount}
           />
-          <StatCard
-            icon={Users}
-            label="Novos clientes no mês"
-            value={String(month.newClients)}
-            sub={`Média diária: ${formatAvg(dailyAvgNewClients)}`}
-            changePct={month.newClientsChangePct}
-            current={month.newClients}
-          />
+          {newClients !== null ? (
+            <StatCard
+              icon={Users}
+              label="Novos clientes no mês"
+              value={String(newClients)}
+              sub={`Média diária: ${formatAvg(dailyAvgNewClients)}`}
+              changePct={month.newClientsChangePct}
+              current={newClients}
+            />
+          ) : null}
           <StatCard
             icon={Gauge}
             label="Ocupação de hoje"
@@ -356,19 +413,21 @@ export function DashboardPage() {
         </div>
 
         {/* 2ª linha: gráfico de linhas (atividade de clientes, não financeiro) */}
-        <ActivityTrendCard trend={data.trend} />
+        <ActivityTrendCard trend={data.trend} showNewClients={newClients !== null} />
 
         {/* 3ª linha: tabela de agendamentos de hoje */}
         <Card>
           <CardHeader className="flex-wrap">
             <CardTitle>Agendamentos de hoje</CardTitle>
-            <Link
-              to="/app/agenda"
-              className="inline-flex items-center gap-1 text-sm font-medium text-primary transition-colors duration-150 hover:text-primary-hover"
-            >
-              Ver agenda completa
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+            {canViewAgenda ? (
+              <Link
+                to="/app/agenda"
+                className="inline-flex items-center gap-1 text-sm font-medium text-primary transition-colors duration-150 hover:text-primary-hover"
+              >
+                Ver agenda completa
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            ) : null}
           </CardHeader>
           {data.todayAppointments.length === 0 ? (
             <CardContent className="pt-4">
@@ -377,9 +436,11 @@ export function DashboardPage() {
                 title="Nenhum agendamento hoje"
                 description="Quando novos horários forem marcados, eles aparecem aqui."
                 action={
-                  <Button variant="outline" size="sm" onClick={() => navigate('/app/agenda')}>
-                    Ver agenda
-                  </Button>
+                  canViewAgenda ? (
+                    <Button variant="outline" size="sm" onClick={() => navigate('/app/agenda')}>
+                      Ver agenda
+                    </Button>
+                  ) : null
                 }
               />
             </CardContent>

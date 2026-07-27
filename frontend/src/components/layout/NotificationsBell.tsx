@@ -21,6 +21,7 @@ import { getRecurringExpensesForecast } from '../../api/recurringExpenses'
 import { listWaitlist } from '../../api/waitlist'
 import { addDays, timeToMinutes, todayStr } from '../../lib/dates'
 import { cn, formatBRL, formatDate, timeAgo } from '../../lib/format'
+import { useAuth } from '../../contexts/AuthContext'
 import { useDropdown } from '../../hooks/useDropdown'
 import { PendingAppointmentDialog, toPendingView } from '../realtime/PendingAppointmentDialog'
 import type { PendingAppointmentView } from '../realtime/PendingAppointmentDialog'
@@ -59,7 +60,21 @@ function isBirthdayToday(birthDate: string | null, today: string): boolean {
 export function NotificationsBell() {
   const { open, setOpen, ref } = useDropdown()
   const navigate = useNavigate()
+  const { can } = useAuth()
   const [selected, setSelected] = useState<PendingAppointmentView | null>(null)
+
+  // O sino vive no header de toda página autenticada, então cada bloco só busca
+  // dado se a sessão tiver a permissão da área. Sem isto, um profissional comum
+  // tomaria 403 em várias rotas a cada navegação.
+  const canAgenda = can('agenda.view')
+  // Confirmar é 'agenda.edit' e recusar é 'agenda.cancel'. Sem os dois o popup
+  // de aprovação só serviria para tomar 403 nos dois botões, então a notificação
+  // continua aparecendo (é informação de agenda) mas leva à agenda, como as
+  // outras do bloco.
+  const canResolvePending = can('agenda.edit') && can('agenda.cancel')
+  const canClients = can('clients.view')
+  const canStock = can('stock.view')
+  const canFinance = can('finance.view')
 
   const today = todayStr()
   const tomorrow = addDays(today, 1)
@@ -72,38 +87,47 @@ export function NotificationsBell() {
     queryKey: ['appointments', 'pending', today],
     queryFn: () => listAppointments({ start: today, end: addDays(today, 365), status: 'pending' }),
     refetchInterval: 45000,
+    enabled: canAgenda,
   })
   // Agendamentos criados nas últimas 24h (por data de criação): "novo agendamento"
   const recentQuery = useQuery({
     queryKey: ['appointments', 'recent'],
     queryFn: () => listRecentAppointments(24),
     refetchInterval: 45000,
+    enabled: canAgenda,
   })
   // Atendimentos de hoje já confirmados (para achar os que passaram e não fecharam)
   const todayConfirmedQuery = useQuery({
     queryKey: ['appointments', 'notif-today', today],
     queryFn: () => listAppointments({ start: today, end: today, status: 'confirmed' }),
     refetchInterval: 60000,
+    enabled: canAgenda,
   })
   const waitlistQuery = useQuery({
     queryKey: ['waitlist'],
     queryFn: () => listWaitlist({ status: 'waiting' }),
     refetchInterval: 60000,
+    enabled: canAgenda,
   })
+  // Sem 'clients.view' a rota exige termo de busca de 2+ caracteres, e aqui a
+  // chamada é sem termo: só busca quem pode ver a carteira inteira.
   const clientsQuery = useQuery({
     queryKey: ['clients', ''],
     queryFn: () => listClients(),
     refetchInterval: 300000,
+    enabled: canClients,
   })
   const productsQuery = useQuery({
     queryKey: ['products'],
     queryFn: () => listProducts(),
     refetchInterval: 300000,
+    enabled: canStock,
   })
   const forecastQuery = useQuery({
     queryKey: ['recurring-expenses', 'forecast', month],
     queryFn: () => getRecurringExpensesForecast(month),
     refetchInterval: 300000,
+    enabled: canFinance,
   })
 
   function go(path: string) {
@@ -123,10 +147,12 @@ export function NotificationsBell() {
         title: 'Agendamento a aprovar',
         description: `${a.client.name} · ${a.service.name} · ${formatDate(a.date)} ${a.startTime}`,
         timestamp: a.createdAt,
-        onClick: () => {
-          setSelected(toPendingView(a))
-          setOpen(false)
-        },
+        onClick: canResolvePending
+          ? () => {
+              setSelected(toPendingView(a))
+              setOpen(false)
+            }
+          : () => go('/app/agenda'),
       })
     }
 
@@ -235,12 +261,16 @@ export function NotificationsBell() {
     clientsQuery.data,
     productsQuery.data,
     forecastQuery.data,
+    canResolvePending,
     today,
     tomorrow,
     nowMin,
   ])
 
   const count = notifications.length
+  // isLoading e não isPending: query desabilitada por falta de permissão fica
+  // "pending" para sempre, e isso deixaria o spinner girando no lugar do estado
+  // vazio para quem não tem nenhuma das áreas.
   const someLoading = [
     pendingQuery,
     recentQuery,
@@ -249,7 +279,7 @@ export function NotificationsBell() {
     clientsQuery,
     productsQuery,
     forecastQuery,
-  ].some((q) => q.isPending)
+  ].some((q) => q.isLoading)
 
   return (
     <div ref={ref} className="relative">

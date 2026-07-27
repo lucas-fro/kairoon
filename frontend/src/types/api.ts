@@ -5,6 +5,15 @@ export interface User {
   phone: string | null
   birthDate: string | null
   cpf: string | null
+  /** Dono da conta: tem tudo, inclusive o que nenhum switch concede. */
+  isOwner: boolean
+  /** Ficha de profissional vinculada a esta conta (toda conta tem uma). */
+  employeeId: string
+  /**
+   * Permissões EFETIVAS (as implícitas já vêm expandidas pelo servidor), para a
+   * UI só checar pertencimento. A regra de verdade continua sendo o backend.
+   */
+  permissions: string[]
 }
 
 export interface Socials {
@@ -33,7 +42,6 @@ export type BusinessType = 'barbearia' | 'salao' | 'clinica' | 'outro'
 
 export interface Establishment {
   id: string
-  ownerId: string
   name: string
   slug: string
   logoUrl: string | null
@@ -58,6 +66,8 @@ export interface Establishment {
   showInstagram: boolean
   showWhatsapp: boolean
   autoConfirm: boolean
+  /** Lembrete de WhatsApp na véspera do atendimento (não afeta a confirmação). */
+  notifyWhatsapp: boolean
   paymentSettings: PaymentSettings
   quiz: Record<string, string> | null
   plan: string
@@ -123,6 +133,13 @@ export type Gender = 'masculino' | 'feminino' | 'outro'
 
 export type CommissionType = 'percent' | 'fixed'
 
+/**
+ * Situação do acesso ao painel de um profissional. Derivada no servidor:
+ * 'none' nunca convidado ou acesso revogado, 'invited' convite em aberto,
+ * 'expired' convite venceu sem uso, 'active' já entrou.
+ */
+export type AccessStatus = 'none' | 'invited' | 'expired' | 'active'
+
 export interface EmployeeCommission {
   serviceId: string
   /** porcentagem inteira (0–100) quando commissionType='percent'; centavos quando 'fixed' */
@@ -143,9 +160,18 @@ export interface Employee {
   lunchEnd: string | null
   workDays: number[]
   active: boolean
+  /** Atende clientes? false some da agenda e do link público (ex.: recepção). */
+  bookable: boolean
   /** O dono do estabelecimento (exatamente um): exibe a coroa, não pode ser
    *  excluído e só tem jornada/status editáveis. */
   isOwner: boolean
+  /** Permissões GUARDADAS (sem as implícitas): é o que o diálogo do dono edita. */
+  permissions: string[]
+  /** Já existe conta de login ligada a esta ficha? */
+  hasLogin: boolean
+  accessStatus: AccessStatus
+  /** Vencimento do convite em aberto; null fora de 'invited'/'expired'. */
+  inviteExpiresAt: string | null
   commissionEnabled: boolean
   commissionType: CommissionType
   commissions: EmployeeCommission[]
@@ -479,14 +505,16 @@ export interface CommissionsReport {
 }
 
 export interface DashboardMonthSummary {
-  revenueCents: number
+  /** null quando a sessão não tem permissão de financeiro: o cartão some. */
+  revenueCents: number | null
   /** variação vs. mesmo período do mês anterior; null sem base de comparação */
   revenueChangePct: number | null
   /** atendimentos concluídos no período: denominador do ticket médio */
   completedCount: number
   appointmentsCount: number
   appointmentsChangePct: number | null
-  newClients: number
+  /** null sem permissão de ver clientes (mesma lógica do faturamento). */
+  newClients: number | null
   newClientsChangePct: number | null
   /** 0–1, mês corrente */
   occupancyRate: number
@@ -581,6 +609,7 @@ export type PlanFeatureKey =
   | 'relatorios_avancados'
   | 'cupons'
   | 'clientes_crm'
+  | 'whatsapp'
 
 /**
  * Estado de acesso da conta (ver backend lib/plan.ts#getAccessState). Não há
@@ -719,4 +748,25 @@ export interface BookingResult {
   service: { id: string; name: string; durationMinutes: number; priceCents: number }
   employee: { id: string; name: string }
   establishment: { name: string; slug: string; phone: string | null }
+  /** Token do link "cancelar/remarcar" (ver ManagedAppointment). */
+  manageToken: string
+}
+
+/**
+ * Agendamento visto pela área pública de gerenciamento
+ * (`/:slug/editagendamento`). O `token` é a credencial do próprio agendamento:
+ * ele autoriza cancelar/remarcar sem conta.
+ */
+export interface ManagedAppointment {
+  id: string
+  token: string
+  date: string
+  startTime: string
+  endTime: string
+  status: AppointmentStatus
+  clientName: string
+  service: { name: string; durationMinutes: number; priceCents: number }
+  employee: { id: string; name: string }
+  /** false quando já passou, já foi cancelado/concluído ou falta menos de 2h. */
+  canChange: boolean
 }

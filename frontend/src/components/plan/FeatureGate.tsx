@@ -14,6 +14,7 @@ const FEATURE_MIN_PLAN: Record<PlanFeatureKey, string> = {
   relatorios_avancados: 'Essencial',
   cupons: 'Essencial',
   clientes_crm: 'Essencial',
+  whatsapp: 'Essencial',
 }
 
 /**

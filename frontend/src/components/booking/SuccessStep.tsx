@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Banknote,
   Calendar,
+  CalendarCog,
   CalendarPlus,
   CheckCircle2,
   Clock,
@@ -152,6 +153,16 @@ export function SuccessStep({ result, establishment, branding }: SuccessStepProp
             Adicionar ao calendário
           </Button>
         )}
+
+        {/* Mesmo link que vai na mensagem de confirmação. Oferecer aqui evita
+            que quem não recebeu o WhatsApp fique sem como cancelar/remarcar. */}
+        <a
+          href={`/${establishment.slug}/editagendamento?t=${encodeURIComponent(result.manageToken)}`}
+          className="mt-3 flex items-center justify-center gap-1.5 text-center text-[13px] text-ink-secondary underline underline-offset-2 hover:text-ink"
+        >
+          <CalendarCog className="h-4 w-4" />
+          Cancelar ou remarcar
+        </a>
       </div>
     </div>
   )

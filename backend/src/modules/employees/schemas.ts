@@ -25,6 +25,10 @@ export const createEmployeeSchema = z.object({
   // Não é coluna: se true, aplica a mesma jornada a todos os profissionais
   applyScheduleToAll: z.boolean().optional(),
   active: z.boolean().default(true),
+  // Atende clientes? false tira da agenda e do link público sem tirar o acesso
+  // ao painel: é o caso da recepcionista. As permissões NÃO passam por aqui:
+  // quem as edita é o dono, pelo módulo /access.
+  bookable: z.boolean().optional(),
   // Comissão: tipo e valores por serviço. value é porcentagem inteira (0–100)
   // quando commissionType='percent', ou centavos quando 'fixed'.
   commissionEnabled: z.boolean().optional(),

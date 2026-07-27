@@ -1,10 +1,11 @@
-import { and, asc, eq, inArray, ne } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, ne } from 'drizzle-orm'
 import { db } from '../../db'
-import { employeeCommissions, employees, services } from '../../db/schema'
+import { employeeCommissions, employees, services, staffInvites, users } from '../../db/schema'
 import { timeToMinutes } from '../../lib/datetime'
 import { AppError } from '../../lib/errors'
 import { getEffectivePlan } from '../../lib/plan'
 import { planEmployeeLimit } from '../../lib/plans'
+import type { AuthContext } from '../../plugins/auth'
 import type { CreateEmployeeInput, UpdateEmployeeInput } from './schemas'
 
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -42,6 +43,9 @@ const OWNER_EDITABLE_KEYS = [
   'lunchEnd',
   'workDays',
   'active',
+  // O dono também pode não atender clientes (só administrar): sair da agenda
+  // não tem nada a ver com deixar de ser dono.
+  'bookable',
 ] as const
 
 type EmployeeUpdateData = Omit<
@@ -62,22 +66,126 @@ type EmployeeRow = typeof employees.$inferSelect
 type CommissionRow = typeof employeeCommissions.$inferSelect
 type Commission = { serviceId: string; value: number }
 
-/** Achata as comissões (só serviceId + value) no objeto do profissional */
-function shapeEmployee(row: EmployeeRow & { commissions?: CommissionRow[] }) {
-  const { commissions, ...rest } = row
+/**
+ * Situação do acesso ao painel, derivada (não é coluna):
+ * 'active' já entrou, 'invited' convite em aberto, 'expired' convite venceu sem
+ * uso, 'none' nunca foi convidado ou o acesso foi revogado.
+ */
+export type AccessStatus = 'none' | 'invited' | 'expired' | 'active'
+
+interface AccessInfo {
+  accessStatus: AccessStatus
+  inviteExpiresAt: Date | null
+}
+
+/**
+ * O que cada nível de acesso pode LER da ficha alheia.
+ *
+ * A lista de profissionais é lida por muita gente (a agenda não desenha sem
+ * ela: `agenda.view` implica `employees.view`), e a ficha carrega salário,
+ * benefícios, dias de pagamento e comissão. Sem esta redação, qualquer sessão
+ * que abre a agenda leria a folha inteira da equipe.
+ */
+interface EmployeeVisibility {
+  /** Salário, benefícios, dias de pagamento e comissões. */
+  payroll: boolean
+  /** Permissões guardadas e situação do acesso (só o dono gerencia isso). */
+  access: boolean
+}
+
+export function visibilityFor(auth: AuthContext): EmployeeVisibility {
   return {
-    ...rest,
-    commissions: (commissions ?? []).map((c) => ({ serviceId: c.serviceId, value: c.value })),
+    payroll: auth.permissions.has('finance.payroll'),
+    access: auth.isOwner,
   }
 }
 
-async function getEmployeeShaped(tx: DbTransaction, establishmentId: string, id: string) {
+/** Campos de dinheiro da ficha, zerados para quem não tem `finance.payroll`. */
+const REDACTED_PAYROLL = {
+  salaryCents: null,
+  bonuses: [] as { label: string; amountCents: number }[],
+  vrCents: null,
+  vtCents: null,
+  vaCents: null,
+  paymentDays: [] as { day: number; amountCents: number }[],
+  commissionEnabled: false,
+  commissionType: 'percent',
+  commissions: [] as { serviceId: string; value: number }[],
+}
+
+/**
+ * Achata as comissões (só serviceId + value) e anexa a situação do acesso,
+ * redigindo o que o nível de acesso de quem pediu não alcança. O `userId` NUNCA
+ * sai daqui: o painel só precisa saber se existe login, não qual é o id da conta.
+ */
+function shapeEmployee(
+  row: EmployeeRow & { commissions?: CommissionRow[] },
+  access: AccessInfo = { accessStatus: 'none', inviteExpiresAt: null },
+  visibility: EmployeeVisibility = { payroll: true, access: true },
+) {
+  const { commissions, userId, ...rest } = row
+  const base = {
+    ...rest,
+    commissions: (commissions ?? []).map((c) => ({ serviceId: c.serviceId, value: c.value })),
+    hasLogin: userId !== null,
+    ...access,
+  }
+  return {
+    ...base,
+    ...(visibility.payroll ? {} : REDACTED_PAYROLL),
+    ...(visibility.access
+      ? {}
+      : { permissions: [], accessStatus: 'none' as AccessStatus, inviteExpiresAt: null }),
+  }
+}
+
+/** Convite mais recente ainda em aberto de cada ficha do estabelecimento. */
+async function openInvitesByEmployee(establishmentId: string) {
+  const rows = await db
+    .select({ employeeId: staffInvites.employeeId, expiresAt: staffInvites.expiresAt })
+    .from(staffInvites)
+    .where(
+      and(
+        eq(staffInvites.establishmentId, establishmentId),
+        isNull(staffInvites.acceptedAt),
+        isNull(staffInvites.revokedAt),
+      ),
+    )
+  return new Map(rows.map((r) => [r.employeeId, r.expiresAt]))
+}
+
+function accessInfoFor(row: EmployeeRow, inviteExpiresAt: Date | undefined): AccessInfo {
+  if (row.userId) return { accessStatus: 'active', inviteExpiresAt: null }
+  if (!inviteExpiresAt) return { accessStatus: 'none', inviteExpiresAt: null }
+  return {
+    accessStatus: inviteExpiresAt.getTime() > Date.now() ? 'invited' : 'expired',
+    inviteExpiresAt,
+  }
+}
+
+async function getEmployeeShaped(
+  tx: DbTransaction,
+  establishmentId: string,
+  id: string,
+  visibility: EmployeeVisibility = { payroll: true, access: true },
+) {
   const row = await tx.query.employees.findFirst({
     where: and(eq(employees.id, id), eq(employees.establishmentId, establishmentId)),
     with: { commissions: true },
   })
   if (!row) throw new AppError('Profissional não encontrado', 404)
-  return shapeEmployee(row)
+
+  const [invite] = await tx
+    .select({ expiresAt: staffInvites.expiresAt })
+    .from(staffInvites)
+    .where(
+      and(
+        eq(staffInvites.employeeId, id),
+        isNull(staffInvites.acceptedAt),
+        isNull(staffInvites.revokedAt),
+      ),
+    )
+  return shapeEmployee(row, accessInfoFor(row, invite?.expiresAt), visibility)
 }
 
 /** Copia a jornada de um profissional para todos os outros do estabelecimento */
@@ -131,10 +239,18 @@ async function replaceCommissions(
 
 /** Replica a configuração de comissão de um profissional para todos os outros */
 async function applyCommissionToOthers(tx: DbTransaction, establishmentId: string, source: EmployeeRow) {
+  // O dono fica de fora: comissão "para si mesmo" não faz sentido, e é o mesmo
+  // motivo pelo qual pickOwnerEditable não deixa editá-la na ficha dele.
   const others = await tx
     .select({ id: employees.id })
     .from(employees)
-    .where(and(eq(employees.establishmentId, establishmentId), ne(employees.id, source.id)))
+    .where(
+      and(
+        eq(employees.establishmentId, establishmentId),
+        ne(employees.id, source.id),
+        eq(employees.isOwner, false),
+      ),
+    )
   if (others.length === 0) return
 
   const sourceCommissions = await tx
@@ -156,17 +272,53 @@ async function applyCommissionToOthers(tx: DbTransaction, establishmentId: strin
   }
 }
 
-export async function listEmployees(establishmentId: string) {
-  const rows = await db.query.employees.findMany({
-    where: eq(employees.establishmentId, establishmentId),
-    orderBy: [asc(employees.createdAt)],
-    with: { commissions: true },
-  })
-  return rows.map(shapeEmployee)
+export async function listEmployees(establishmentId: string, auth: AuthContext) {
+  const visibility = visibilityFor(auth)
+  const [rows, invites] = await Promise.all([
+    db.query.employees.findMany({
+      where: eq(employees.establishmentId, establishmentId),
+      orderBy: [asc(employees.createdAt)],
+      with: { commissions: true },
+    }),
+    // Só o dono gerencia acesso: para o resto nem consultamos os convites.
+    visibility.access ? openInvitesByEmployee(establishmentId) : new Map<string, Date>(),
+  ])
+  return rows.map((row) =>
+    shapeEmployee(row, accessInfoFor(row, invites.get(row.id)), visibility),
+  )
 }
 
-export async function createEmployee(establishmentId: string, input: CreateEmployeeInput) {
-  const { applyScheduleToAll, applyCommissionToAll, commissions, ...data } = input
+/**
+ * Campos de dinheiro que só quem tem `finance.payroll` pode gravar. Sem esta
+ * poda, um gerente (que edita a ficha mas não enxerga a folha) salvaria o
+ * formulário com os campos redigidos e APAGARIA o salário do colega.
+ */
+const PAYROLL_KEYS = [
+  'salaryCents',
+  'bonuses',
+  'vrCents',
+  'vtCents',
+  'vaCents',
+  'paymentDays',
+  'commissionEnabled',
+  'commissionType',
+] as const
+
+function stripPayroll<T extends Record<string, unknown>>(data: T): T {
+  const result = { ...data }
+  for (const key of PAYROLL_KEYS) delete result[key]
+  return result
+}
+
+export async function createEmployee(
+  establishmentId: string,
+  input: CreateEmployeeInput,
+  auth: AuthContext,
+) {
+  const visibility = visibilityFor(auth)
+  const { applyScheduleToAll, applyCommissionToAll, commissions, ...raw } = input
+  const data = visibility.payroll ? raw : stripPayroll(raw)
+  const nextCommissions = visibility.payroll ? commissions : undefined
   validateSchedule(data)
   validatePayroll(data)
 
@@ -189,10 +341,12 @@ export async function createEmployee(establishmentId: string, input: CreateEmplo
       .insert(employees)
       .values({ ...data, establishmentId })
       .returning()
-    if (commissions) await replaceCommissions(tx, establishmentId, employee.id, commissions)
+    if (nextCommissions) await replaceCommissions(tx, establishmentId, employee.id, nextCommissions)
     if (applyScheduleToAll) await applyScheduleToOthers(tx, establishmentId, employee)
-    if (applyCommissionToAll) await applyCommissionToOthers(tx, establishmentId, employee)
-    return getEmployeeShaped(tx, establishmentId, employee.id)
+    if (applyCommissionToAll && visibility.payroll) {
+      await applyCommissionToOthers(tx, establishmentId, employee)
+    }
+    return getEmployeeShaped(tx, establishmentId, employee.id, visibility)
   })
 }
 
@@ -200,8 +354,13 @@ export async function updateEmployee(
   establishmentId: string,
   id: string,
   input: UpdateEmployeeInput,
+  auth: AuthContext,
 ) {
-  const { applyScheduleToAll, applyCommissionToAll, commissions, ...rest } = input
+  const visibility = visibilityFor(auth)
+  const { applyScheduleToAll, applyCommissionToAll, commissions, ...raw } = input
+  // Quem não enxerga a folha também não a grava: senão salvar o formulário com
+  // os campos redigidos apagaria salário e comissão do colega.
+  const rest = visibility.payroll ? raw : stripPayroll(raw)
 
   return db.transaction(async (tx) => {
     const existing = await tx.query.employees.findFirst({
@@ -213,8 +372,8 @@ export async function updateEmployee(
     // ignorado, incluindo replicar comissão para todos.
     const isOwner = existing.isOwner
     const data = isOwner ? pickOwnerEditable(rest) : rest
-    const nextCommissions = isOwner ? undefined : commissions
-    const applyCommission = isOwner ? false : applyCommissionToAll
+    const nextCommissions = isOwner || !visibility.payroll ? undefined : commissions
+    const applyCommission = isOwner || !visibility.payroll ? false : applyCommissionToAll
 
     const hasData = Object.keys(data).length > 0
     if (!hasData && nextCommissions === undefined && !applyScheduleToAll && !applyCommission) {
@@ -235,11 +394,11 @@ export async function updateEmployee(
     if (nextCommissions !== undefined) await replaceCommissions(tx, establishmentId, id, nextCommissions)
     if (applyScheduleToAll) await applyScheduleToOthers(tx, establishmentId, updated)
     if (applyCommission) await applyCommissionToOthers(tx, establishmentId, updated)
-    return getEmployeeShaped(tx, establishmentId, id)
+    return getEmployeeShaped(tx, establishmentId, id, visibility)
   })
 }
 
-export async function deleteEmployee(establishmentId: string, id: string) {
+export async function deleteEmployee(establishmentId: string, id: string, auth: AuthContext) {
   const employee = await db.query.employees.findFirst({
     where: and(eq(employees.id, id), eq(employees.establishmentId, establishmentId)),
   })
@@ -248,6 +407,17 @@ export async function deleteEmployee(establishmentId: string, id: string) {
   // O dono é o profissional responsável pelo estabelecimento: nunca é excluído.
   if (employee.isOwner) {
     throw new AppError('O dono não pode ser excluído.', 409)
+  }
+
+  // Excluir a ficha leva junto a conta de login (abaixo), e tirar o acesso de
+  // alguém é poder do dono, não de quem gerencia a equipe. Sem esta trava, um
+  // gerente contornaria /access apagando a ficha do colega.
+  if (employee.userId && !auth.isOwner) {
+    throw new AppError(
+      'Este profissional tem acesso ao painel. Somente o dono pode excluí-lo.',
+      403,
+      'OWNER_ONLY',
+    )
   }
 
   // Invariante: um estabelecimento não pode ficar sem nenhum profissional.
@@ -260,11 +430,18 @@ export async function deleteEmployee(establishmentId: string, id: string) {
   }
 
   try {
-    const deleted = await db
-      .delete(employees)
-      .where(and(eq(employees.id, id), eq(employees.establishmentId, establishmentId)))
-      .returning()
-    if (deleted.length === 0) throw new AppError('Profissional não encontrado', 404)
+    await db.transaction(async (tx) => {
+      // A conta de login vai junto: deixar o usuário órfão só criaria um acesso
+      // que falha no login sem ninguém entender por quê.
+      if (employee.userId) {
+        await tx.delete(users).where(eq(users.id, employee.userId))
+      }
+      const deleted = await tx
+        .delete(employees)
+        .where(and(eq(employees.id, id), eq(employees.establishmentId, establishmentId)))
+        .returning()
+      if (deleted.length === 0) throw new AppError('Profissional não encontrado', 404)
+    })
   } catch (err) {
     if (err instanceof AppError) throw err
     if (isForeignKeyViolation(err)) {

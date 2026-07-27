@@ -1,17 +1,30 @@
-import { and, desc, eq, gt, gte, isNotNull, lte, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, gte, isNotNull, isNull, lte, sql } from 'drizzle-orm'
 import { db } from '../../db'
 import { transactions } from '../../db/schema'
 import { endOfMonth, todayStr } from '../../lib/datetime'
 import { AppError } from '../../lib/errors'
 import { assertFeature } from '../../lib/plan'
+import type { AuthContext } from '../../plugins/auth'
 import type { CreateTransactionInput, ListTransactionsQuery } from './schemas'
 
-export async function listTransactions(establishmentId: string, query: ListTransactionsQuery) {
+export async function listTransactions(
+  establishmentId: string,
+  query: ListTransactionsQuery,
+  auth: AuthContext,
+) {
   const today = todayStr()
   const from = query.from ?? `${today.slice(0, 8)}01`
   const to = query.to ?? today
 
   if (from > to) throw new AppError('Data inicial não pode ser maior que a data final', 400)
+
+  // Lançamento de folha carrega "Salário de Fulano" no valor cheio. Quem tem
+  // `finance.view` mas não `finance.payroll` (o preset Gerente) leria pelo caixa
+  // exatamente o que a permissão promete esconder, então esses lançamentos ficam
+  // de fora, e do saldo também.
+  const hidePayroll = auth.permissions.has('finance.payroll')
+    ? undefined
+    : isNull(transactions.employeeId)
 
   const rows = await db.query.transactions.findMany({
     columns: {
@@ -35,6 +48,7 @@ export async function listTransactions(establishmentId: string, query: ListTrans
       gte(transactions.date, from),
       lte(transactions.date, to),
       query.type ? eq(transactions.type, query.type) : undefined,
+      hidePayroll,
     ),
     orderBy: [desc(transactions.date), desc(transactions.createdAt)],
   })

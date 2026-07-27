@@ -10,6 +10,10 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(20, 'JWT_SECRET deve ter no mínimo 20 caracteres'),
   PORT: z.coerce.number().default(3333),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  // Redis (BullMQ): infra core, não feature opcional — por isso tem default,
+  // como DATABASE_URL. Como o dispatcher enfileira best-effort, uma URL errada
+  // degrada para "notificação perdida + log", nunca crash de boot.
+  REDIS_URL: z.string().default('redis://localhost:6379'),
   // E-mail transacional (Resend). Opcional: sem a chave a app sobe normalmente e
   // os envios viram no-op (logados no console), útil em dev. Em produção,
   // defina a chave e um remetente de domínio verificado no Resend.
@@ -33,6 +37,15 @@ const envSchema = z.object({
   BUNNY_STORAGE_ZONE: z.string().optional(),
   BUNNY_STORAGE_PASSWORD: z.string().optional(),
   BUNNY_CDN_URL: z.string().optional(),
+  // WhatsApp transacional (Z-API). Opcionais pela mesma lógica do RESEND_API_KEY:
+  // sem elas a app sobe normal e os envios viram no-op (logados). INSTANCE_ID e
+  // TOKEN identificam a instância (o número conectado); CLIENT_TOKEN é o "Token
+  // de Segurança da Conta" do painel Z-API, exigido em todas as requisições
+  // depois de ativado lá. É UMA instância global do Kairoon: todos os
+  // estabelecimentos enviam pelo mesmo número.
+  ZAPI_INSTANCE_ID: z.string().optional(),
+  ZAPI_TOKEN: z.string().optional(),
+  ZAPI_CLIENT_TOKEN: z.string().optional(),
 })
 
 export const env = envSchema.parse(process.env)

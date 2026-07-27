@@ -43,6 +43,7 @@ const FEATURE_LABELS: [PlanFeatureKey, string][] = [
   ['relatorios_avancados', 'Relatórios avançados'],
   ['cupons', 'Cupons e campanhas de marketing'],
   ['clientes_crm', 'CRM de clientes (aniversários e sumidos)'],
+  ['whatsapp', 'Confirmação e lembrete por WhatsApp'],
 ]
 
 // Espelha UNLIMITED (999) de backend/src/lib/plans.ts: o limite trafega como

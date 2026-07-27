@@ -14,8 +14,15 @@ function isValidWebhookToken(received: string | undefined): boolean {
   return timingSafeEqual(expected, actual)
 }
 
+/**
+ * Assinatura e cobrança. Fora o catálogo de planos e o webhook, tudo aqui é
+ * 'owner': o cartão e a fatura são do dono, e nem o switch `admin` alcança
+ * (ver lib/permissions.ts).
+ */
 export async function paymentsRoutes(app: FastifyInstance) {
-  app.get('/plans', async () => PLANS)
+  // Catálogo estático de planos, sem nada da conta: é lido pela tela de preços
+  // antes mesmo de existir sessão, por isso 'public' e não 'owner'.
+  app.get('/plans', { config: { permission: 'public' } }, async () => PLANS)
 
   // Rate limit: superfície sensível a fraude/abuso de tentativas de cartão.
   app.post(
@@ -23,7 +30,11 @@ export async function paymentsRoutes(app: FastifyInstance) {
     {
       preHandler: [app.authenticate],
       // allowWhenReadOnly: assinar é justamente como o dono sai do somente-leitura.
-      config: { rateLimit: { max: 5, timeWindow: '10 minutes' }, allowWhenReadOnly: true },
+      config: {
+        permission: 'owner',
+        rateLimit: { max: 5, timeWindow: '10 minutes' },
+        allowWhenReadOnly: true,
+      },
     },
     async (request, reply) => {
       const input = subscribeSchema.parse(request.body)
@@ -36,9 +47,13 @@ export async function paymentsRoutes(app: FastifyInstance) {
     },
   )
 
-  app.get('/subscription', { preHandler: [app.authenticate] }, async (request) => {
-    return paymentsService.getSubscription(request.user.establishmentId)
-  })
+  app.get(
+    '/subscription',
+    { preHandler: [app.authenticate], config: { permission: 'owner' } },
+    async (request) => {
+      return paymentsService.getSubscription(request.user.establishmentId)
+    },
+  )
 
   // Troca de plano reaproveitando o cartão já tokenizado no Asaas (sem coletar
   // cartão de novo). Rate limit modesto: não coleta cartão, mas mexe em cobrança.
@@ -46,7 +61,11 @@ export async function paymentsRoutes(app: FastifyInstance) {
     '/change-plan',
     {
       preHandler: [app.authenticate],
-      config: { rateLimit: { max: 10, timeWindow: '10 minutes' }, allowWhenReadOnly: true },
+      config: {
+        permission: 'owner',
+        rateLimit: { max: 10, timeWindow: '10 minutes' },
+        allowWhenReadOnly: true,
+      },
     },
     async (request) => {
       const input = changePlanSchema.parse(request.body)
@@ -55,13 +74,17 @@ export async function paymentsRoutes(app: FastifyInstance) {
   )
 
   // Cartão cadastrado (últimos 4 + bandeira) pra confirmação da troca de plano.
-  app.get('/payment-method', { preHandler: [app.authenticate] }, async (request) => {
-    return paymentsService.getPaymentMethod(request.user.establishmentId)
-  })
+  app.get(
+    '/payment-method',
+    { preHandler: [app.authenticate], config: { permission: 'owner' } },
+    async (request) => {
+      return paymentsService.getPaymentMethod(request.user.establishmentId)
+    },
+  )
 
   app.post(
     '/cancel',
-    { preHandler: [app.authenticate], config: { allowWhenReadOnly: true } },
+    { preHandler: [app.authenticate], config: { permission: 'owner', allowWhenReadOnly: true } },
     async (request) => {
       return paymentsService.cancel(request.user.establishmentId)
     },
@@ -70,7 +93,7 @@ export async function paymentsRoutes(app: FastifyInstance) {
   // Público (o Asaas não manda JWT), autenticado pelo header próprio abaixo.
   app.post(
     '/webhook',
-    { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } },
+    { config: { permission: 'public', rateLimit: { max: 120, timeWindow: '1 minute' } } },
     async (request, reply) => {
       const token = request.headers['asaas-access-token']
       if (!isValidWebhookToken(typeof token === 'string' ? token : undefined)) {

@@ -110,7 +110,12 @@ export function AppointmentDetailsDialog({
 }: AppointmentDetailsDialogProps) {
   const toast = useToast()
   const queryClient = useQueryClient()
-  const { establishment } = useAuth()
+  const { establishment, can } = useAuth()
+  // Cada botão daqui é um poder diferente no servidor (remarcar, cancelar,
+  // finalizar). Sem a permissão o botão some: não há upgrade que resolva.
+  const canEdit = can('agenda.edit')
+  const canCancel = can('agenda.cancel')
+  const canComplete = can('agenda.complete')
 
   const [rescheduling, setRescheduling] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
@@ -355,36 +360,50 @@ export function AppointmentDetailsDialog({
             )}
 
             <div className="pt-1">
-              {appointment.status === 'pending' && !rescheduling && (
+              {appointment.status === 'pending' && !rescheduling && (canCancel || canEdit) && (
                 <DialogActions>
-                  <Button variant="danger" size="sm" onClick={() => setConfirmCancel(true)}>
-                    Recusar
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setRescheduling(true)}>
-                    Remarcar
-                  </Button>
-                  <Button
-                    size="sm"
-                    isLoading={mutation.isPending}
-                    onClick={() => mutation.mutate({ status: 'confirmed' })}
-                  >
-                    Aceitar
-                  </Button>
+                  {canCancel && (
+                    <Button variant="danger" size="sm" onClick={() => setConfirmCancel(true)}>
+                      Recusar
+                    </Button>
+                  )}
+                  {canEdit && (
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => setRescheduling(true)}>
+                        Remarcar
+                      </Button>
+                      <Button
+                        size="sm"
+                        isLoading={mutation.isPending}
+                        onClick={() => mutation.mutate({ status: 'confirmed' })}
+                      >
+                        Aceitar
+                      </Button>
+                    </>
+                  )}
                 </DialogActions>
               )}
-              {appointment.status === 'confirmed' && !rescheduling && (
-                <DialogActions>
-                  <Button variant="danger" size="sm" onClick={() => setConfirmCancel(true)}>
-                    Cancelar
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setRescheduling(true)}>
-                    Remarcar
-                  </Button>
-                  <Button size="sm" onClick={() => setFinalizing(true)}>
-                    Finalizar
-                  </Button>
-                </DialogActions>
-              )}
+              {appointment.status === 'confirmed' &&
+                !rescheduling &&
+                (canCancel || canEdit || canComplete) && (
+                  <DialogActions>
+                    {canCancel && (
+                      <Button variant="danger" size="sm" onClick={() => setConfirmCancel(true)}>
+                        Cancelar
+                      </Button>
+                    )}
+                    {canEdit && (
+                      <Button variant="outline" size="sm" onClick={() => setRescheduling(true)}>
+                        Remarcar
+                      </Button>
+                    )}
+                    {canComplete && (
+                      <Button size="sm" onClick={() => setFinalizing(true)}>
+                        Finalizar
+                      </Button>
+                    )}
+                  </DialogActions>
+                )}
               {(appointment.status === 'confirmed' || appointment.status === 'pending') &&
                 rescheduling && (
                   <DialogActions>
@@ -401,7 +420,9 @@ export function AppointmentDetailsDialog({
                     </Button>
                   </DialogActions>
                 )}
-              {appointment.status === 'completed' && (
+              {/* Reabrir e restaurar voltam o status para "confirmado": para o
+                  servidor isso é alterar o agendamento (agenda.edit). */}
+              {appointment.status === 'completed' && canEdit && (
                 <DialogActions>
                   <Button
                     variant="outline"
@@ -413,7 +434,7 @@ export function AppointmentDetailsDialog({
                   </Button>
                 </DialogActions>
               )}
-              {appointment.status === 'cancelled' && (
+              {appointment.status === 'cancelled' && canEdit && (
                 <DialogActions>
                   <Button
                     variant="outline"
@@ -473,6 +494,7 @@ function PaymentCheckout({
   onBack,
   onConfirm,
 }: PaymentCheckoutProps) {
+  const { can } = useAuth()
   const productsQuery = useQuery({ queryKey: ['products'], queryFn: listProducts })
   const catalog = useMemo(
     () => (productsQuery.data ?? []).filter((p) => p.active),
@@ -620,9 +642,12 @@ function PaymentCheckout({
   })
   // Dívida acumulada do cliente em fechamentos anteriores (exclui este
   // atendimento, para não contar uma dívida que ele mesmo gerou ao refinalizar).
+  // Ler a ficha do cliente é 'clients.view', que quem só fecha a própria comanda
+  // não tem: sem ela a chamada voltaria 403 e o fechamento segue sem esta linha.
   const clientDetailQuery = useQuery({
     queryKey: ['client', clientId],
     queryFn: () => getClient(clientId),
+    enabled: can('clients.view'),
   })
   const previousDebtCents = useMemo(() => {
     const history = clientDetailQuery.data?.history ?? []

@@ -17,10 +17,50 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3333
+    # Só ordem de start, NUNCA health gate: cadastrar e agendar precisam
+    # funcionar mesmo com o Redis fora (o enfileiramento é best-effort).
+    depends_on:
+      - redis
     networks:
       - web
     expose:
       - "3333"
+
+  # Fila de disparos (BullMQ). appendonly=yes para a fila sobreviver a restart;
+  # noeviction para o Redis errar em vez de descartar jobs em silêncio se a
+  # memória acabar.
+  redis:
+    image: redis:7-alpine
+    container_name: kairoon-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis-data:/data
+    networks:
+      - web
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Consumidor das filas (e-mail, WhatsApp, lembretes). Reusa a imagem do
+  # backend, mas o `entrypoint` SUBSTITUI o docker-entrypoint.sh: só o serviço
+  # `backend` aplica migrations, senão dois processos migram ao mesmo tempo.
+  worker:
+    build: ./backend
+    image: kairoon-backend
+    container_name: kairoon-worker
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+    entrypoint: ["npm", "run", "worker"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - web
 
   frontend:
     build:
@@ -47,6 +87,9 @@ services:
       - web
     expose:
       - "80"
+
+volumes:
+  redis-data:
 
 networks:
   web:

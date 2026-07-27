@@ -1,9 +1,10 @@
-import { and, asc, eq, ne, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm'
 import { db } from '../../db'
 import { employees, establishments, timeBlocks, users, workingHours } from '../../db/schema'
 import { bunnyDeleteByUrl, bunnyDeleteEstablishmentFolder } from '../../lib/bunnyStorage'
 import { timeToMinutes } from '../../lib/datetime'
 import { AppError } from '../../lib/errors'
+import { getLinkedUserIds, getOwnedEstablishmentIds } from '../../lib/owner'
 import { getAccessState, getEffectivePlan } from '../../lib/plan'
 import { planFeatureMap, planHasFeature, planIsAboveCatalog, planTier } from '../../lib/plans'
 import type {
@@ -188,16 +189,24 @@ export async function deleteAccount(userId: string) {
   // Coleta os estabelecimentos ANTES do delete: depois do cascade não há mais
   // como saber quais pastas do CDN limpar, e as imagens ficariam públicas para
   // sempre, contradizendo a promessa de exclusão definitiva.
-  const owned = await db.query.establishments.findMany({
-    columns: { id: true },
-    where: eq(establishments.ownerId, userId),
+  const ownedIds = await getOwnedEstablishmentIds(userId)
+  if (ownedIds.length === 0) throw new AppError('Usuário não encontrado', 404)
+
+  // Contas de login da equipe: apagar o estabelecimento cascateia as fichas, mas
+  // os `users` deles sobreviveriam sem vínculo nenhum, segurando para sempre
+  // e-mails que ninguém mais poderia usar (o e-mail é único no sistema).
+  const linkedUserIds = await getLinkedUserIds(ownedIds)
+  const userIds = [...new Set([userId, ...linkedUserIds])]
+
+  await db.transaction(async (tx) => {
+    // O estabelecimento não referencia mais o dono, então a exclusão dele é
+    // explícita: é ela que cascateia agenda, clientes, financeiro e fichas.
+    await tx.delete(establishments).where(inArray(establishments.id, ownedIds))
+    await tx.delete(users).where(inArray(users.id, userIds))
   })
 
-  const deleted = await db.delete(users).where(eq(users.id, userId)).returning({ id: users.id })
-  if (deleted.length === 0) throw new AppError('Usuário não encontrado', 404)
-
-  for (const est of owned) {
-    await bunnyDeleteEstablishmentFolder(est.id)
+  for (const id of ownedIds) {
+    await bunnyDeleteEstablishmentFolder(id)
   }
 }
 

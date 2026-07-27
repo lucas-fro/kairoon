@@ -2,6 +2,7 @@ import { and, asc, count, eq, gte, lt, lte, sum } from 'drizzle-orm'
 import { db } from '../../db'
 import { appointments, clients, employees, transactions, workingHours } from '../../db/schema'
 import { addDays, addMonthsClamped, getDayOfWeek, timeToMinutes, todayStr } from '../../lib/datetime'
+import type { AuthContext } from '../../plugins/auth'
 import type { DashboardSummary } from './schemas'
 
 function toDate(dateStr: string): Date {
@@ -52,7 +53,18 @@ function availableMinutesOf(
   return total
 }
 
-export async function getSummary(establishmentId: string): Promise<DashboardSummary> {
+export async function getSummary(
+  establishmentId: string,
+  auth: AuthContext,
+): Promise<DashboardSummary> {
+  // Sem `agenda.view_all`, o dashboard vira o dashboard DAQUELE profissional:
+  // agendamentos, ocupação e agenda do dia contam só o que é dele. A ocupação
+  // também passa a ter denominador de uma pessoa, senão pareceria sempre vazia.
+  const scope = auth.agendaScopeEmployeeId
+  const scopedAppointment = scope ? eq(appointments.employeeId, scope) : undefined
+  const canSeeMoney = auth.permissions.has('finance.view')
+  const canSeeClients = auth.permissions.has('clients.view')
+
   const today = todayStr()
   const monthStart = `${today.slice(0, 7)}-01`
   // Período comparável do mês anterior: mesmo nº de dias decorridos, com clamp
@@ -87,6 +99,7 @@ export async function getSummary(establishmentId: string): Promise<DashboardSumm
           eq(appointments.establishmentId, establishmentId),
           gte(appointments.date, monthStart),
           lte(appointments.date, today),
+          scopedAppointment,
         ),
       ),
     db
@@ -97,6 +110,7 @@ export async function getSummary(establishmentId: string): Promise<DashboardSumm
           eq(appointments.establishmentId, establishmentId),
           gte(appointments.date, prevMonthStart),
           lte(appointments.date, prevMonthEnd),
+          scopedAppointment,
         ),
       ),
     db
@@ -148,7 +162,11 @@ export async function getSummary(establishmentId: string): Promise<DashboardSumm
       .from(employees)
       .where(and(eq(employees.establishmentId, establishmentId), eq(employees.active, true))),
     db.query.appointments.findMany({
-      where: and(eq(appointments.establishmentId, establishmentId), eq(appointments.date, today)),
+      where: and(
+        eq(appointments.establishmentId, establishmentId),
+        eq(appointments.date, today),
+        scopedAppointment,
+      ),
       orderBy: [asc(appointments.startTime)],
       limit: 50,
       with: {
@@ -159,7 +177,9 @@ export async function getSummary(establishmentId: string): Promise<DashboardSumm
     }),
   ])
 
-  const activeEmployeesCount = Number(activeEmployeesRows[0]?.value ?? 0)
+  // Escopado a um profissional: o denominador da ocupação é a jornada de UMA
+  // pessoa, não a do estabelecimento inteiro.
+  const activeEmployeesCount = scope ? 1 : Number(activeEmployeesRows[0]?.value ?? 0)
   const hoursByDay = new Map(workingHoursRows.map((row) => [row.dayOfWeek, row]))
 
   const revenueCents = Number(currentRevenueRows[0]?.total ?? 0)
@@ -208,18 +228,21 @@ export async function getSummary(establishmentId: string): Promise<DashboardSumm
   const trend = eachDateInRange(monthStart, today).map((date) => ({
     date,
     appointmentsCount: apptCountByDate.get(date) ?? 0,
-    newClientsCount: clientCountByDate.get(date) ?? 0,
+    newClientsCount: canSeeClients ? (clientCountByDate.get(date) ?? 0) : 0,
   }))
 
   return {
     month: {
-      revenueCents,
-      revenueChangePct: pctChange(revenueCents, prevRevenueCents),
+      // Dinheiro e carteira de clientes só para quem tem a permissão. O
+      // dashboard não é barrado inteiro porque é a página inicial de todos:
+      // null aqui vira "cartão não aparece" na tela.
+      revenueCents: canSeeMoney ? revenueCents : null,
+      revenueChangePct: canSeeMoney ? pctChange(revenueCents, prevRevenueCents) : null,
       completedCount,
       appointmentsCount,
       appointmentsChangePct: pctChange(appointmentsCount, prevAppointmentsCount),
-      newClients,
-      newClientsChangePct: pctChange(newClients, prevNewClients),
+      newClients: canSeeClients ? newClients : null,
+      newClientsChangePct: canSeeClients ? pctChange(newClients, prevNewClients) : null,
       occupancyRate,
       occupancyChangePct: pctChange(occupancyRate, prevOccupancyRate),
       todayOccupancyRate,

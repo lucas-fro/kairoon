@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
+import { PERMISSION_PRESETS } from '../lib/permissions'
 import {
   addDays,
   addMinutesToTime,
@@ -13,31 +14,29 @@ import * as schema from './schema'
 
 const SEED_EMAIL = 'admin@barbearia.com'
 const SEED_PASSWORD = 'admin123'
+const SEED_SLUG = 'navalha-de-ouro'
+// Conta de equipe para testar níveis de acesso: recepção (vê a agenda de todos,
+// mexe em agendamentos e clientes, mas não vê financeiro nem configurações).
+const SEED_STAFF_EMAIL = 'recepcao@barbearia.com'
+const SEED_STAFF_PASSWORD = 'recepcao123'
 
 async function main() {
   console.log('Removendo dados de seed anteriores (se existirem)…')
-  await db.delete(schema.users).where(eq(schema.users.email, SEED_EMAIL))
+  // A ordem importa: o estabelecimento não referencia mais o dono, então apagar
+  // o usuário não leva mais o negócio junto. É a exclusão do estabelecimento que
+  // cascateia fichas, agenda e financeiro.
+  await db.delete(schema.establishments).where(eq(schema.establishments.slug, SEED_SLUG))
+  await db
+    .delete(schema.users)
+    .where(inArray(schema.users.email, [SEED_EMAIL, SEED_STAFF_EMAIL]))
 
   const passwordHash = await bcrypt.hash(SEED_PASSWORD, 10)
-
-  const [user] = await db
-    .insert(schema.users)
-    .values({
-      name: 'Lucas Oliveira',
-      email: SEED_EMAIL,
-      passwordHash,
-      cpf: '123.456.789-09',
-      phone: '11987654321',
-      birthDate: '1989-07-22',
-    })
-    .returning()
 
   const [establishment] = await db
     .insert(schema.establishments)
     .values({
-      ownerId: user.id,
       name: 'Barbearia Navalha de Ouro',
-      slug: 'navalha-de-ouro',
+      slug: SEED_SLUG,
       businessType: 'barbearia',
       // Sem isto a conta nasce como teste vencido (somente-leitura), já que
       // trialEndsAt null não concede mais acesso gravável.
@@ -77,11 +76,24 @@ async function main() {
     { establishmentId: establishment.id, dayOfWeek: 6, opensAt: '09:00', closesAt: '18:00', isClosed: false },
   ])
 
+  const [user] = await db
+    .insert(schema.users)
+    .values({
+      name: 'Lucas Oliveira',
+      email: SEED_EMAIL,
+      passwordHash,
+      cpf: '123.456.789-09',
+      phone: '11987654321',
+      birthDate: '1989-07-22',
+    })
+    .returning()
+
   // O dono da conta também é um profissional (isOwner): aparece com a coroa,
-  // não pode ser excluído e só tem jornada/status editáveis. Inserido primeiro,
-  // como no cadastro real.
+  // não pode ser excluído, só tem jornada/status editáveis, e é esta linha que
+  // liga a conta ao estabelecimento (não existe mais establishments.ownerId).
   await db.insert(schema.employees).values({
     establishmentId: establishment.id,
+    userId: user.id,
     name: user.name,
     isOwner: true,
     workStart: '09:00',
@@ -107,6 +119,28 @@ async function main() {
       commissionType: 'percent',
     })
     .returning()
+
+  // Recepcionista com login: exercita níveis de acesso de ponta a ponta.
+  // bookable: false a tira da agenda e do link público sem tirar o acesso.
+  const [staffUser] = await db
+    .insert(schema.users)
+    .values({
+      name: 'Juliana Prado',
+      email: SEED_STAFF_EMAIL,
+      passwordHash: await bcrypt.hash(SEED_STAFF_PASSWORD, 10),
+      phone: '11990004444',
+    })
+    .returning()
+
+  await db.insert(schema.employees).values({
+    establishmentId: establishment.id,
+    userId: staffUser.id,
+    name: staffUser.name,
+    email: SEED_STAFF_EMAIL,
+    phone: '11990004444',
+    bookable: false,
+    permissions: PERMISSION_PRESETS.find((p) => p.key === 'recepcao')?.permissions ?? [],
+  })
 
   // Profissionais adicionais para testes de agenda com múltiplos funcionários
   await db.insert(schema.employees).values([
@@ -368,9 +402,9 @@ async function main() {
 
   console.log('')
   console.log('Seed concluído com sucesso!')
-  console.log(`  Login:  ${SEED_EMAIL}`)
-  console.log(`  Senha:  ${SEED_PASSWORD}`)
-  console.log(`  Link público: http://localhost:5173/navalha-de-ouro`)
+  console.log(`  Dono:      ${SEED_EMAIL} / ${SEED_PASSWORD}`)
+  console.log(`  Recepção:  ${SEED_STAFF_EMAIL} / ${SEED_STAFF_PASSWORD}`)
+  console.log(`  Link público: http://localhost:5173/${SEED_SLUG}`)
 }
 
 main()

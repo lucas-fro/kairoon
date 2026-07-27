@@ -12,7 +12,7 @@ import { NotificationsBell } from './NotificationsBell'
  * marca (a sidebar desktop já mostra a marca).
  */
 export function AppHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
-  const { establishment } = useAuth()
+  const { establishment, isOwner } = useAuth()
   const slot = useHeaderSlotContent()
 
   return (
@@ -41,7 +41,8 @@ export function AppHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <UpgradeBanner variant="header" />
+          {/* Chamada de upgrade é do dono: a equipe não assina nada. */}
+          {isOwner && <UpgradeBanner variant="header" />}
           <NotificationsBell />
           <AccountMenu />
         </div>

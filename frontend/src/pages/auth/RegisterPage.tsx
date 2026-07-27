@@ -227,7 +227,7 @@ export function RegisterPage() {
   const [slugApiError, setSlugApiError] = useState<string | null>(null)
   const [slugStatus, setSlugStatus] = useState<SlugStatus>('idle')
 
-  // Aceite dos Termos + Política (etapa 1, obrigatório para criar a conta)
+  // Aceite dos Termos + Política (etapa 3, obrigatório para concluir o cadastro)
   const [acceptedLegal, setAcceptedLegal] = useState(false)
 
   // Etapa 3: quiz (opcional)
@@ -283,13 +283,12 @@ export function RegisterPage() {
     EMAIL_REGEX.test(email.trim()) &&
     (personalPhone === '' || isValidPhone(personalPhone)) &&
     password.length >= 6 &&
-    confirmPassword === password &&
-    acceptedLegal
+    confirmPassword === password
 
   const step2Valid = businessName.trim().length >= 2 && businessType !== null && slugUsable
 
-  // Quiz é opcional: a etapa final sempre pode concluir.
-  const step3Valid = true
+  // Quiz é opcional; só o aceite legal é obrigatório para concluir o cadastro.
+  const step3Valid = acceptedLegal
   const currentStepValid = step === 1 ? step1Valid : step === 2 ? step2Valid : step3Valid
 
   function handleBusinessNameChange(value: string) {
@@ -522,36 +521,6 @@ export function RegisterPage() {
                         error={confirmError}
                       />
                     </div>
-
-                    <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-line bg-background/60 p-3">
-                      <input
-                        type="checkbox"
-                        checked={acceptedLegal}
-                        onChange={(e) => setAcceptedLegal(e.target.checked)}
-                        className="mt-0.5 h-4 w-4 shrink-0 rounded border-line text-primary focus:ring-2 focus:ring-secondary-light"
-                      />
-                      <span className="text-[13px] leading-snug text-ink-secondary">
-                        Li e concordo com a{' '}
-                        <a
-                          href="/politica-de-privacidade"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-medium text-primary hover:underline"
-                        >
-                          Política de Privacidade
-                        </a>{' '}
-                        e os{' '}
-                        <a
-                          href="/termos-de-uso"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-medium text-primary hover:underline"
-                        >
-                          Termos de Uso
-                        </a>
-                        .
-                      </span>
-                    </label>
                   </div>
                 )}
 
@@ -674,6 +643,35 @@ export function RegisterPage() {
                       </div>
                     ))}
 
+                    <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-line bg-background/60 p-3">
+                      <input
+                        type="checkbox"
+                        checked={acceptedLegal}
+                        onChange={(e) => setAcceptedLegal(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 shrink-0 rounded border-line text-primary focus:ring-2 focus:ring-secondary-light"
+                      />
+                      <span className="text-[13px] leading-snug text-ink-secondary">
+                        Li e concordo com a{' '}
+                        <a
+                          href="/politica-de-privacidade"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium text-primary hover:underline"
+                        >
+                          Política de Privacidade
+                        </a>{' '}
+                        e os{' '}
+                        <a
+                          href="/termos-de-uso"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium text-primary hover:underline"
+                        >
+                          Termos de Uso
+                        </a>
+                        .
+                      </span>
+                    </label>
                   </div>
                 )}
               </div>

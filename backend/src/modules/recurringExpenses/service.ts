@@ -4,6 +4,7 @@ import { commissionEntries, employees, recurringExpenses, transactions } from '.
 import { todayStr } from '../../lib/datetime'
 import { AppError } from '../../lib/errors'
 import { assertFeature } from '../../lib/plan'
+import type { AuthContext } from '../../plugins/auth'
 import type { CreateRecurringExpenseInput, UpdateRecurringExpenseInput } from './schemas'
 
 const recurringExpenseColumns = {
@@ -133,7 +134,17 @@ interface ForecastItem {
  * como pago quando há uma transação vinculada no mês. Na última parcela de cada
  * profissional soma a comissão do mês ao valor a pagar: é saída real do caixa.
  */
-export async function getForecast(establishmentId: string, month?: string) {
+export async function getForecast(
+  establishmentId: string,
+  month: string | undefined,
+  auth: AuthContext,
+) {
+  // A previsão mistura custo fixo manual com a folha de cada profissional.
+  // `finance.view` libera os custos; salário de colega é folha e exige
+  // `finance.payroll`, senão o gerente veria pela previsão exatamente o que o
+  // preset dele promete esconder.
+  const canSeePayroll = auth.permissions.has('finance.payroll')
+
   const targetMonth = month ?? currentMonth()
   const monthStart = `${targetMonth}-01`
   const monthEnd = dueDateFor(targetMonth, 31)
@@ -219,7 +230,7 @@ export async function getForecast(establishmentId: string, month?: string) {
     })
   }
 
-  for (const employee of activeEmployees) {
+  for (const employee of canSeePayroll ? activeEmployees : []) {
     const monthCommission = commissionByEmployee.get(employee.id) ?? 0
     const validDays = (employee.paymentDays ?? []).filter((pd) => pd.amountCents > 0)
     validDays.forEach((paymentDay, index) => {

@@ -267,6 +267,20 @@
       "when": 1785006162280,
       "tag": "0037_nebulous_blink",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1785165601439,
+      "tag": "0038_unique_bulldozer",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1785177748162,
+      "tag": "0039_volatile_bloodscream",
+      "breakpoints": true
     }
   ]
 }

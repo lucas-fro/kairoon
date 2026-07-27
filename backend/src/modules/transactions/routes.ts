@@ -5,12 +5,12 @@ import * as transactionsService from './service'
 export async function transactionsRoutes(app: FastifyInstance) {
   app.addHook('preHandler', app.authenticate)
 
-  app.get('/', async (request) => {
+  app.get('/', { config: { permission: 'finance.view' } }, async (request) => {
     const query = listTransactionsQuerySchema.parse(request.query)
-    return transactionsService.listTransactions(request.user.establishmentId, query)
+    return transactionsService.listTransactions(request.auth.establishmentId, query, request.auth)
   })
 
-  app.post('/', async (request, reply) => {
+  app.post('/', { config: { permission: 'finance.manage' } }, async (request, reply) => {
     const input = createTransactionSchema.parse(request.body)
     const transaction = await transactionsService.createTransaction(
       request.user.establishmentId,
@@ -19,7 +19,7 @@ export async function transactionsRoutes(app: FastifyInstance) {
     return reply.status(201).send(transaction)
   })
 
-  app.delete('/:id', async (request, reply) => {
+  app.delete('/:id', { config: { permission: 'finance.manage' } }, async (request, reply) => {
     const { id } = idParamSchema.parse(request.params)
     await transactionsService.deleteTransaction(request.user.establishmentId, id)
     return reply.status(204).send()

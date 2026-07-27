@@ -2,7 +2,7 @@ import { LegalPageLayout } from './LegalPageLayout'
 
 export function TermsOfServicePage() {
   return (
-    <LegalPageLayout current="termos" title="Termos de Uso" updatedAt="17 de julho de 2026">
+    <LegalPageLayout current="termos" title="Termos de Uso" updatedAt="27 de julho de 2026">
       <p>
         Estes Termos de Uso ("Termos") regulam o acesso e o uso da plataforma Kairoon, um sistema de
         agenda online e gestão para estabelecimentos como barbearias, salões de beleza e clínicas de
@@ -36,10 +36,11 @@ export function TermsOfServicePage() {
       <h2>2. Objeto e descrição do serviço</h2>
       <p>
         A Kairoon oferece uma agenda online, um link público de agendamento para os clientes do
-        Estabelecimento, além de ferramentas de gestão de equipe, serviços, clientes, estoque,
-        finanças, fidelidade e relatórios. A plataforma é uma ferramenta de apoio à gestão: a
-        prestação dos serviços de beleza ou estética é de responsabilidade exclusiva do
-        Estabelecimento perante seus Clientes finais.
+        Estabelecimento, o envio de mensagens transacionais de agendamento aos Clientes finais, além
+        de ferramentas de gestão de equipe, serviços, clientes, estoque, finanças, fidelidade e
+        relatórios. A plataforma é uma ferramenta de apoio à gestão: a prestação dos serviços de
+        beleza ou estética é de responsabilidade exclusiva do Estabelecimento perante seus Clientes
+        finais.
       </p>
 
       <h2>3. Cadastro, elegibilidade e conta</h2>
@@ -59,71 +60,140 @@ export function TermsOfServicePage() {
         informações corretas. É proibido usar o link ou a plataforma para fins ilícitos, ofensivos,
         enganosos ou que violem direitos de terceiros.
       </p>
-
-      <h2>5. Planos, assinatura e pagamento</h2>
       <p>
-        <strong>5.1 Planos.</strong> A Kairoon oferece um plano gratuito com funcionalidades básicas
-        e planos pagos com recursos adicionais. As funcionalidades, os limites e os preços de cada
-        plano são apresentados na página de planos e no momento da contratação.
+        O link público também permite que o próprio Cliente final consulte, cancele ou remarque o
+        seu agendamento, sem precisar de conta na plataforma. O acesso a essa área é feito por um
+        link individual enviado ao Cliente final ou por um código de verificação enviado ao telefone
+        informado no agendamento. Cancelamentos e remarcações feitos pelo Cliente final alteram a
+        agenda do Estabelecimento imediatamente, e a plataforma pode impedir alterações muito
+        próximas ao horário marcado.
+      </p>
+
+      <h2>5. Mensagens aos Clientes finais</h2>
+      <p>
+        <strong>5.1 O que é enviado.</strong> A plataforma envia mensagens transacionais aos
+        Clientes finais relacionadas aos próprios agendamentos deles, como a confirmação do horário
+        marcado, o lembrete na véspera do atendimento e o aviso de cancelamento. Essas mensagens são
+        enviadas por WhatsApp e, quando o Cliente final informa um e-mail, também por e-mail.
       </p>
       <p>
-        <strong>5.2 Processador de pagamento.</strong> Os pagamentos das assinaturas são processados
+        <strong>5.2 Disponibilidade por plano.</strong> O envio por <strong>WhatsApp</strong> é um
+        recurso dos planos Essencial e Profissional, e também do período de teste grátis. Nos demais
+        planos os agendamentos funcionam normalmente e o Cliente final continua recebendo a
+        confirmação por e-mail, quando tiver informado um. A tabela de planos indica quais incluem o
+        recurso.
+      </p>
+      <p>
+        <strong>5.3 Canal de envio.</strong> As mensagens de WhatsApp são enviadas por meio de um
+        provedor terceiro contratado pela Kairoon, a partir de um número de titularidade da Kairoon,
+        identificando o Estabelecimento no conteúdo da mensagem. O WhatsApp é um serviço de
+        terceiro, sujeito às regras e à disponibilidade da plataforma dele.
+      </p>
+      <p>
+        <strong>5.4 Sem garantia de entrega.</strong> O envio depende de fatores fora do nosso
+        controle, como o número informado estar correto e ativo, a disponibilidade do WhatsApp e
+        eventuais restrições impostas por ele. A Kairoon não garante a entrega nem a leitura das
+        mensagens, e o Estabelecimento não deve tratá-las como único meio de comunicação com seus
+        Clientes finais.
+      </p>
+      <p>
+        <strong>5.5 Controle do Estabelecimento.</strong> O Estabelecimento pode desativar o
+        lembrete de véspera nas configurações do painel. A confirmação enviada no momento do
+        agendamento é parte do funcionamento do serviço e acompanha o agendamento.
+      </p>
+      <p>
+        <strong>5.6 Descadastro do Cliente final.</strong> O Cliente final pode, a qualquer momento,
+        pedir para não receber mais mensagens de WhatsApp, pelo link disponível na página de
+        gerenciamento do agendamento. O pedido é respeitado independentemente da configuração do
+        Estabelecimento.
+      </p>
+      <p>
+        <strong>5.7 Uso proibido do canal.</strong> O canal de mensagens existe apenas para
+        comunicações relacionadas a agendamentos. É vedado ao Estabelecimento usar a plataforma,
+        direta ou indiretamente, para disparo de propaganda, promoções, cobrança ou qualquer
+        comunicação de marketing não solicitada aos Clientes finais. O Estabelecimento declara que
+        possui base legal para que seus Clientes finais sejam contatados a respeito dos
+        agendamentos que eles próprios realizaram.
+      </p>
+
+      <h2>6. Teste grátis, planos, assinatura e pagamento</h2>
+      <p>
+        <strong>6.1 Teste grátis.</strong> Toda conta nova começa com um período de teste grátis de
+        14 dias, concedido no cadastro, <strong>sem necessidade de cadastrar cartão de crédito</strong>.
+        Durante o teste você tem acesso aos recursos da plataforma e não há qualquer cobrança.
+      </p>
+      <p>
+        <strong>6.2 Fim do teste sem assinatura.</strong> A Kairoon <strong>não</strong> possui um
+        plano gratuito permanente. Terminado o teste grátis sem a contratação de um plano pago, a
+        conta passa a ficar <strong>somente leitura</strong>: você continua acessando o painel e
+        consultando todos os seus dados, mas não consegue criar nem alterar registros, e o link
+        público deixa de aceitar novos agendamentos. Nenhum dado é excluído por esse motivo, e o
+        acesso completo é restabelecido assim que um plano é contratado.
+      </p>
+      <p>
+        <strong>6.3 Planos pagos.</strong> As funcionalidades, os limites e os preços de cada plano
+        são apresentados na página de planos e no momento da contratação.
+      </p>
+      <p>
+        <strong>6.4 Processador de pagamento.</strong> Os pagamentos das assinaturas são processados
         pela <strong>Asaas</strong> (Asaas Gestão Financeira Instituição de Pagamento S.A.), nosso
         provedor de pagamento. Ao assinar um plano pago, você também concorda com os termos e as
         políticas da Asaas aplicáveis ao processamento da transação.
       </p>
       <p>
-        <strong>5.3 Teste grátis e cobrança recorrente.</strong> Novas assinaturas incluem um
-        período de teste grátis de 14 dias: você tem acesso imediato ao plano e a primeira cobrança
-        só ocorre ao fim desse período. Se cancelar antes do fim do teste, nada é cobrado. Após o
-        teste, a assinatura passa a ser cobrada de forma recorrente e automática no ciclo escolhido
-        (mensal ou anual), no cartão informado, até que seja cancelada. Ao contratar, você autoriza
-        expressamente essas cobranças recorrentes.
+        <strong>6.5 Cobrança recorrente.</strong> A assinatura é cobrada de forma recorrente e
+        automática no ciclo escolhido (mensal ou anual), no cartão informado, até que seja
+        cancelada. Ao contratar, você autoriza expressamente essas cobranças recorrentes. No caso do
+        plano anual parcelado no cartão, a contratação cobre o período pago e não se renova
+        automaticamente: ao fim do período, o acesso aos recursos pagos se encerra até uma nova
+        contratação.
       </p>
       <p>
-        <strong>5.4 Dados do cartão.</strong> Os dados do cartão são coletados no checkout apenas
+        <strong>6.6 Dados do cartão.</strong> Os dados do cartão são coletados no checkout apenas
         para viabilizar a cobrança e são transmitidos de forma criptografada à Asaas para
         processamento. A Kairoon não armazena o número completo do cartão nem o código de segurança
         (CVV) em seus servidores. O tratamento desses dados está descrito na Política de
         Privacidade.
       </p>
       <p>
-        <strong>5.5 Alteração de preços.</strong> Os preços podem ser alterados a qualquer momento.
+        <strong>6.7 Alteração de preços.</strong> Os preços podem ser alterados a qualquer momento.
         Mudanças de preço de um plano já contratado só passam a valer no ciclo seguinte e serão
         comunicadas com antecedência razoável, permitindo o cancelamento antes da renovação caso
         você não concorde com o novo valor.
       </p>
       <p>
-        <strong>5.6 Inadimplência e período de tolerância.</strong> Se uma cobrança não for
+        <strong>6.8 Inadimplência e período de tolerância.</strong> Se uma cobrança não for
         confirmada (por exemplo, cartão recusado ou sem saldo), a assinatura fica em atraso. Há um
-        período de tolerância antes do bloqueio dos recursos pagos, durante o qual você pode
-        regularizar o pagamento. Passado esse prazo sem regularização, a conta volta ao plano
-        gratuito, sem exclusão automática dos dados.
+        período de tolerância de 5 dias antes do bloqueio dos recursos pagos, durante o qual você
+        pode regularizar o pagamento. Passado esse prazo sem regularização, a assinatura é encerrada
+        e a conta passa a ficar somente leitura, nos termos do item 6.2, sem exclusão automática dos
+        dados.
       </p>
       <p>
-        <strong>5.7 Cancelamento pelo assinante.</strong> Você pode cancelar a assinatura a qualquer
+        <strong>6.9 Cancelamento pelo assinante.</strong> Você pode cancelar a assinatura a qualquer
         momento pelo painel, na aba de plano em Configurações. O cancelamento interrompe as
-        cobranças futuras e mantém o acesso aos recursos pagos até o fim do período já pago. Não há
-        multa nem fidelidade.
+        cobranças futuras e mantém o acesso aos recursos pagos até o fim do período já pago, após o
+        que a conta passa a ficar somente leitura, nos termos do item 6.2. Não há multa nem
+        fidelidade.
       </p>
       <p>
-        <strong>5.8 Direito de arrependimento.</strong> Nas contratações feitas pela internet, você
+        <strong>6.10 Direito de arrependimento.</strong> Nas contratações feitas pela internet, você
         tem o direito de se arrepender em até 7 (sete) dias corridos contados da data da
         contratação, nos termos do art. 49 do Código de Defesa do Consumidor. Nesse caso, o valor
         pago é integralmente devolvido. Para exercer esse direito, entre em contato pelo e-mail{' '}
         <strong>contato@kairoon.com.br</strong>.
       </p>
       <p>
-        <strong>5.9 Reembolsos.</strong> Fora da hipótese de arrependimento do item 5.8, os valores
+        <strong>6.11 Reembolsos.</strong> Fora da hipótese de arrependimento do item 6.10, os valores
         já pagos referentes ao ciclo em curso não são reembolsáveis, salvo em caso de cobrança
         indevida comprovada ou quando exigido por lei.
       </p>
       <p>
-        <strong>5.10 Tributos.</strong> Os preços podem incluir tributos aplicáveis. Você é
+        <strong>6.12 Tributos.</strong> Os preços podem incluir tributos aplicáveis. Você é
         responsável por quaisquer tributos incidentes sobre a sua própria atividade econômica.
       </p>
 
-      <h2>6. Uso aceitável e condutas proibidas</h2>
+      <h2>7. Uso aceitável e condutas proibidas</h2>
       <p>Ao usar a plataforma, você concorda em não:</p>
       <ul className="list-disc space-y-1 pl-5">
         <li>tentar acessar contas, dados ou áreas da plataforma sem autorização;</li>
@@ -140,12 +210,16 @@ export function TermsOfServicePage() {
           ilegal;
         </li>
         <li>
+          cadastrar contatos de terceiros sem base legal, ou usar o canal de mensagens para
+          comunicação não solicitada, conforme o item 5.7;
+        </li>
+        <li>
           usar a plataforma para fins de fraude em pagamentos, teste de cartões ou lavagem de
           dinheiro.
         </li>
       </ul>
 
-      <h2>7. Conteúdo e responsabilidade do Contratante</h2>
+      <h2>8. Conteúdo e responsabilidade do Contratante</h2>
       <p>
         O Contratante é o responsável pelos dados que insere na plataforma, inclusive os dados dos
         seus Clientes finais, e garante que possui base legal para tratá-los. Em relação a esses
@@ -153,7 +227,7 @@ export function TermsOfServicePage() {
         Política de Privacidade.
       </p>
 
-      <h2>8. Propriedade intelectual</h2>
+      <h2>9. Propriedade intelectual</h2>
       <p>
         A marca Kairoon, o software, o design, os textos e os demais elementos da plataforma
         pertencem à Kairoon ou aos seus licenciadores e são protegidos por lei. Nada nestes Termos
@@ -161,24 +235,26 @@ export function TermsOfServicePage() {
         limitada, não exclusiva e revogável de uso da plataforma enquanto durar a relação.
       </p>
 
-      <h2>9. Disponibilidade e suporte</h2>
+      <h2>10. Disponibilidade e suporte</h2>
       <p>
         Trabalhamos para manter a plataforma disponível e estável, mas o serviço é fornecido "no
         estado em que se encontra", sem garantia de disponibilidade ininterrupta. Podem ocorrer
         manutenções programadas, atualizações e indisponibilidades pontuais decorrentes de fatores
-        fora do nosso controle.
+        fora do nosso controle, inclusive de serviços de terceiros dos quais a plataforma depende,
+        como o processador de pagamento e o canal de mensagens.
       </p>
 
-      <h2>10. Limitação de responsabilidade</h2>
+      <h2>11. Limitação de responsabilidade</h2>
       <p>
         Na máxima extensão permitida pela lei, a Kairoon não se responsabiliza por acordos,
         atendimentos, cobranças ou conflitos entre o Estabelecimento e seus Clientes finais, por
-        lucros cessantes, nem por danos indiretos decorrentes do uso ou da impossibilidade de uso da
-        plataforma. Nada nestes Termos exclui responsabilidades que não possam ser afastadas por
-        lei, em especial as relações de consumo aplicáveis.
+        agendamentos perdidos em razão de mensagem não entregue, por lucros cessantes, nem por danos
+        indiretos decorrentes do uso ou da impossibilidade de uso da plataforma. Nada nestes Termos
+        exclui responsabilidades que não possam ser afastadas por lei, em especial as relações de
+        consumo aplicáveis.
       </p>
 
-      <h2>11. Suspensão e encerramento</h2>
+      <h2>12. Suspensão e encerramento</h2>
       <p>
         Você pode encerrar sua conta a qualquer momento pelo painel. A Kairoon pode suspender ou
         encerrar contas que violem estes Termos, que representem risco à segurança da plataforma ou
@@ -186,21 +262,21 @@ export function TermsOfServicePage() {
         <strong>Exclusão de Conta</strong>.
       </p>
 
-      <h2>12. Alterações destes Termos</h2>
+      <h2>13. Alterações destes Termos</h2>
       <p>
         Podemos atualizar estes Termos periodicamente. Mudanças relevantes serão comunicadas pelos
         canais habituais da plataforma, e a data no topo desta página indica a versão mais recente.
         O uso continuado do serviço após a atualização representa a aceitação dos novos Termos.
       </p>
 
-      <h2>13. Legislação aplicável e foro</h2>
+      <h2>14. Legislação aplicável e foro</h2>
       <p>
         Estes Termos são regidos pelas leis da República Federativa do Brasil. Fica eleito o foro do
         domicílio do consumidor para dirimir eventuais controvérsias, quando aplicável a relação de
         consumo, sem prejuízo de outras hipóteses previstas em lei.
       </p>
 
-      <h2>14. Contato</h2>
+      <h2>15. Contato</h2>
       <p>
         Dúvidas sobre estes Termos podem ser enviadas para{' '}
         <strong>contato@kairoon.com.br</strong>.

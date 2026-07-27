@@ -92,7 +92,8 @@ export interface GridColumn {
   isToday: boolean
   /** Rótulo usado no aria-label dos slots clicáveis */
   slotLabel: string
-  onSlotClick: (startTime: string) => void
+  /** Ausente = sem permissão de criar: o horário vago não abre nada. */
+  onSlotClick?: (startTime: string) => void
 }
 
 interface WeekGridProps {
@@ -189,16 +190,21 @@ export function WeekGrid({
                 {Array.from({ length: slotCount }, (_, index) => {
                   const minutes = startMinutes + index * SLOT_MINUTES
                   const time = minutesToTime(minutes)
+                  // Sem onSlotClick (fechado ou sem permissão de criar) o slot
+                  // continua desenhando as linhas da grade, mas não convida ao clique.
+                  const clickable = Boolean(column.onSlotClick) && !column.isClosed
                   return (
                     <button
                       key={minutes}
                       type="button"
-                      disabled={column.isClosed}
-                      onClick={() => column.onSlotClick(time)}
+                      disabled={!clickable}
+                      onClick={() => column.onSlotClick?.(time)}
                       aria-label={
                         column.isClosed
                           ? `Indisponível: ${column.slotLabel}`
-                          : `Novo agendamento: ${column.slotLabel} às ${time}`
+                          : clickable
+                            ? `Novo agendamento: ${column.slotLabel} às ${time}`
+                            : `${column.slotLabel} às ${time}`
                       }
                       className={cn(
                         'absolute inset-x-0 border-t transition-colors duration-150',
@@ -206,7 +212,7 @@ export function WeekGrid({
                           ? 'border-dashed border-line-divider'
                           : 'border-transparent',
                         index === 0 && 'border-transparent',
-                        column.isClosed ? 'cursor-default' : 'hover:bg-secondary-light/50',
+                        clickable ? 'hover:bg-secondary-light/50' : 'cursor-default',
                       )}
                       style={{ top: index * SLOT_HEIGHT_PX, height: SLOT_HEIGHT_PX }}
                     />

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   BarChart3,
   Boxes,
@@ -32,6 +32,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { HeaderSlotProvider } from '../../contexts/HeaderSlotContext'
 import { usePlan } from '../../hooks/usePlan'
 import { cn } from '../../lib/format'
+import type { AnyPermission } from '../../lib/permissions'
 import type { PlanFeatureKey } from '../../types/api'
 import { KairoonMark } from '../brand/Logo'
 import { TrialBanner } from '../plan/TrialBanner'
@@ -41,11 +42,34 @@ import { PendingBookingsListener } from '../realtime/PendingBookingsListener'
 import { PaletteThemeApplier } from '../theme/PaletteThemeApplier'
 import { AppHeader } from './AppHeader'
 
+/**
+ * Dois eixos independentes escondem coisas aqui, e eles NÃO se misturam:
+ *   `feature`    = limite de plano. Aparece com cadeado, convidando ao upgrade.
+ *   `permission` = nível de acesso. Some da navegação, porque não é algo que a
+ *                  pessoa possa resolver comprando um plano.
+ *   `ownerOnly`  = só o dono (plano, conta, acessos da equipe).
+ */
+
 /** Item de navegação simples (link direto). */
-type NavLeaf = { to: string; label: string; icon: LucideIcon; end?: boolean; feature?: PlanFeatureKey }
+type NavLeaf = {
+  to: string
+  label: string
+  icon: LucideIcon
+  end?: boolean
+  feature?: PlanFeatureKey
+  permission?: AnyPermission
+  ownerOnly?: boolean
+}
 
 /** Sub-opção de um dropdown: navega para `${parent.to}?tab=${tab}`. */
-type NavSubItem = { tab: string; label: string; icon: LucideIcon; feature?: PlanFeatureKey }
+type NavSubItem = {
+  tab: string
+  label: string
+  icon: LucideIcon
+  feature?: PlanFeatureKey
+  permission?: AnyPermission
+  ownerOnly?: boolean
+}
 
 /** Item de navegação com sub-opções (dropdown que expande na própria sidebar). */
 type NavParent = {
@@ -53,6 +77,8 @@ type NavParent = {
   label: string
   icon: LucideIcon
   feature?: PlanFeatureKey
+  permission?: AnyPermission
+  ownerOnly?: boolean
   defaultTab: string
   children: NavSubItem[]
 }
@@ -68,7 +94,7 @@ const NAV_GROUPS: { label: string; items: NavEntry[] }[] = [
     label: 'Principal',
     items: [
       { to: '/app', label: 'Dashboard', icon: LayoutDashboard, end: true },
-      { to: '/app/agenda', label: 'Agenda', icon: Calendar },
+      { to: '/app/agenda', label: 'Agenda', icon: Calendar, permission: 'agenda.view' },
     ],
   },
   {
@@ -78,6 +104,7 @@ const NAV_GROUPS: { label: string; items: NavEntry[] }[] = [
         to: '/app/clientes',
         label: 'Clientes',
         icon: Users,
+        permission: 'clients.view',
         defaultTab: 'listagem',
         children: [
           { tab: 'listagem', label: 'Listagem', icon: List },
@@ -85,13 +112,19 @@ const NAV_GROUPS: { label: string; items: NavEntry[] }[] = [
           { tab: 'sumidos', label: 'Sumidos', icon: UserX, feature: 'clientes_crm' },
         ],
       },
-      { to: '/app/servicos', label: 'Serviços', icon: Scissors },
-      { to: '/app/funcionarios', label: 'Profissionais', icon: UserCircle },
+      { to: '/app/servicos', label: 'Serviços', icon: Scissors, permission: 'services.manage' },
+      {
+        to: '/app/funcionarios',
+        label: 'Profissionais',
+        icon: UserCircle,
+        permission: 'employees.view',
+      },
       {
         to: '/app/fidelidade',
         label: 'Fidelidade',
         icon: Gift,
         feature: 'fidelidade',
+        permission: 'marketing.view',
         defaultTab: 'cartao',
         children: [
           { tab: 'cupons', label: 'Cupons', icon: Ticket, feature: 'cupons' },
@@ -100,9 +133,27 @@ const NAV_GROUPS: { label: string; items: NavEntry[] }[] = [
           { tab: 'pontos', label: 'Pontos', icon: Coins, feature: 'fidelidade' },
         ],
       },
-      { to: '/app/estoque', label: 'Estoque', icon: Boxes, feature: 'estoque' },
-      { to: '/app/financeiro', label: 'Financeiro', icon: Wallet, feature: 'financeiro' },
-      { to: '/app/relatorios', label: 'Relatórios', icon: BarChart3, feature: 'relatorios' },
+      {
+        to: '/app/estoque',
+        label: 'Estoque',
+        icon: Boxes,
+        feature: 'estoque',
+        permission: 'stock.view',
+      },
+      {
+        to: '/app/financeiro',
+        label: 'Financeiro',
+        icon: Wallet,
+        feature: 'financeiro',
+        permission: 'finance.view',
+      },
+      {
+        to: '/app/relatorios',
+        label: 'Relatórios',
+        icon: BarChart3,
+        feature: 'relatorios',
+        permission: 'reports.view',
+      },
     ],
   },
   {
@@ -114,10 +165,11 @@ const NAV_GROUPS: { label: string; items: NavEntry[] }[] = [
         icon: Settings,
         defaultTab: 'estabelecimento',
         children: [
-          { tab: 'estabelecimento', label: 'Estabelecimento', icon: Store },
-          { tab: 'funcionamento', label: 'Expediente', icon: Clock },
-          { tab: 'aparencia', label: 'Aparência', icon: Palette },
-          { tab: 'plano', label: 'Plano', icon: Crown },
+          { tab: 'estabelecimento', label: 'Estabelecimento', icon: Store, permission: 'settings.manage' },
+          { tab: 'funcionamento', label: 'Expediente', icon: Clock, permission: 'settings.manage' },
+          { tab: 'aparencia', label: 'Aparência', icon: Palette, permission: 'settings.manage' },
+          { tab: 'plano', label: 'Plano', icon: Crown, ownerOnly: true },
+          // Sem gate: todo mundo abre os próprios dados e troca a própria senha.
           { tab: 'conta', label: 'Conta', icon: UserCog },
         ],
       },
@@ -255,16 +307,40 @@ function SidebarContent({
    *  aparece no header, ao lado do sino). */
   mobile?: boolean
 }) {
-  const { establishment } = useAuth()
+  const { establishment, can, isOwner } = useAuth()
   const { data: plan } = usePlan()
   const location = useLocation()
   const [searchParams] = useSearchParams()
 
   const featureLocked: FeatureLocked = (feature) => !!feature && !!plan && !plan.features[feature]
 
+  // Recurso trancado pelo PLANO continua visível com cadeado (é upgrade); o que
+  // a permissão barra some, porque não há o que comprar para destravar.
+  const groups = useMemo(() => {
+    const allowed = (entry: { permission?: AnyPermission; ownerOnly?: boolean }) =>
+      (!entry.ownerOnly || isOwner) && (!entry.permission || can(entry.permission))
+
+    return NAV_GROUPS.map((group) => ({
+      label: group.label,
+      items: group.items.filter(allowed).map((item) => {
+        if (!isParent(item)) return item
+        const children = item.children.filter(allowed)
+        // A aba padrão pode ter sumido: cai na primeira que sobrou.
+        const defaultTab = children.some((c) => c.tab === item.defaultTab)
+          ? item.defaultTab
+          : (children[0]?.tab ?? item.defaultTab)
+        return { ...item, children, defaultTab }
+      }),
+      // Dropdown sem nenhuma sub-opção visível não faz sentido na navegação.
+    })).map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !isParent(item) || item.children.length > 0),
+    })).filter((group) => group.items.length > 0)
+  }, [can, isOwner])
+
   // Parent (dropdown) da rota atual: mantém a seção aberta ao navegar/deep-link.
   const activeParentTo =
-    NAV_GROUPS.flatMap((group) => group.items).find(
+    groups.flatMap((group) => group.items).find(
       (item): item is NavParent => isParent(item) && location.pathname.startsWith(item.to),
     )?.to ?? null
 
@@ -288,7 +364,7 @@ function SidebarContent({
       </div>
 
       <nav className="mt-4 flex-1 space-y-6 overflow-y-auto">
-        {NAV_GROUPS.map((group) => (
+        {groups.map((group) => (
           <div key={group.label}>
             <p className="mb-1.5 px-3 text-xs font-medium text-white/40">{group.label}</p>
             <div className="space-y-0.5">
@@ -317,8 +393,10 @@ function SidebarContent({
             em estados diferentes de conta e nunca aparecem juntos: o do teste
             some fora do teste, e o de upgrade só existe no Básico pago (e só no
             mobile, porque no desktop essa chamada já fica no header). */}
-        <TrialBanner variant="sidebar" />
-        {mobile && <UpgradeBanner variant="sidebar" />}
+        {/* Assinatura é assunto do dono: a equipe não vê convite de upgrade nem
+            contagem regressiva de teste, que ela não tem como resolver. */}
+        {isOwner && <TrialBanner variant="sidebar" />}
+        {mobile && isOwner && <UpgradeBanner variant="sidebar" />}
       </nav>
     </div>
   )

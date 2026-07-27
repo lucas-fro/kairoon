@@ -49,7 +49,20 @@ function isUniqueViolation(err: unknown): boolean {
   return error.code === '23505' || error.cause?.code === '23505'
 }
 
-export async function listClients(establishmentId: string, search?: string) {
+/**
+ * `limit` corta no banco, não depois: quem só tem 'clients.lookup' está achando
+ * um cliente para agendar e nunca deve receber a carteira inteira no fio.
+ *
+ * `lookupOnly` vai junto: nesse modo o retorno perde histórico e quanto o
+ * cliente já gastou, que é justamente o que a aba Clientes reserva para
+ * 'clients.view'. Achar um nome para agendar não é abrir a ficha dele.
+ */
+export async function listClients(
+  establishmentId: string,
+  search?: string,
+  limit?: number,
+  lookupOnly = false,
+) {
   const today = todayStr()
 
   const filters = [eq(clients.establishmentId, establishmentId)]
@@ -61,7 +74,7 @@ export async function listClients(establishmentId: string, search?: string) {
     if (searchFilter) filters.push(searchFilter)
   }
 
-  const rows = await db
+  const query = db
     .select({
       id: clients.id,
       name: clients.name,
@@ -79,15 +92,17 @@ export async function listClients(establishmentId: string, search?: string) {
     .groupBy(clients.id)
     .orderBy(asc(clients.name))
 
+  const rows = await (limit === undefined ? query : query.limit(limit))
+
   return rows.map((row) => ({
     id: row.id,
     name: row.name,
     phone: row.phone,
     birthDate: row.birthDate,
     createdAt: row.createdAt,
-    appointmentsCount: Number(row.appointmentsCount),
-    lastVisit: row.lastVisit,
-    totalSpentCents: Number(row.totalSpentCents),
+    appointmentsCount: lookupOnly ? 0 : Number(row.appointmentsCount),
+    lastVisit: lookupOnly ? null : row.lastVisit,
+    totalSpentCents: lookupOnly ? 0 : Number(row.totalSpentCents),
   }))
 }
 

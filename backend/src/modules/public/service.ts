@@ -9,6 +9,7 @@ import {
   timeBlocks,
   workingHours,
 } from '../../db/schema'
+import { createAppointmentToken } from '../../lib/appointmentToken'
 import {
   addMinutesToTime,
   getDayOfWeek,
@@ -21,13 +22,14 @@ import { publish } from '../../lib/events'
 import { lockEmployeeDay } from '../../lib/locks'
 import { getAccessState } from '../../lib/plan'
 import { computeAvailableSlots, isValidPhone, normalizePhone, timesOverlap } from '../../lib/slots'
+import { notifyAppointment } from '../../notifications/appointment'
 import type { AvailabilityQuery, CreateBookingInput } from './schemas'
 
 // Cor primária do design system (tailwind `primary`). É a cor da página pública
 // no plano grátis, independente do themeColor guardado (que pode ter default legado).
 const SYSTEM_PRIMARY = '#1E2F5E'
 
-async function findEstablishmentBySlug(slug: string) {
+export async function findEstablishmentBySlug(slug: string) {
   const establishment = await db.query.establishments.findFirst({
     where: eq(establishments.slug, slug),
   })
@@ -35,27 +37,36 @@ async function findEstablishmentBySlug(slug: string) {
   return establishment
 }
 
-async function resolveEmployee(establishmentId: string, employeeId?: string) {
+/**
+ * Quem o cliente final pode escolher: ativo E agendável. `bookable = false` é a
+ * recepcionista e afins, que têm ficha (e às vezes login) mas não atendem.
+ */
+export async function resolveEmployee(establishmentId: string, employeeId?: string) {
   if (employeeId) {
     const employee = await db.query.employees.findFirst({
       where: and(
         eq(employees.id, employeeId),
         eq(employees.establishmentId, establishmentId),
         eq(employees.active, true),
+        eq(employees.bookable, true),
       ),
     })
     if (!employee) throw new AppError('Profissional não encontrado', 404)
     return employee
   }
   const employee = await db.query.employees.findFirst({
-    where: and(eq(employees.establishmentId, establishmentId), eq(employees.active, true)),
+    where: and(
+      eq(employees.establishmentId, establishmentId),
+      eq(employees.active, true),
+      eq(employees.bookable, true),
+    ),
     orderBy: [asc(employees.createdAt)],
   })
   if (!employee) throw new AppError('Nenhum profissional disponível para agendamento', 404)
   return employee
 }
 
-async function findActiveService(establishmentId: string, serviceId: string) {
+export async function findActiveService(establishmentId: string, serviceId: string) {
   const service = await db.query.services.findFirst({
     where: and(
       eq(services.id, serviceId),
@@ -76,7 +87,11 @@ export async function getPublicEstablishment(slug: string) {
       orderBy: [asc(services.name)],
     }),
     db.query.employees.findMany({
-      where: and(eq(employees.establishmentId, establishment.id), eq(employees.active, true)),
+      where: and(
+        eq(employees.establishmentId, establishment.id),
+        eq(employees.active, true),
+        eq(employees.bookable, true),
+      ),
       orderBy: [asc(employees.createdAt)],
     }),
     db.query.workingHours.findMany({
@@ -165,7 +180,15 @@ export async function getPublicEstablishment(slug: string) {
   }
 }
 
-export async function getAvailability(slug: string, query: AvailabilityQuery) {
+export async function getAvailability(
+  slug: string,
+  query: AvailabilityQuery,
+  /**
+   * Agendamento a ignorar ao montar os horários ocupados. Usado na remarcação:
+   * sem isso o próprio horário atual do cliente apareceria como indisponível.
+   */
+  excludeAppointmentId?: string,
+) {
   const establishment = await findEstablishmentBySlug(slug)
   const service = await findActiveService(establishment.id, query.serviceId)
   const employee = await resolveEmployee(establishment.id, query.employeeId)
@@ -198,6 +221,7 @@ export async function getAvailability(slug: string, query: AvailabilityQuery) {
       eq(appointments.employeeId, employee.id),
       eq(appointments.date, query.date),
       ne(appointments.status, 'cancelled'),
+      ...(excludeAppointmentId ? [ne(appointments.id, excludeAppointmentId)] : []),
     ),
     columns: { startTime: true, endTime: true },
   })
@@ -234,6 +258,86 @@ export async function getAvailability(slug: string, query: AvailabilityQuery) {
   return { employeeId: employee.id, slots }
 }
 
+type BookableEmployee = Awaited<ReturnType<typeof resolveEmployee>>
+
+/**
+ * Regras de "este horário pode ser reservado": expediente do estabelecimento,
+ * jornada e almoço do profissional, bloqueios (feriado/folga) e horário
+ * passado. NÃO checa conflito com outro agendamento — isso é feito dentro da
+ * transação, sob o lock do dia (ver createPublicBooking).
+ *
+ * Extraída para ser a fonte única entre agendar e remarcar: sem isso, as duas
+ * regras divergem com o tempo e o cliente consegue remarcar para um horário
+ * que o booking recusaria.
+ */
+export async function assertBookableSlot(args: {
+  establishmentId: string
+  employee: BookableEmployee
+  date: string
+  startTime: string
+  endTime: string
+}): Promise<void> {
+  const { establishmentId, employee, date, startTime, endTime } = args
+
+  const dayHours = await db.query.workingHours.findFirst({
+    where: and(
+      eq(workingHours.establishmentId, establishmentId),
+      eq(workingHours.dayOfWeek, getDayOfWeek(date)),
+    ),
+  })
+  if (!dayHours || dayHours.isClosed) {
+    throw new AppError('O estabelecimento não atende neste dia', 400)
+  }
+  if (
+    timeToMinutes(startTime) < timeToMinutes(dayHours.opensAt) ||
+    timeToMinutes(endTime) > timeToMinutes(dayHours.closesAt)
+  ) {
+    throw new AppError('Horário fora do expediente', 400)
+  }
+
+  // Jornada do profissional (dia, horário e almoço)
+  if (!employee.workDays.includes(getDayOfWeek(date))) {
+    throw new AppError('O profissional não atende neste dia', 400)
+  }
+  if (
+    timeToMinutes(startTime) < timeToMinutes(employee.workStart) ||
+    timeToMinutes(endTime) > timeToMinutes(employee.workEnd)
+  ) {
+    throw new AppError('Horário fora da jornada do profissional', 400)
+  }
+  if (
+    employee.lunchStart &&
+    employee.lunchEnd &&
+    timesOverlap(startTime, endTime, employee.lunchStart, employee.lunchEnd)
+  ) {
+    throw new AppError('Horário indisponível (intervalo de almoço)', 400)
+  }
+
+  // Bloqueios (feriados/folgas): pausas gerais (employeeId null) + folgas deste
+  // profissional. Bloqueios de outros profissionais não impedem este agendamento.
+  const blocks = await db.query.timeBlocks.findMany({
+    where: and(
+      eq(timeBlocks.establishmentId, establishmentId),
+      eq(timeBlocks.date, date),
+      or(isNull(timeBlocks.employeeId), eq(timeBlocks.employeeId, employee.id)),
+    ),
+  })
+  for (const block of blocks) {
+    if (
+      !block.startTime ||
+      !block.endTime ||
+      timesOverlap(startTime, endTime, block.startTime, block.endTime)
+    ) {
+      throw new AppError('Este horário está indisponível (feriado ou folga)', 400)
+    }
+  }
+
+  const today = todayStr()
+  if (date < today || (date === today && timeToMinutes(startTime) <= nowMinutes())) {
+    throw new AppError('Não é possível agendar em um horário que já passou', 400)
+  }
+}
+
 export async function createPublicBooking(slug: string, input: CreateBookingInput) {
   const establishment = await findEstablishmentBySlug(slug)
 
@@ -250,63 +354,13 @@ export async function createPublicBooking(slug: string, input: CreateBookingInpu
 
   const endTime = addMinutesToTime(input.startTime, service.durationMinutes)
 
-  const dayHours = await db.query.workingHours.findFirst({
-    where: and(
-      eq(workingHours.establishmentId, establishment.id),
-      eq(workingHours.dayOfWeek, getDayOfWeek(input.date)),
-    ),
+  await assertBookableSlot({
+    establishmentId: establishment.id,
+    employee,
+    date: input.date,
+    startTime: input.startTime,
+    endTime,
   })
-  if (!dayHours || dayHours.isClosed) {
-    throw new AppError('O estabelecimento não atende neste dia', 400)
-  }
-  if (
-    timeToMinutes(input.startTime) < timeToMinutes(dayHours.opensAt) ||
-    timeToMinutes(endTime) > timeToMinutes(dayHours.closesAt)
-  ) {
-    throw new AppError('Horário fora do expediente', 400)
-  }
-
-  // Jornada do profissional (dia, horário e almoço)
-  if (!employee.workDays.includes(getDayOfWeek(input.date))) {
-    throw new AppError('O profissional não atende neste dia', 400)
-  }
-  if (
-    timeToMinutes(input.startTime) < timeToMinutes(employee.workStart) ||
-    timeToMinutes(endTime) > timeToMinutes(employee.workEnd)
-  ) {
-    throw new AppError('Horário fora da jornada do profissional', 400)
-  }
-  if (
-    employee.lunchStart &&
-    employee.lunchEnd &&
-    timesOverlap(input.startTime, endTime, employee.lunchStart, employee.lunchEnd)
-  ) {
-    throw new AppError('Horário indisponível (intervalo de almoço)', 400)
-  }
-
-  // Bloqueios (feriados/folgas): pausas gerais (employeeId null) + folgas deste
-  // profissional. Bloqueios de outros profissionais não impedem este agendamento.
-  const blocks = await db.query.timeBlocks.findMany({
-    where: and(
-      eq(timeBlocks.establishmentId, establishment.id),
-      eq(timeBlocks.date, input.date),
-      or(isNull(timeBlocks.employeeId), eq(timeBlocks.employeeId, employee.id)),
-    ),
-  })
-  for (const block of blocks) {
-    if (
-      !block.startTime ||
-      !block.endTime ||
-      timesOverlap(input.startTime, endTime, block.startTime, block.endTime)
-    ) {
-      throw new AppError('Este horário está indisponível (feriado ou folga)', 400)
-    }
-  }
-
-  const today = todayStr()
-  if (input.date < today || (input.date === today && timeToMinutes(input.startTime) <= nowMinutes())) {
-    throw new AppError('Não é possível agendar em um horário que já passou', 400)
-  }
 
   if (!isValidPhone(input.client.phone)) throw new AppError('Telefone inválido', 400)
   const phone = normalizePhone(input.client.phone)
@@ -317,7 +371,7 @@ export async function createPublicBooking(slug: string, input: CreateBookingInpu
   // Confirma na hora ou deixa pendente até o estabelecimento aceitar
   const status = establishment.autoConfirm ? 'confirmed' : 'pending'
 
-  const result = await db.transaction(async (tx) => {
+  const { notifyClient, ...result } = await db.transaction(async (tx) => {
     // Serializa reservas deste profissional+dia e revalida o conflito:
     // outro cliente pode ter reservado o mesmo horário entre a listagem
     // e a confirmação.
@@ -407,7 +461,26 @@ export async function createPublicBooking(slug: string, input: CreateBookingInpu
         slug: establishment.slug,
         phone: establishment.phone,
       },
+      // Token do link "cancelar/remarcar": vai na resposta para a tela de
+      // sucesso oferecer o link na hora, sem depender da mensagem chegar.
+      manageToken: createAppointmentToken(appointment.id),
+      // Fora do payload público (o `notifyClient` é removido logo abaixo):
+      // e-mail e opt-out não devem voltar para o navegador.
+      notifyClient: { email: client.email, whatsappOptOut: client.whatsappOptOut },
     }
+  })
+
+  // Confirmação para o cliente (WhatsApp nos planos que o incluem; e-mail
+  // sempre que ele informou um).
+  void notifyAppointment('appointment_confirmed', {
+    appointmentId: result.appointment.id,
+    date: result.appointment.date,
+    startTime: result.appointment.startTime,
+    pending: result.appointment.status === 'pending',
+    client: { ...result.client, ...notifyClient },
+    service: result.service,
+    employee: result.employee,
+    establishment: { id: establishment.id, ...result.establishment },
   })
 
   // Notifica o painel em tempo real quando o agendamento fica pendente
@@ -416,6 +489,9 @@ export async function createPublicBooking(slug: string, input: CreateBookingInpu
       type: 'pending-appointment',
       appointment: {
         id: result.appointment.id,
+        // Usado pelo stream para não avisar o profissional errado quando quem
+        // ouve só enxerga a própria agenda (ver modules/realtime).
+        employeeId: result.employee.id,
         date: result.appointment.date,
         startTime: result.appointment.startTime,
         endTime: result.appointment.endTime,

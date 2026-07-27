@@ -11,6 +11,7 @@ import {
 } from '../../lib/asaasClient'
 import { AppError } from '../../lib/errors'
 import { sendPaymentReceiptEmail } from '../../lib/mailer'
+import { getOwnerUser } from '../../lib/owner'
 import {
   MAX_INSTALLMENTS,
   PLANS,
@@ -482,11 +483,7 @@ async function sendPaymentReceipt(
   nextChargeDate: Date,
 ) {
   try {
-    const establishment = await db.query.establishments.findFirst({
-      where: eq(establishments.id, subscription.establishmentId),
-    })
-    if (!establishment) return
-    const owner = await db.query.users.findFirst({ where: eq(users.id, establishment.ownerId) })
+    const owner = await getOwnerUser(subscription.establishmentId)
     if (!owner) return
 
     await sendPaymentReceiptEmail({
