@@ -128,6 +128,12 @@ export async function subscribe(establishmentId: string, remoteIp: string, input
 
   const isChange = !!existing && existing.status !== 'canceled'
 
+  // Valida o cupom ANTES de qualquer chamada ao Asaas: recusar depois deixaria
+  // um cliente órfão criado no gateway a cada tentativa com código errado.
+  const promo = await resolvePromoForSubscribe(existing, isChange, input.promoCode)
+  /** Valor do ciclo com o desconto do cupom já aplicado (em centavos). */
+  const discounted = (cents: number) => (promo ? applyPromoCents(cents, promo.percentOff) : cents)
+
   const customer = await findOrCreateCustomer({
     name: input.holder.name,
     email: input.holder.email,
@@ -142,10 +148,6 @@ export async function subscribe(establishmentId: string, remoteIp: string, input
 
   // Parcelamento só existe no anual (2–12x); no mensal é sempre à vista.
   const useInstallments = input.billingCycle === 'yearly' && (input.installments ?? 1) >= 2
-
-  const promo = await resolvePromoForSubscribe(existing, isChange, input.promoCode)
-  /** Valor do ciclo com o desconto do cupom já aplicado (em centavos). */
-  const discounted = (cents: number) => (promo ? applyPromoCents(cents, promo.percentOff) : cents)
 
   let values: typeof subscriptions.$inferInsert
 
