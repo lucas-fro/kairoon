@@ -46,6 +46,9 @@ export const subscribeSchema = z.object({
   // Parcelas do cartão (2–12): só faz efeito no anual; o service ignora no
   // mensal. Ausente/1 = à vista (assinatura recorrente).
   installments: z.number().int().min(1).max(12).optional(),
+  // Cupom promocional (ver lib/promos.ts). O service é quem decide se vale:
+  // aqui só limitamos o tamanho pra não aceitar texto arbitrário.
+  promoCode: z.string().trim().max(32).optional(),
   card: cardSchema,
   holder: holderSchema,
 })

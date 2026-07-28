@@ -18,7 +18,7 @@ import {
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { getMe } from '../../api/auth'
 import { ApiError } from '../../api/client'
-import { getPlans, getSubscription, subscribe } from '../../api/payments'
+import { getPlans, getPromo, getSubscription, subscribe } from '../../api/payments'
 import { KairoonLogotype } from '../../components/brand/Logo'
 import { BillingCycleToggle, getAnnualDiscountPercent } from '../../components/payments/BillingCycleToggle'
 import { Button } from '../../components/ui/Button'
@@ -29,6 +29,7 @@ import { useToast } from '../../components/ui/Toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { usePlan } from '../../hooks/usePlan'
 import { addDays, todayStr } from '../../lib/dates'
+import { applyPromoCents, isPromoEligible, promoScopeLabel } from '../../lib/promo'
 import {
   formatBRL,
   formatCep,
@@ -82,15 +83,51 @@ export function CheckoutPage() {
 
   const plansQuery = useQuery({ queryKey: ['payments', 'plans'], queryFn: getPlans })
   const plan = plansQuery.data?.[planSlug]
-  const cycleCents = plan ? (billingCycle === 'yearly' ? plan.yearlyCents : plan.monthlyCents) : null
+  const fullCycleCents = plan ? (billingCycle === 'yearly' ? plan.yearlyCents : plan.monthlyCents) : null
   const discountPercent = plan ? getAnnualDiscountPercent(plan.monthlyCents, plan.yearlyCents) : 0
   // Parcelado de verdade = anual com 2+ parcelas (cobrança imediata, sem trial).
   const isInstallment = billingCycle === 'yearly' && installments >= 2
-  const perInstallmentCents = cycleCents && installments > 0 ? Math.round(cycleCents / installments) : 0
 
   const subscriptionQuery = useQuery({ queryKey: ['payments', 'subscription'], queryFn: getSubscription })
   const currentSub = subscriptionQuery.data?.subscription ?? null
   const isChange = currentSub !== null && currentSub.status !== 'canceled'
+
+  // ---- Cupom promocional ----
+  const promoQuery = useQuery({ queryKey: ['payments', 'promo'], queryFn: getPromo })
+  const activePromo = promoQuery.data ?? null
+  // A conta se qualifica? Mesma regra do backend, calculada com dados que esta
+  // tela já busca. Sem isso o campo apareceria pra quem levaria 422 no submit.
+  const promoEligible =
+    subscriptionQuery.isSuccess && isPromoEligible(currentSub, subscriptionQuery.data?.payments)
+  // Semeado da URL (o diálogo de upgrade manda ?coupon=), mas o campo é dono do
+  // próprio estado daqui pra frente: o checkout também é aberto direto, pela LP
+  // ou por link salvo, e precisa funcionar sem o parâmetro.
+  const [couponInput, setCouponInput] = useState(searchParams.get('coupon') ?? '')
+  // Erro de cupom só depois que a pessoa sai do campo: reclamar a cada tecla
+  // acusaria "inválido" no meio da digitação de um código correto.
+  const [couponBlurred, setCouponBlurred] = useState(false)
+
+  // Aplicação é DERIVADA do que está na caixa, sem estado paralelo nem efeito de
+  // sincronia: o código semeado pela URL já entra valendo, e o que o resumo
+  // mostra nunca diverge do que está escrito ali. O cupom vale em todo ciclo e
+  // em qualquer nº de parcelas, então trocar de ciclo ou parcelar não o desfaz.
+  const couponTyped = couponInput.trim().toUpperCase()
+  const couponMatches = activePromo !== null && couponTyped === activePromo.code
+  const promoActive = couponMatches && promoEligible
+  // O campo só existe pra conta elegível (ver JSX), então aqui basta cuidar do
+  // código errado. Espera o promoQuery resolver pra não acusar erro à toa.
+  const couponError =
+    couponTyped && !couponMatches && couponBlurred && promoQuery.isSuccess
+      ? 'Cupom inválido ou já encerrado.'
+      : null
+
+  const discountCents =
+    promoActive && fullCycleCents !== null && activePromo
+      ? fullCycleCents - applyPromoCents(fullCycleCents, activePromo.percentOff)
+      : 0
+  /** O que vai ser cobrado de fato (é este valor que manda no resumo). */
+  const cycleCents = fullCycleCents !== null ? fullCycleCents - discountCents : null
+  const perInstallmentCents = cycleCents && installments > 0 ? Math.round(cycleCents / installments) : 0
 
   // Data real da 1ª cobrança, espelha o backend (payments/service.ts#subscribe):
   // troca de plano e teste expirado cobram hoje; teste em andamento cobra no fim
@@ -229,6 +266,10 @@ export function CheckoutPage() {
         planSlug,
         billingCycle,
         installments: isInstallment ? installments : 1,
+        // Só manda o cupom quando ele está de fato valendo no resumo: enviar um
+        // código inaplicável levaria 422 e queimaria uma das 5 tentativas de
+        // assinatura permitidas por 10 minutos.
+        promoCode: promoActive && activePromo ? activePromo.code : undefined,
         card: {
           holderName: holderName.trim(),
           number: onlyDigits(cardNumber),
@@ -307,14 +348,51 @@ export function CheckoutPage() {
                       onChange={(e) => setInstallments(Number(e.target.value))}
                       className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm font-medium text-ink outline-none transition-colors duration-150 focus:border-primary"
                     >
+                      {/* Com cupom os rótulos mostram o valor JÁ descontado: é
+                          por eles que a pessoa escolhe a parcela, então exibir
+                          "3x de R$ 796,00" e cobrar R$ 716,40 seria mentir no
+                          exato ponto da decisão. */}
                       {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
                         <option key={n} value={n}>
                           {n === 1
-                            ? `À vista · ${formatBRL(plan.yearlyCents)}`
-                            : `${n}x de ${formatBRL(Math.round(plan.yearlyCents / n))} sem juros`}
+                            ? `À vista · ${formatBRL(cycleCents ?? plan.yearlyCents)}`
+                            : `${n}x de ${formatBRL(Math.round((cycleCents ?? plan.yearlyCents) / n))} sem juros`}
                         </option>
                       ))}
                     </select>
+                  </div>
+                )}
+
+                {/* Cupom: aparece só quando há campanha no ar E a conta pode
+                    usar (assinatura nova). Quem está trocando de plano não veria
+                    utilidade e levaria 422; sem campanha, nenhum código valeria. */}
+                {activePromo && promoEligible && (
+                  <div className="mt-4">
+                    <label
+                      htmlFor="coupon"
+                      className="mb-1.5 block text-xs font-medium text-ink-secondary"
+                    >
+                      Cupom de desconto
+                    </label>
+                    <input
+                      id="coupon"
+                      value={couponInput}
+                      onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                      onBlur={() => setCouponBlurred(true)}
+                      placeholder="Digite seu cupom"
+                      autoComplete="off"
+                      spellCheck={false}
+                      className={`w-full rounded-lg border bg-surface px-3 py-2.5 text-sm font-medium uppercase text-ink outline-none transition-colors duration-150 focus:border-primary ${
+                        couponError ? 'border-error' : promoActive ? 'border-success' : 'border-line'
+                      }`}
+                    />
+                    {couponError && <p className="mt-1.5 text-xs text-error-dark">{couponError}</p>}
+                    {promoActive && activePromo && (
+                      <p className="mt-1.5 text-xs text-success-dark">
+                        Cupom aplicado: {activePromo.percentOff}% de desconto{' '}
+                        {promoScopeLabel(billingCycle)}.
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -322,19 +400,55 @@ export function CheckoutPage() {
                   {plansQuery.isPending && <Skeleton className="h-14 w-full" />}
                   {plan && (
                     <>
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="font-medium text-ink">Plano {plan.name}</span>
-                        <span className="font-display text-xl font-bold text-primary">
-                          {formatBRL(cycleCents ?? 0)}
-                        </span>
-                      </div>
+                      {/* Com cupom o preço do plano vira linha de cima e o
+                          desconto aparece explícito, pra que o total grande
+                          nunca seja confundido com o valor recorrente. */}
+                      {promoActive && activePromo ? (
+                        <>
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            <span className="text-ink-secondary">Plano {plan.name}</span>
+                            <span className="text-ink-secondary">{formatBRL(fullCycleCents ?? 0)}</span>
+                          </div>
+                          <div className="mt-1 flex items-center justify-between gap-3 text-sm">
+                            <span className="text-success-dark">Cupom {activePromo.code}</span>
+                            <span className="font-medium text-success-dark">
+                              − {formatBRL(discountCents)}
+                            </span>
+                          </div>
+                          <div className="mt-2 flex items-center justify-between gap-3 border-t border-line-divider pt-2">
+                            <span className="font-medium text-ink">
+                              {isInstallment ? 'Total' : 'Primeira cobrança'}
+                            </span>
+                            <span className="font-display text-xl font-bold text-primary">
+                              {formatBRL(cycleCents ?? 0)}
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-medium text-ink">Plano {plan.name}</span>
+                          <span className="font-display text-xl font-bold text-primary">
+                            {formatBRL(cycleCents ?? 0)}
+                          </span>
+                        </div>
+                      )}
                       <p className="mt-1 text-xs text-ink-secondary">
                         {isInstallment
                           ? `${installments}x de ${formatBRL(perInstallmentCents)} sem juros no cartão`
                           : billingCycle === 'yearly'
-                            ? `Cobrado uma vez por ano · equivale a ${formatBRL(plan.yearlyCents / 12)}/mês`
+                            ? `Cobrado uma vez por ano · equivale a ${formatBRL((cycleCents ?? 0) / 12)}/mês`
                             : 'Cobrado mensalmente'}
                       </p>
+                      {/* Obrigatória fora do parcelado: no mensal e no anual à
+                          vista a cobrança SEGUINTE volta ao preço cheio, e
+                          esconder isso é o maior risco de chargeback aqui. O
+                          parcelado não renova, então não tem "depois". */}
+                      {promoActive && !isInstallment && (
+                        <p className="mt-0.5 text-xs font-medium text-ink-secondary">
+                          Depois, {formatBRL(fullCycleCents ?? 0)}
+                          {billingCycle === 'yearly' ? '/ano' : '/mês'}.
+                        </p>
+                      )}
                       {isInstallment ? (
                         <div className="mt-3 rounded-lg bg-secondary-light px-3 py-2.5 text-xs text-primary">
                           <span className="font-semibold">1ª parcela cobrada hoje.</span> As outras{' '}

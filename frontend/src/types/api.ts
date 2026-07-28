@@ -650,6 +650,13 @@ export interface PlanCatalogEntry {
 
 export type PlanCatalog = Record<PlanSlug, PlanCatalogEntry>
 
+/** Campanha promocional em vigor na assinatura (null quando não há nenhuma). */
+export interface Promo {
+  code: string
+  /** Percentual de desconto (10 = 10%). */
+  percentOff: number
+}
+
 export type SubscriptionStatus = 'pending' | 'active' | 'past_due' | 'canceled'
 
 export interface Subscription {

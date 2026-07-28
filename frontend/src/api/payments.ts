@@ -1,4 +1,11 @@
-import type { BillingCycle, PlanCatalog, PlanSlug, Subscription, SubscriptionDetails } from '../types/api'
+import type {
+  BillingCycle,
+  PlanCatalog,
+  PlanSlug,
+  Promo,
+  Subscription,
+  SubscriptionDetails,
+} from '../types/api'
 import { api } from './client'
 
 export interface SubscribePayload {
@@ -6,6 +13,8 @@ export interface SubscribePayload {
   billingCycle: BillingCycle
   /** Parcelas do cartão (2–12): só vale no anual; 1/ausente = à vista. */
   installments?: number
+  /** Cupom promocional; o backend revalida e recusa com 422 se não valer. */
+  promoCode?: string
   card: {
     holderName: string
     number: string
@@ -25,6 +34,15 @@ export interface SubscribePayload {
 
 export function getPlans() {
   return api<PlanCatalog>('/payments/plans', { auth: false })
+}
+
+/**
+ * Campanha promocional em vigor, ou null. Endpoint separado de /plans de
+ * propósito: o diálogo de upgrade percorre as chaves de /plans para montar os
+ * cards, então uma chave a mais ali viraria um card fantasma.
+ */
+export function getPromo() {
+  return api<Promo | null>('/payments/promo', { auth: false })
 }
 
 export function subscribe(payload: SubscribePayload) {

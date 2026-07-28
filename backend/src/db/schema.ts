@@ -836,6 +836,15 @@ export const subscriptions = pgTable(
     // (ver getEffectivePlan). Null = sem atraso em aberto.
     graceUntil: timestamp('grace_until', { withTimezone: true }),
     canceledAt: timestamp('canceled_at', { withTimezone: true }),
+    // Cupom promocional usado na contratação (ver lib/promos.ts). Nunca é
+    // limpo: serve de registro de qual campanha trouxe a assinatura.
+    promoCode: text('promo_code'),
+    // Quando o valor CHEIO foi devolvido à assinatura recorrente depois da
+    // cobrança promocional. Só faz sentido no recorrente: no parcelado não há
+    // valor recorrente a restaurar e esta coluna fica null de direito.
+    // Vazamento de desconto = promo_code IS NOT NULL AND promo_restored_at IS
+    // NULL AND asaas_subscription_id IS NOT NULL.
+    promoRestoredAt: timestamp('promo_restored_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
