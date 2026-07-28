@@ -164,6 +164,15 @@ export function isValidDateBR(value: string): boolean {
   return dateBRToIso(value) !== ''
 }
 
+/**
+ * Timestamp ISO (UTC) → 'DD/MM/AAAA' no fuso do usuário. Diferente de
+ * `isoToDateBR`, que fatia a string crua: fatiar mostra o dia seguinte para
+ * eventos gravados à noite no horário de Brasília.
+ */
+export function formatTimestampBR(iso: string): string {
+  return new Date(iso).toLocaleDateString('pt-BR')
+}
+
 /** 'YYYY-MM' → 'julho de 2026' */
 export function formatMonthLabel(month: string): string {
   const [year, m] = month.split('-').map(Number)

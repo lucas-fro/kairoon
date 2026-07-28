@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { Clock, Lock } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { usePlan } from '../../hooks/usePlan'
 import { cn } from '../../lib/format'
 import { Button } from '../ui/Button'
+import { PlanUpgradeDialog } from './PlanUpgradeDialog'
 
 const UPGRADE_PATH = '/app/configuracoes?tab=plano'
 
@@ -12,8 +14,21 @@ const UPGRADE_PATH = '/app/configuracoes?tab=plano'
  * `variant='sidebar'` é a versão compacta, último item da navegação (o
  * espaçamento vem do `space-y` do `nav` que a contém); `variant='page'` é a
  * versão destacada (topo do dashboard).
+ *
+ * Na sidebar o clique abre a escolha de plano ali mesmo (durante o teste este é
+ * o único convite de upgrade que a navegação mostra, já que o plano efetivo é o
+ * essencial e o UpgradeBanner some). No dashboard, que é uma página inteira e
+ * não um menu, o botão continua levando para Configurações › Plano.
  */
-export function TrialBanner({ variant = 'page' }: { variant?: 'page' | 'sidebar' }) {
+export function TrialBanner({
+  variant = 'page',
+  onOpen,
+}: {
+  variant?: 'page' | 'sidebar'
+  /** Avisa o container que o diálogo abriu (o drawer mobile se fecha atrás). */
+  onOpen?: () => void
+}) {
+  const [dialogOpen, setDialogOpen] = useState(false)
   const navigate = useNavigate()
   const { data } = usePlan()
 
@@ -22,28 +37,36 @@ export function TrialBanner({ variant = 'page' }: { variant?: 'page' | 'sidebar'
   const expired = data.state === 'trial_expired'
   const days = data.trialDaysLeft ?? 0
   const dayLabel = `${days} ${days === 1 ? 'dia' : 'dias'}`
-  const goUpgrade = () => navigate(UPGRADE_PATH)
 
   if (variant === 'sidebar') {
+    const openUpgrade = () => {
+      setDialogOpen(true)
+      onOpen?.()
+    }
+
     return (
-      <div className="rounded-lg bg-white/10 p-3">
-        <div className="flex items-center gap-2 text-white">
-          {expired ? <Lock className="h-4 w-4 shrink-0" /> : <Clock className="h-4 w-4 shrink-0" />}
-          <span className="text-xs font-semibold">
-            {expired ? 'Teste encerrado' : `Teste grátis · ${dayLabel}`}
-          </span>
+      <>
+        <div className="rounded-lg bg-white/10 p-3">
+          <div className="flex items-center gap-2 text-white">
+            {expired ? <Lock className="h-4 w-4 shrink-0" /> : <Clock className="h-4 w-4 shrink-0" />}
+            <span className="text-xs font-semibold">
+              {expired ? 'Teste encerrado' : `Teste grátis · ${dayLabel}`}
+            </span>
+          </div>
+          <p className="mt-1 text-[11px] leading-snug text-white/70">
+            {expired ? 'Assine para voltar a editar.' : 'Tudo desbloqueado durante o teste.'}
+          </p>
+          <button
+            type="button"
+            onClick={openUpgrade}
+            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md bg-secondary px-2.5 py-1.5 text-xs font-semibold text-primary transition-colors duration-150 hover:bg-secondary/90"
+          >
+            {expired ? 'Assinar' : 'Fazer upgrade'}
+          </button>
         </div>
-        <p className="mt-1 text-[11px] leading-snug text-white/70">
-          {expired ? 'Assine para voltar a editar.' : 'Tudo desbloqueado durante o teste.'}
-        </p>
-        <button
-          type="button"
-          onClick={goUpgrade}
-          className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md bg-secondary px-2.5 py-1.5 text-xs font-semibold text-primary transition-colors duration-150 hover:bg-secondary/90"
-        >
-          {expired ? 'Assinar' : 'Fazer upgrade'}
-        </button>
-      </div>
+
+        <PlanUpgradeDialog open={dialogOpen} onClose={() => setDialogOpen(false)} />
+      </>
     )
   }
 
@@ -74,7 +97,7 @@ export function TrialBanner({ variant = 'page' }: { variant?: 'page' | 'sidebar'
           </p>
         </div>
       </div>
-      <Button onClick={goUpgrade} className="shrink-0">
+      <Button onClick={() => navigate(UPGRADE_PATH)} className="shrink-0">
         {expired ? 'Assinar agora' : 'Fazer upgrade'}
       </Button>
     </div>

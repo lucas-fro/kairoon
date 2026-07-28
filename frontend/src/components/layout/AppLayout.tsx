@@ -395,8 +395,10 @@ function SidebarContent({
             mobile, porque no desktop essa chamada já fica no header). */}
         {/* Assinatura é assunto do dono: a equipe não vê convite de upgrade nem
             contagem regressiva de teste, que ela não tem como resolver. */}
-        {isOwner && <TrialBanner variant="sidebar" />}
-        {mobile && isOwner && <UpgradeBanner variant="sidebar" />}
+        {/* `onOpen` fecha o drawer no mobile: o diálogo de planos abre por cima
+            dele, e deixar o menu montado atrás só atrapalha ao fechar. */}
+        {isOwner && <TrialBanner variant="sidebar" onOpen={onNavigate} />}
+        {mobile && isOwner && <UpgradeBanner variant="sidebar" onOpen={onNavigate} />}
       </nav>
     </div>
   )
