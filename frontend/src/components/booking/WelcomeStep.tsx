@@ -22,6 +22,12 @@ interface WelcomeStepProps {
   onStart: () => void
   /** Tocar um serviço entra no fluxo já com ele escolhido. */
   onPickService: (service: PublicService) => void
+  /**
+   * Encolhe o microsite para caber numa moldura de celular (apresentação em
+   * `/apresentacao`). Necessário porque as alturas em `dvh`/`vh` medem sempre a
+   * viewport real, não o container onde o componente está embutido.
+   */
+  compact?: boolean
 }
 
 // Rótulo do tipo de negócio (eyebrow acima do nome). 'outro'/desconhecido omite.
@@ -44,6 +50,7 @@ export function WelcomeStep({
   socialLinks,
   onStart,
   onPickService,
+  compact = false,
 }: WelcomeStepProps) {
   const fg = readableTextColor(branding.brandColor)
   const welcomeMessage =
@@ -55,7 +62,12 @@ export function WelcomeStep({
       {/* HERO full-bleed: cor de marca sólida ou imagem de banner. */}
       <div className="relative w-full">
         <div
-          className="relative h-[40dvh] max-h-[460px] min-h-[16rem] w-full overflow-hidden lg:h-[30vh] lg:max-h-[400px] lg:min-h-[14rem]"
+          className={cn(
+            'relative w-full overflow-hidden',
+            compact
+              ? 'h-28'
+              : 'h-[40dvh] max-h-[460px] min-h-[16rem] lg:h-[30vh] lg:max-h-[400px] lg:min-h-[14rem]',
+          )}
           style={{ backgroundColor: branding.brandColor }}
         >
           {branding.bannerImageUrl && (
@@ -69,7 +81,12 @@ export function WelcomeStep({
 
         {/* LOGO ampliado, centralizado, metade sobre o banner e metade abaixo.
             Sem logo: inicial do nome na cor de marca. */}
-        <div className="absolute bottom-0 left-1/2 h-28 w-28 -translate-x-1/2 translate-y-1/2 overflow-hidden rounded-full border-4 border-surface bg-surface shadow-elevated lg:h-32 lg:w-32">
+        <div
+          className={cn(
+            'absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 overflow-hidden rounded-full border-4 border-surface bg-surface shadow-elevated',
+            compact ? 'h-20 w-20' : 'h-28 w-28 lg:h-32 lg:w-32',
+          )}
+        >
           {establishment.logoUrl ? (
             <img
               src={establishment.logoUrl}
@@ -87,13 +104,23 @@ export function WelcomeStep({
 
       {/* CONTEÚDO: coluna centralizada e confortável. O padding-top livra a metade
           do logo que se projeta sobre esta seção. */}
-      <div className="mx-auto flex w-full max-w-3xl flex-col items-center px-4 pt-20 text-center lg:pt-24">
+      <div
+        className={cn(
+          'mx-auto flex w-full max-w-3xl flex-col items-center px-4 text-center',
+          compact ? 'pt-12' : 'pt-20 lg:pt-24',
+        )}
+      >
         {typeLabel && (
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-ink-tertiary">
             {typeLabel}
           </p>
         )}
-        <h1 className="mt-1 text-balance break-words font-display text-2xl font-semibold text-ink lg:text-3xl">
+        <h1
+          className={cn(
+            'mt-1 text-balance break-words font-display font-semibold text-ink',
+            compact ? 'text-lg' : 'text-2xl lg:text-3xl',
+          )}
+        >
           {establishment.name}
         </h1>
         {/* Régua curta na cor de marca: fecha o bloco de identidade. */}
@@ -102,14 +129,19 @@ export function WelcomeStep({
           style={{ backgroundColor: branding.brandColor }}
           aria-hidden="true"
         />
-        <p className="mt-3 max-w-md text-balance break-words text-sm text-ink-secondary lg:text-base">
+        <p
+          className={cn(
+            'mt-3 max-w-md text-balance break-words text-ink-secondary',
+            compact ? 'text-[13px]' : 'text-sm lg:text-base',
+          )}
+        >
           {welcomeMessage}
         </p>
 
         <Button
-          size="lg"
+          size={compact ? 'md' : 'lg'}
           leftIcon={<CalendarPlus className="h-5 w-5" />}
-          className="mt-7 w-full max-w-sm shadow-soft"
+          className={cn('w-full max-w-sm shadow-soft', compact ? 'mt-5' : 'mt-7')}
           style={{ backgroundColor: branding.brandColor, color: fg }}
           onClick={onStart}
         >
@@ -119,7 +151,10 @@ export function WelcomeStep({
         {/* CARDÁPIO DE SERVIÇOS: some por completo sem serviços. Lista editorial
             com divisórias finas (escala bem para menus grandes). Tocar agenda. */}
         {services.length > 0 && (
-          <section className="mt-12 w-full max-w-2xl" aria-labelledby="welcome-services-heading">
+          <section
+            className={cn('w-full max-w-2xl', compact ? 'mt-8' : 'mt-12')}
+            aria-labelledby="welcome-services-heading"
+          >
             <h2
               id="welcome-services-heading"
               className="text-center text-xs font-semibold uppercase tracking-[0.18em] text-ink-tertiary"
