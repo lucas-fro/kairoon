@@ -413,6 +413,26 @@
           Comece com 14 dias grátis e evolua quando quiser. Sem fidelidade, cancele quando precisar.
         </p>
 
+        <!--
+          Campanha promocional, na mesma posição que ela ocupa no diálogo de
+          upgrade do painel (PromoBanner.tsx): acima do seletor de ciclo, logo
+          antes dos planos. O código do cupom e o percentual estão escritos aqui
+          porque a LP é estática e não consulta a API; se a campanha mudar no
+          backend (lib/promos.ts), este bloco precisa mudar junto.
+        -->
+        <div class="promo-banner" id="promoBanner">
+          <svg class="promo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="10" y1="2" x2="14" y2="2" />
+            <line x1="12" y1="14" x2="15" y2="11" />
+            <circle cx="12" cy="14" r="8" />
+          </svg>
+          <p class="promo-text">
+            Use o cupom <strong>BEMVINDO10</strong> e ganhe <strong>10% de desconto</strong>
+            <span id="promoScope">no valor total do primeiro ano</span>.
+          </p>
+          <span class="promo-countdown" id="promoCountdown" role="timer" aria-live="off">00h:00m:00s</span>
+        </div>
+
         <div class="plans-toggle" id="plansToggle" data-active="annual" role="tablist" aria-label="Ciclo de cobrança">
           <span class="plans-toggle-slider" aria-hidden="true"></span>
           <button type="button" class="plans-toggle-btn" data-period="monthly" role="tab" aria-selected="false">Mensal</button>

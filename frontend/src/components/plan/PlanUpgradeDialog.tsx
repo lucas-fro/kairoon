@@ -133,12 +133,17 @@ export function PlanUpgradeDialog({ open, onClose }: PlanUpgradeDialogProps) {
   const canTokenizedChange = canChangeWithSavedCard(subscription)
   const installmentTermActive = isInstallmentTermActive(subscription)
 
-  // Só anuncia a promo depois de saber que a conta se qualifica: exibir e
-  // depois sumir seria pior do que esperar um instante. Quem já pagou alguma
-  // vez fica de fora mesmo tendo cancelado (o cancelamento preserva a linha).
-  const promo =
-    subscriptionReady && isPromoEligible(subscription, subscriptionQuery.data?.payments)
-      ? (promoQuery.data ?? null)
+  // A campanha é anunciada para TODA conta que abre o diálogo, inclusive quem
+  // já paga: é chamada de marketing, e some sozinha quando ACTIVE_PROMO virar
+  // null no backend. Não espera a assinatura carregar justamente por não
+  // depender dela.
+  const promo = promoQuery.data ?? null
+  // Quem de fato consegue aplicar o cupom, que é mais restrito do que quem o
+  // vê: o backend (resolvePromoForSubscribe) recusa assinatura ativa e quem já
+  // pagou alguma vez, mesmo tendo cancelado (o cancelamento preserva a linha).
+  const usablePromo =
+    promo && subscriptionReady && isPromoEligible(subscription, subscriptionQuery.data?.payments)
+      ? promo
       : null
 
   const subscribedCycle = subscription?.billingCycle
@@ -156,8 +161,10 @@ export function PlanUpgradeDialog({ open, onClose }: PlanUpgradeDialogProps) {
     }
     onClose()
     // Leva o cupom junto pra ele já chegar preenchido no checkout: quem clicou
-    // vindo do banner não devia ter que digitar o código de novo.
-    const coupon = promo ? `&coupon=${encodeURIComponent(promo.code)}` : ''
+    // vindo do banner não devia ter que digitar o código de novo. Só para quem
+    // se qualifica: pré-preencher um código que o backend vai recusar abriria o
+    // checkout já com mensagem de erro.
+    const coupon = usablePromo ? `&coupon=${encodeURIComponent(usablePromo.code)}` : ''
     navigate(`/checkout?plan=${planSlug}&cycle=${selectedCycle}${coupon}`)
   }
 
