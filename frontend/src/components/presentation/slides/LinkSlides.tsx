@@ -30,7 +30,11 @@ interface SlideLayoutProps {
   mock: ReactNode
 }
 
-/** Texto de um lado, celular do outro (empilhado no mobile). */
+/**
+ * Texto de um lado, link público do outro. A coluna do link não tem respiro
+ * vertical de propósito: ela encosta no topo e no rodapé do slide, como uma
+ * tela de verdade aberta ao lado da explicação.
+ */
 function MockSlideLayout({
   eyebrow,
   title,
@@ -41,15 +45,17 @@ function MockSlideLayout({
   mock,
 }: SlideLayoutProps) {
   return (
-    <section className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center gap-5 px-5 py-6 sm:px-8 lg:flex-row lg:gap-12 lg:py-8">
-      <div className="flex max-w-md shrink-0 flex-col items-center gap-3 text-center lg:items-start lg:text-left">
+    <section className="mx-auto flex w-full max-w-6xl flex-1 flex-col lg:flex-row">
+      <div className="flex shrink-0 flex-col items-center justify-center gap-3 px-5 pb-4 pt-6 text-center sm:px-8 lg:flex-1 lg:items-start lg:py-10 lg:pr-10 lg:text-left">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-tertiary">
           {eyebrow}
         </p>
         <h2 className="text-balance font-display text-2xl font-semibold leading-tight text-ink sm:text-3xl lg:text-4xl">
           {title}
         </h2>
-        <p className="text-balance text-sm text-ink-secondary sm:text-base">{description}</p>
+        <p className="max-w-md text-balance text-sm text-ink-secondary sm:text-base">
+          {description}
+        </p>
         {aside}
         {action}
         {hint && (
@@ -58,41 +64,28 @@ function MockSlideLayout({
           </p>
         )}
       </div>
-      {/* No mobile o aparelho estica no espaço que sobra; no desktop tem altura fixa. */}
-      <div className="flex min-h-[19rem] w-full flex-1 items-center justify-center lg:h-[32rem] lg:min-h-0 lg:w-auto lg:flex-none">
+
+      <div className="flex min-h-[17rem] w-full flex-1 justify-center lg:w-[23rem] lg:flex-none">
         {mock}
       </div>
     </section>
   )
 }
 
-interface PublicLinkSlideProps {
-  /** Concluir o agendamento fictício também avança a apresentação. */
-  onDone: () => void
-}
+const MOCK_CLASS = 'h-full w-full max-w-md border-x border-line shadow-elevated'
 
-export function PublicLinkSlide({ onDone }: PublicLinkSlideProps) {
+export function PublicLinkSlide({ onDone }: { onDone: () => void }) {
   const [touched, setTouched] = useState(false)
   const [done, setDone] = useState(false)
 
   return (
     <MockSlideLayout
       eyebrow="Do lado do seu cliente"
-      title="Um link só seu para o cliente agendar sozinho"
-      description="Você manda o link no Instagram ou no WhatsApp. O cliente escolhe o serviço e o horário livre a qualquer hora, sem baixar aplicativo e sem falar com ninguém."
-      hint={
-        done ? undefined : touched ? (
-          <>Agora escolha um horário livre</>
-        ) : (
-          <>
-            <MousePointerClick className="h-4 w-4" />
-            Toque em um serviço dentro do celular
-          </>
-        )
-      }
+      title="Seu cliente agenda sozinho, sem te interromper"
+      description="Um link só seu, que você manda no Instagram ou no WhatsApp. O cliente escolhe serviço, profissional, dia e horário entre os que estão realmente livres. Chega pronto na sua agenda, de madrugada ou no domingo."
       aside={
         <p className="text-xs text-ink-tertiary">
-          Exemplo ilustrativo. O link fica com o nome, o logo e os serviços do seu negócio.
+          Exemplo ilustrativo, com o nome e os serviços de uma barbearia fictícia.
         </p>
       }
       action={
@@ -103,12 +96,22 @@ export function PublicLinkSlide({ onDone }: PublicLinkSlideProps) {
           </Button>
         )
       }
+      hint={
+        done ? undefined : touched ? (
+          <>Siga até o fim: o agendamento é o mesmo que o seu cliente faria</>
+        ) : (
+          <>
+            <MousePointerClick className="h-4 w-4" />
+            Faça um agendamento aqui do lado
+          </>
+        )
+      }
       mock={
         <BookingMock
           palette={DEFAULT_PALETTE}
           onInteract={() => setTouched(true)}
           onComplete={() => setDone(true)}
-          className="h-full max-h-[32rem]"
+          className={MOCK_CLASS}
         />
       }
     />
@@ -122,14 +125,8 @@ export function BrandingSlide() {
   return (
     <MockSlideLayout
       eyebrow="Sua marca"
-      title="Com a cara do seu negócio"
-      description={`Escolha entre ${PALETTES.length} paletas prontas ou use a cor exata da sua marca. Suba seu logo e sua foto de capa: o link inteiro muda junto.`}
-      hint={touched ? <>O painel do sistema muda junto com o link</> : (
-        <>
-          <Hand className="h-4 w-4" />
-          Toque em uma cor
-        </>
-      )}
+      title="A página é sua, não da Kairoon"
+      description={`Seu logo, sua foto de capa e a cor da sua marca: ${PALETTES.length} paletas prontas ou o tom exato que você usa. Quem abre o link vê o seu negócio, não o nosso.`}
       aside={
         <ul className="flex flex-wrap justify-center gap-2 lg:justify-start">
           {SHOWCASE.map((option) => (
@@ -144,7 +141,8 @@ export function BrandingSlide() {
                 aria-pressed={palette.key === option.key}
                 className={cn(
                   'h-8 w-8 rounded-full transition-transform duration-150 hover:scale-110',
-                  palette.key === option.key && 'ring-2 ring-ink ring-offset-2 ring-offset-background',
+                  palette.key === option.key &&
+                    'ring-2 ring-ink ring-offset-2 ring-offset-background',
                 )}
                 style={{ backgroundColor: option.primary }}
               />
@@ -152,9 +150,17 @@ export function BrandingSlide() {
           ))}
         </ul>
       }
-      mock={
-        <BookingMock palette={palette} className="h-[26rem] shrink-0 sm:h-[30rem]" />
+      hint={
+        touched ? (
+          <>O painel que você usa por dentro muda junto</>
+        ) : (
+          <>
+            <Hand className="h-4 w-4" />
+            Toque em uma cor
+          </>
+        )
       }
+      mock={<BookingMock palette={palette} className={MOCK_CLASS} />}
     />
   )
 }

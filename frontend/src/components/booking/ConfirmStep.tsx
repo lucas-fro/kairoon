@@ -26,6 +26,11 @@ interface ConfirmStepProps {
   clientGender: string
   onSuccess: (result: BookingResult) => void
   onSlotTaken: () => void
+  /**
+   * Envio alternativo do agendamento. Existe para a apresentação
+   * (/apresentacao) reusar esta etapa sem criar nada de verdade.
+   */
+  submit?: () => Promise<BookingResult>
 }
 
 function SummaryRow({
@@ -62,6 +67,7 @@ export function ConfirmStep({
   clientGender,
   onSuccess,
   onSlotTaken,
+  submit,
 }: ConfirmStepProps) {
   const toast = useToast()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -70,6 +76,7 @@ export function ConfirmStep({
 
   const mutation = useMutation({
     mutationFn: () =>
+      submit?.() ??
       createBooking(slug, {
         serviceId: service.id,
         employeeId: employee?.id,

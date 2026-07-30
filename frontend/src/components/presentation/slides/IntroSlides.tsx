@@ -22,8 +22,8 @@ export function IntroSlide() {
         Sua agenda no <span className="text-primary">piloto automático</span>
       </h1>
       <p className="max-w-lg text-balance text-sm text-ink-secondary sm:text-base">
-        Uma apresentação rápida do sistema que organiza os agendamentos, os clientes e o caixa do
-        seu negócio.
+        Cinco minutos para ver como o Kairoon organiza os agendamentos, os clientes, o caixa e o
+        estoque do seu negócio. Sem instalar nada para assistir.
       </p>
       <p className="text-xs font-medium text-ink-tertiary sm:text-[13px]">
         Use as setas para avançar
@@ -35,18 +35,18 @@ export function IntroSlide() {
 const PAINS: { icon: LucideIcon; title: string; text: string }[] = [
   {
     icon: PhoneCall,
-    title: 'Telefone sem parar',
-    text: 'Ligação e mensagem no meio do atendimento, só para marcar um horário.',
+    title: 'Você atende e agenda ao mesmo tempo',
+    text: 'Cada mensagem no meio do corte é uma interrupção. E quem não é respondido rápido procura outro lugar.',
   },
   {
     icon: NotebookPen,
-    title: 'Agenda no caderno',
-    text: 'Horário marcado duas vezes, rasura, e ninguém sabe quem atende quem.',
+    title: 'A agenda mora num caderno',
+    text: 'Horário marcado duas vezes, rasura e nenhuma ideia de quanto o mês rendeu de verdade.',
   },
   {
     icon: UserRoundX,
-    title: 'Cliente que some',
-    text: 'Esqueceu e não avisou. A cadeira fica vazia e o dia rende menos.',
+    title: 'O cliente esquece e não avisa',
+    text: 'A cadeira fica vazia numa hora que estava vendida. Esse buraco não volta mais.',
   },
 ]
 
@@ -54,7 +54,7 @@ export function PainSlide() {
   return (
     <SlideShell
       eyebrow="O dia a dia hoje"
-      title="Quanto tempo você perde para marcar um horário?"
+      title="O problema não é falta de cliente. É o tempo que some no meio do caminho."
       description="Três coisas atrapalham quase todo estabelecimento que atende com hora marcada."
     >
       <ul className="grid w-full gap-3 sm:grid-cols-3">
@@ -89,8 +89,8 @@ export function ProductSlide() {
   return (
     <SlideShell
       eyebrow="A solução"
-      title="O Kairoon cuida disso por você"
-      description="Um sistema só para tudo o que roda em volta do atendimento. Funciona no celular, no tablet e no computador, sem instalar nada."
+      title="Um sistema só, do agendamento ao fechamento do mês"
+      description="Nada de um app para agenda, uma planilha para o caixa e um caderno para o estoque. Tudo conversa entre si e funciona no celular, no tablet e no computador."
     >
       <ul className="grid w-full max-w-3xl grid-cols-2 gap-3 sm:grid-cols-4">
         {MODULES.map((item) => (

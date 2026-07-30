@@ -40,8 +40,8 @@ export function AgendaSlide() {
   return (
     <SlideShell
       eyebrow="Dentro do sistema"
-      title="O dia inteiro numa tela só"
-      description="Cada coluna é um profissional. A cor diz na hora o que está pendente, confirmado e já concluído."
+      title="Bateu o olho, entendeu o dia"
+      description="Cada coluna é um profissional e a cor diz o que está pendente, confirmado e concluído. Os buracos entre um atendimento e outro ficam na cara, prontos para serem vendidos."
     >
       <div
         data-no-swipe

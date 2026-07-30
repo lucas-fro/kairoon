@@ -1,5 +1,6 @@
-import type { PublicBranding, PublicEstablishment } from '../../types/api'
-import type { PublicService } from '../booking/types'
+import { minutesToTime, timeToMinutes } from '../../lib/dates'
+import type { BookingResult, PublicBranding, PublicEstablishment, WorkingHour } from '../../types/api'
+import type { PublicEmployee, PublicService } from '../booking/types'
 
 /**
  * Dados fictícios do estabelecimento usado como exemplo na apresentação
@@ -89,7 +90,22 @@ export const DEMO_BRANDING: PublicBranding = {
   footerMessage: null,
 }
 
-export const DEMO_EMPLOYEE_NAME = 'Carlos Andrade'
+export const DEMO_EMPLOYEES: PublicEmployee[] = [
+  { id: 'carlos', name: 'Carlos Andrade' },
+  { id: 'juliana', name: 'Juliana Prado' },
+  { id: 'rafael', name: 'Rafael Nunes' },
+]
+
+/** Aberto de terça a sábado: o calendário risca domingo e segunda. */
+export const DEMO_WORKING_HOURS: WorkingHour[] = [
+  { dayOfWeek: 0, opensAt: '09:00', closesAt: '19:00', isClosed: true },
+  { dayOfWeek: 1, opensAt: '09:00', closesAt: '19:00', isClosed: true },
+  { dayOfWeek: 2, opensAt: '09:00', closesAt: '19:00', isClosed: false },
+  { dayOfWeek: 3, opensAt: '09:00', closesAt: '19:00', isClosed: false },
+  { dayOfWeek: 4, opensAt: '09:00', closesAt: '19:00', isClosed: false },
+  { dayOfWeek: 5, opensAt: '09:00', closesAt: '20:00', isClosed: false },
+  { dayOfWeek: 6, opensAt: '09:00', closesAt: '18:00', isClosed: false },
+]
 
 /** Horários livres do dia no mock (o link real busca isso na API). */
 export const DEMO_SLOTS = [
@@ -106,3 +122,41 @@ export const DEMO_SLOTS = [
   '17:00',
   '18:30',
 ]
+
+/**
+ * Monta o retorno que a API devolveria depois de confirmar, para a etapa de
+ * sucesso do mock ser a mesma tela que o cliente vê de verdade.
+ */
+export function demoBookingResult(input: {
+  service: PublicService
+  employee: PublicEmployee
+  date: string
+  startTime: string
+  clientName: string
+  clientPhone: string
+}): BookingResult {
+  const { service, employee, date, startTime, clientName, clientPhone } = input
+  return {
+    appointment: {
+      id: 'demo-appointment',
+      date,
+      startTime,
+      endTime: minutesToTime(timeToMinutes(startTime) + service.durationMinutes),
+      status: 'confirmed',
+    },
+    client: { id: 'demo-client', name: clientName, phone: clientPhone },
+    service: {
+      id: service.id,
+      name: service.name,
+      durationMinutes: service.durationMinutes,
+      priceCents: service.priceCents,
+    },
+    employee: { id: employee.id, name: employee.name },
+    establishment: {
+      name: DEMO_ESTABLISHMENT.name,
+      slug: DEMO_ESTABLISHMENT.slug,
+      phone: null,
+    },
+    manageToken: 'demo',
+  }
+}

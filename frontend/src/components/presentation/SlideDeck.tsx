@@ -85,36 +85,14 @@ export function SlideDeck({ slides }: SlideDeckProps) {
         </span>
       </header>
 
-      <div className="relative flex min-h-0 flex-1">
-        {/* Setas grandes nas laterais: só sobra espaço para elas no desktop. */}
-        <button
-          type="button"
-          onClick={goPrev}
-          disabled={isFirst}
-          aria-label="Slide anterior"
-          className="absolute left-3 top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-ink-secondary shadow-soft transition-colors duration-150 hover:text-ink disabled:pointer-events-none disabled:opacity-0 lg:flex"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </button>
-        <button
-          type="button"
-          onClick={goNext}
-          disabled={isLast}
-          aria-label="Próximo slide"
-          className="absolute right-3 top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-ink-secondary shadow-soft transition-colors duration-150 hover:text-ink disabled:pointer-events-none disabled:opacity-0 lg:flex"
-        >
-          <ChevronRight className="h-5 w-5" />
-        </button>
-
-        <main
-          key={slide.id}
-          onPointerDown={handlePointerDown}
-          onPointerUp={handlePointerUp}
-          className="deck-enter flex min-h-0 w-full flex-1 flex-col overflow-y-auto overscroll-contain"
-        >
-          {slide.render({ goNext })}
-        </main>
-      </div>
+      <main
+        key={slide.id}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        className="deck-enter flex min-h-0 w-full flex-1 flex-col overflow-y-auto overscroll-contain"
+      >
+        {slide.render({ goNext })}
+      </main>
 
       <nav
         aria-label="Navegação da apresentação"

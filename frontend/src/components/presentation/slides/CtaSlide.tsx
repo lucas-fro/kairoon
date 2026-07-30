@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom'
 import { KairoonMark } from '../../brand/Logo'
 
 const PROMISES = [
-  'Teste completo por 14 dias, sem cartão de crédito',
-  'Seu link de agendamento no ar no mesmo dia',
-  'Sem fidelidade: cancele quando quiser',
+  'Teste completo por 14 dias, sem pedir cartão de crédito',
+  'Seu link de agendamento no ar hoje mesmo',
+  'Sem fidelidade e sem multa: cancele quando quiser',
+  'Seus dados são seus, e saem com você se quiser sair',
 ]
 
 export function CtaSlide() {
@@ -17,7 +18,8 @@ export function CtaSlide() {
         Comece hoje, <span className="text-primary">grátis por 14 dias</span>
       </h2>
       <p className="max-w-lg text-balance text-sm text-ink-secondary sm:text-base">
-        Leva menos de cinco minutos para cadastrar seus serviços e colocar sua agenda online no ar.
+        Cadastre seus serviços, compartilhe o link e receba o primeiro agendamento ainda esta
+        semana. Se não fizer sentido, é só parar.
       </p>
 
       <ul className="flex flex-col items-start gap-2">
