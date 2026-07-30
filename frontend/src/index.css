@@ -52,6 +52,26 @@ body {
   animation: dialog-in 0.16s ease-out;
 }
 
+/* Entrada de cada slide da apresentação pública (/apresentacao) */
+@keyframes deck-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.deck-enter {
+  animation: deck-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .deck-enter {
+    animation: none;
+  }
+}
+
 /* Scrollbar discreta para grids e tabs */
 .thin-scrollbar::-webkit-scrollbar {
   height: 8px;

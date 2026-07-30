@@ -81,7 +81,14 @@ export async function notify<T extends NotificationType>(
     if (!destination) continue
     // O jobId precisa ser único POR CANAL: com a mesma chave nos dois, o
     // segundo enqueue seria silenciosamente descartado como duplicata.
-    const key = opts?.key ? `${channel}:${opts.key}` : undefined
+    //
+    // E NÃO pode conter ':'. O BullMQ rejeita o enqueue inteiro com "Custom Id
+    // cannot contain :" (ele usa o caractere como separador das próprias chaves
+    // no Redis); só tolera quando o id parte em exatamente 3 pedaços, um
+    // carve-out legado de jobs repetíveis. Contar dois-pontos seria frágil, então
+    // trocamos todos. A limpeza mora aqui, no único ponto por onde todo produtor
+    // passa, para nenhum deles precisar conhecer essa restrição do BullMQ.
+    const key = opts?.key ? `${channel}-${opts.key}`.replace(/:/g, '-') : undefined
     try {
       const job = { type, to: destination, params }
       if (channel === 'email') {

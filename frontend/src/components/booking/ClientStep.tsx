@@ -41,6 +41,11 @@ interface ClientStepProps {
     birthDate: string,
     gender: string,
   ) => void
+  /**
+   * Origem alternativa da checagem "esse telefone já é cliente?". Existe para a
+   * apresentação (/apresentacao) reusar esta etapa sem chamar a API.
+   */
+  identify?: (phoneDigits: string) => Promise<{ client: { name: string } | null }>
 }
 
 export function ClientStep({
@@ -51,6 +56,7 @@ export function ClientStep({
   initialBirthDate,
   initialGender,
   onContinue,
+  identify,
 }: ClientStepProps) {
   const [phase, setPhase] = useState<Phase>('phone')
   const [name, setName] = useState(initialName)
@@ -78,7 +84,7 @@ export function ClientStep({
     }
     setChecking(true)
     try {
-      const { client } = await identifyClient(slug, digits)
+      const { client } = identify ? await identify(digits) : await identifyClient(slug, digits)
       if (client) {
         toast.info(`Que bom te ver de novo, ${client.name.split(' ')[0]}!`)
         onContinue(client.name, phone, '', '', '')

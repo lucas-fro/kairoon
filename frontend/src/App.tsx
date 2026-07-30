@@ -21,6 +21,7 @@ import { ReportsPage } from './pages/panel/ReportsPage'
 import { ServicesPage } from './pages/panel/ServicesPage'
 import { SettingsPage } from './pages/panel/SettingsPage'
 import { StockPage } from './pages/panel/StockPage'
+import { PresentationPage } from './pages/presentation/PresentationPage'
 import { PublicBookingPage } from './pages/public/PublicBookingPage'
 import { PublicManageBookingPage } from './pages/public/PublicManageBookingPage'
 import { PermissionRoute } from './routes/PermissionRoute'
@@ -43,6 +44,7 @@ export function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="/apresentacao" element={<PresentationPage />} />
         <Route path="/politica-de-privacidade" element={<PrivacyPolicyPage />} />
         <Route path="/termos-de-uso" element={<TermsOfServicePage />} />
         <Route path="/exclusao-de-conta" element={<AccountDeletionPage />} />

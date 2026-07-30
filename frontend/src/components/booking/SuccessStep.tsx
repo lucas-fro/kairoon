@@ -19,6 +19,11 @@ interface SuccessStepProps {
   result: BookingResult
   establishment: PublicEstablishment['establishment']
   branding: PublicBranding
+  /**
+   * Esconde o link de cancelar/remarcar. Existe para a apresentação
+   * (/apresentacao), onde não há agendamento de verdade para gerenciar.
+   */
+  hideManageLink?: boolean
 }
 
 /** Escapa vírgulas/pontos-e-vírgulas conforme o formato iCalendar */
@@ -78,7 +83,12 @@ function SummaryRow({
   )
 }
 
-export function SuccessStep({ result, establishment, branding }: SuccessStepProps) {
+export function SuccessStep({
+  result,
+  establishment,
+  branding,
+  hideManageLink = false,
+}: SuccessStepProps) {
   const { appointment, service, employee } = result
   const isPending = appointment.status === 'pending'
 
@@ -156,13 +166,15 @@ export function SuccessStep({ result, establishment, branding }: SuccessStepProp
 
         {/* Mesmo link que vai na mensagem de confirmação. Oferecer aqui evita
             que quem não recebeu o WhatsApp fique sem como cancelar/remarcar. */}
-        <a
-          href={`/${establishment.slug}/editagendamento?t=${encodeURIComponent(result.manageToken)}`}
-          className="mt-3 flex items-center justify-center gap-1.5 text-center text-[13px] text-ink-secondary underline underline-offset-2 hover:text-ink"
-        >
-          <CalendarCog className="h-4 w-4" />
-          Cancelar ou remarcar
-        </a>
+        {!hideManageLink && (
+          <a
+            href={`/${establishment.slug}/editagendamento?t=${encodeURIComponent(result.manageToken)}`}
+            className="mt-3 flex items-center justify-center gap-1.5 text-center text-[13px] text-ink-secondary underline underline-offset-2 hover:text-ink"
+          >
+            <CalendarCog className="h-4 w-4" />
+            Cancelar ou remarcar
+          </a>
+        )}
       </div>
     </div>
   )
