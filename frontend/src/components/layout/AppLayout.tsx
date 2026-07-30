@@ -363,7 +363,7 @@ function SidebarContent({
         </div>
       </div>
 
-      <nav className="mt-4 flex-1 space-y-6 overflow-y-auto">
+      <nav className="no-scrollbar mt-4 flex-1 space-y-6 overflow-y-auto">
         {groups.map((group) => (
           <div key={group.label}>
             <p className="mb-1.5 px-3 text-xs font-medium text-white/40">{group.label}</p>

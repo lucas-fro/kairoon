@@ -83,3 +83,13 @@ body {
 .thin-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* Rola normalmente, mas sem barra visível: usado na sidebar, onde a barra
+   cortaria a faixa colorida do menu e ficaria feia. */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
