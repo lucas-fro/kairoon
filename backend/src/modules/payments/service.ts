@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq, inArray } from 'drizzle-orm'
 import { db } from '../../db'
 import { establishments, payments, subscriptions, users } from '../../db/schema'
 import {
@@ -18,8 +18,10 @@ import {
   addBillingCycle,
   centsToReais,
   getPlanCycleCents,
+  isPlanSlug,
   type PlanSlug,
 } from '../../lib/plans'
+import { applyPromoCents, resolvePromo, type Promo } from '../../lib/promos'
 import type { ChangePlanInput, SubscribeInput, WebhookInput } from './schemas'
 
 /** Dias de tolerância após um PAYMENT_OVERDUE antes do downgrade pro free. */
@@ -43,6 +45,50 @@ export async function getSubscription(establishmentId: string) {
   })
 
   return { subscription, payments: history }
+}
+
+/**
+ * Resolve o cupom promocional da contratação: null quando não veio cupom, a
+ * promo quando vale, 422 quando veio e não vale. A UI já barra os casos
+ * inválidos, então isto é guarda de integridade, mas com mensagem acionável.
+ *
+ * As duas regras existem por motivo de dinheiro:
+ *   1. quem já tem assinatura ativa não é "boas-vindas": é troca de plano, e a
+ *      troca nem passa por aqui na UI (usa o cartão tokenizado, em changePlan);
+ *   2. quem JÁ PAGOU alguma vez não usa de novo. Sem isto existe o loop
+ *      assinar → pagar 90% → cancelar → reassinar com cupom, indefinidamente,
+ *      porque `isChange` é false para registro cancelado. O histórico em
+ *      `payments` sobrevive ao cancelamento (subscribe faz UPDATE na linha, nunca
+ *      DELETE), então ele é a fonte da verdade de "primeira cobrança".
+ */
+async function resolvePromoForSubscribe(
+  existing: typeof subscriptions.$inferSelect | undefined,
+  isChange: boolean,
+  promoCode: string | undefined,
+): Promise<Promo | null> {
+  if (!promoCode) return null
+
+  const promo = resolvePromo(promoCode)
+  if (!promo) throw new AppError('Cupom inválido ou já encerrado.', 422)
+
+  if (isChange) {
+    throw new AppError('O cupom vale só na primeira assinatura, não na troca de plano.', 422)
+  }
+
+  if (existing) {
+    const alreadyPaid = await db.query.payments.findFirst({
+      columns: { id: true },
+      where: and(
+        eq(payments.subscriptionId, existing.id),
+        inArray(payments.status, ['confirmed', 'received']),
+      ),
+    })
+    if (alreadyPaid) {
+      throw new AppError('Este cupom vale só na primeira cobrança da conta.', 422)
+    }
+  }
+
+  return promo
 }
 
 /**
@@ -82,6 +128,12 @@ export async function subscribe(establishmentId: string, remoteIp: string, input
 
   const isChange = !!existing && existing.status !== 'canceled'
 
+  // Valida o cupom ANTES de qualquer chamada ao Asaas: recusar depois deixaria
+  // um cliente órfão criado no gateway a cada tentativa com código errado.
+  const promo = await resolvePromoForSubscribe(existing, isChange, input.promoCode)
+  /** Valor do ciclo com o desconto do cupom já aplicado (em centavos). */
+  const discounted = (cents: number) => (promo ? applyPromoCents(cents, promo.percentOff) : cents)
+
   const customer = await findOrCreateCustomer({
     name: input.holder.name,
     email: input.holder.email,
@@ -102,7 +154,10 @@ export async function subscribe(establishmentId: string, remoteIp: string, input
   if (useInstallments) {
     // ---- Anual parcelado: cobrança avulsa parcelada no cartão ----
     const installmentCount = Math.min(input.installments ?? 1, MAX_INSTALLMENTS)
-    const totalValue = centsToReais(getPlanCycleCents(input.planSlug, 'yearly'))
+    // O cupom desconta o ANO INTEIRO aqui, e o Asaas divide o total já
+    // descontado entre as parcelas. Não há o que restaurar depois: parcelamento
+    // é uma compra única que não renova (getEffectivePlan rebaixa no vencimento).
+    const totalValue = centsToReais(discounted(getPlanCycleCents(input.planSlug, 'yearly')))
     // A captura no cartão é IMEDIATA (o Asaas cobra a 1ª parcela hoje mesmo,
     // independentemente do dueDate); por isso o parcelado não tem teste grátis
     // diferido: o dueDate abaixo é só informativo.
@@ -132,12 +187,15 @@ export async function subscribe(establishmentId: string, remoteIp: string, input
       currentPeriodEnd: addBillingCycle(now, 'yearly'),
       graceUntil: null,
       canceledAt: null,
+      promoCode: promo?.code ?? null,
+      // Fica null de direito: não existe valor recorrente a restaurar aqui.
+      promoRestoredAt: null,
       updatedAt: now,
     }
   } else {
     // ---- Assinatura recorrente (mensal ou anual à vista) ----
     const cycle = input.billingCycle === 'yearly' ? 'YEARLY' : 'MONTHLY'
-    const value = centsToReais(getPlanCycleCents(input.planSlug, input.billingCycle))
+    const fullCents = getPlanCycleCents(input.planSlug, input.billingCycle)
 
     // Data da 1ª cobrança:
     // - Troca de plano: cobra já no ciclo atual (hoje).
@@ -164,12 +222,35 @@ export async function subscribe(establishmentId: string, remoteIp: string, input
     const asaasSubscription = await createCreditCardSubscription({
       customer: customer.id,
       cycle,
-      value,
+      // Cria já com o desconto: o Asaas materializa a cobrança #1 aqui mesmo
+      // (é por isso que o nextDueDate que ele devolve vem 1 ciclo à frente).
+      value: centsToReais(discounted(fullCents)),
       nextDueDate,
       creditCard: input.card,
       creditCardHolderInfo: input.holder,
       remoteIp,
     })
+
+    // ...e devolve o valor CHEIO na sequência. A cobrança #1 já existe e não
+    // muda (updateAsaasSubscription só afeta cobranças futuras), então o
+    // desconto fica preso nela e as #2 em diante nascem no preço normal. É o
+    // que dá "10% só na primeira cobrança" numa API que só tem valor de ciclo.
+    // Deixar a assinatura sentada no valor descontado até a 1ª cobrança seria
+    // pior: ela pode estar a até 14 dias de distância (fim do trial).
+    let promoRestoredAt: Date | null = null
+    if (promo) {
+      try {
+        await updateAsaasSubscription(asaasSubscription.id, {
+          value: centsToReais(fullCents),
+          cycle,
+        })
+        promoRestoredAt = new Date()
+      } catch (err) {
+        // Não derruba a assinatura: o cartão já foi capturado. Fica registrado
+        // em promoRestoredAt null e o webhook da 1ª cobrança tenta de novo.
+        console.error('[payments] falha ao restaurar valor cheio após cupom:', err)
+      }
+    }
 
     values = {
       establishmentId,
@@ -186,6 +267,8 @@ export async function subscribe(establishmentId: string, remoteIp: string, input
       currentPeriodEnd: new Date(nextDueDate),
       graceUntil: null,
       canceledAt: null,
+      promoCode: promo?.code ?? null,
+      promoRestoredAt,
       updatedAt: new Date(),
     }
   }
@@ -289,6 +372,9 @@ export async function changePlan(establishmentId: string, input: ChangePlanInput
     .set({
       planSlug: input.planSlug,
       billingCycle: input.billingCycle,
+      // A chamada acima já gravou o valor cheio do novo plano no Asaas, então
+      // qualquer desconto promocional pendente deixou de existir aqui.
+      promoRestoredAt: subscription.promoRestoredAt ?? new Date(),
       updatedAt: new Date(),
     })
     .where(eq(subscriptions.id, subscription.id))
@@ -428,6 +514,38 @@ export async function handleWebhook(event: string, payment: WebhookInput['paymen
       // "próxima cobrança" ficaria enganoso (o prazo é fixo, não recorrente).
       if (!wasAlreadyPaid && !isInstallment) {
         void sendPaymentReceipt(subscription, payment, paidAt, nextChargeDate)
+      }
+
+      // Rede de segurança do cupom: normalmente o valor cheio já foi restaurado
+      // logo após criar a assinatura (ver subscribe), e promoRestoredAt está
+      // preenchido. Se aquela chamada falhou, a assinatura ficou no valor
+      // descontado; como a cobrança promocional acabou de confirmar, o cheio
+      // vale de agora em diante. O guard de asaasSubscriptionId ignora o
+      // parcelado, onde não existe valor recorrente a restaurar.
+      // isPlanSlug em vez de cast: `planSlug` é text livre no banco (o plano
+      // 'profissional' é gravado à mão), e getPlanCycleCents estouraria nele.
+      if (
+        subscription.promoCode &&
+        !subscription.promoRestoredAt &&
+        subscription.asaasSubscriptionId &&
+        isPlanSlug(subscription.planSlug)
+      ) {
+        try {
+          await updateAsaasSubscription(subscription.asaasSubscriptionId, {
+            value: centsToReais(
+              getPlanCycleCents(subscription.planSlug, subscription.billingCycle),
+            ),
+            cycle: subscription.billingCycle === 'yearly' ? 'YEARLY' : 'MONTHLY',
+          })
+          await db
+            .update(subscriptions)
+            .set({ promoRestoredAt: new Date(), updatedAt: new Date() })
+            .where(eq(subscriptions.id, subscription.id))
+        } catch (err) {
+          // Segue com promoRestoredAt null pra tentar de novo na próxima
+          // cobrança. Nunca propaga: resposta não-2xx pausa a fila do Asaas.
+          console.error('[payments] falha ao restaurar valor cheio no webhook:', err)
+        }
       }
     }
   } else if (event === 'PAYMENT_OVERDUE') {

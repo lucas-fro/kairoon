@@ -1083,6 +1083,54 @@ button {
   margin-bottom: 18px;
 }
 
+/* Banner da campanha promocional, acima do seletor de ciclo. As cores são as
+   mesmas do warning do painel (tailwind.config.ts) pra ele ser reconhecido como
+   o mesmo aviso nos dois lugares. */
+.promo-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 12px;
+  margin-top: 28px;
+  padding: 12px 18px;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 12px;
+  background: #fef3c7;
+  text-align: left;
+}
+
+.promo-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: #b45309;
+}
+
+.promo-text {
+  /* flex:1 empurra o cronômetro pra ponta direita, como no banner do painel. */
+  flex: 1 1 240px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #b45309;
+}
+
+.promo-text strong {
+  font-weight: 700;
+}
+
+.promo-countdown {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #b45309;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 .plans-toggle {
   position: relative;
   display: inline-flex;

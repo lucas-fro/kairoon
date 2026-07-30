@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
 import { env } from '../../env'
 import { PLANS } from '../../lib/plans'
+import { ACTIVE_PROMO } from '../../lib/promos'
 import { changePlanSchema, subscribeSchema, webhookSchema } from './schemas'
 import * as paymentsService from './service'
 
@@ -23,6 +24,11 @@ export async function paymentsRoutes(app: FastifyInstance) {
   // Catálogo estático de planos, sem nada da conta: é lido pela tela de preços
   // antes mesmo de existir sessão, por isso 'public' e não 'owner'.
   app.get('/plans', { config: { permission: 'public' } }, async () => PLANS)
+
+  // Campanha promocional em vigor (ou null). Fonte ÚNICA da verdade do cupom:
+  // o frontend não duplica o código nem o percentual, então encerrar a campanha
+  // é só zerar ACTIVE_PROMO aqui e dar deploy, sem mexer em tela nenhuma.
+  app.get('/promo', { config: { permission: 'public' } }, async () => ACTIVE_PROMO)
 
   // Rate limit: superfície sensível a fraude/abuso de tentativas de cartão.
   app.post(

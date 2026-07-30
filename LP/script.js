@@ -178,6 +178,16 @@
           cta.setAttribute('href', url.toString());
         }
       });
+
+      // Onde o desconto do cupom incide muda por ciclo, e essa diferença
+      // precisa estar na frente do olho: no mensal vale só a primeira cobrança,
+      // no anual vale o ano contratado inteiro. Espelha promoScopeLabel
+      // (frontend/src/lib/promo.ts).
+      var promoScope = document.getElementById('promoScope');
+      if (promoScope) {
+        promoScope.textContent =
+          period === 'annual' ? 'no valor total do primeiro ano' : 'no primeiro mês';
+      }
     }
 
     periodBtns.forEach(function (btn) {
@@ -189,5 +199,27 @@
     // Estado inicial derivado do data-active (anual por padrão): garante que
     // preços, rótulos e CTAs já saem consistentes sem depender de clique.
     setPeriod(plansToggle.getAttribute('data-active') || 'annual');
+  }
+
+  // Cronômetro do banner da promo. Espelha endOfLocalDay/formatCountdown
+  // (frontend/src/lib/promo.ts): o prazo é o fim do dia local, recalculado a
+  // cada tick em vez de guardado no carregamento, pra o contador atravessar a
+  // virada do dia, o notebook dormindo e o horário de verão sem travar em zero.
+  var promoCountdown = document.getElementById('promoCountdown');
+  if (promoCountdown) {
+    var pad = function (n) {
+      return String(n).padStart(2, '0');
+    };
+
+    var tickPromo = function () {
+      var end = new Date();
+      end.setHours(24, 0, 0, 0);
+      var total = Math.max(0, Math.floor((end.getTime() - Date.now()) / 1000));
+      promoCountdown.textContent =
+        pad(Math.floor(total / 3600)) + 'h:' + pad(Math.floor((total % 3600) / 60)) + 'm:' + pad(total % 60) + 's';
+    };
+
+    tickPromo();
+    window.setInterval(tickPromo, 1000);
   }
 })();

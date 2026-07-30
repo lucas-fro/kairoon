@@ -4,10 +4,11 @@ import { Check, CreditCard } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { getMe } from '../../api/auth'
 import { ApiError } from '../../api/client'
-import { changePlan, getPaymentMethod, getPlans, getSubscription } from '../../api/payments'
+import { changePlan, getPaymentMethod, getPlans, getPromo, getSubscription } from '../../api/payments'
 import { useAuth } from '../../contexts/AuthContext'
 import { usePlan } from '../../hooks/usePlan'
 import { cn, formatBRL, formatTimestampBR } from '../../lib/format'
+import { isPromoEligible } from '../../lib/promo'
 import {
   canChangeWithSavedCard,
   hasActiveSubscription,
@@ -16,6 +17,7 @@ import {
 } from '../../lib/subscription'
 import type { BillingCycle, PlanSlug } from '../../types/api'
 import { BillingCycleToggle, getAnnualDiscountPercent } from '../payments/BillingCycleToggle'
+import { PromoBanner } from './PromoBanner'
 import { Button } from '../ui/Button'
 import { Dialog } from '../ui/Dialog'
 import { DialogActions } from '../ui/DialogActions'
@@ -92,6 +94,7 @@ export function PlanUpgradeDialog({ open, onClose }: PlanUpgradeDialogProps) {
     enabled: open,
   })
   const plansQuery = useQuery({ queryKey: ['payments', 'plans'], queryFn: getPlans, enabled: open })
+  const promoQuery = useQuery({ queryKey: ['payments', 'promo'], queryFn: getPromo, enabled: open })
   // Cartão cadastrado: buscado só no passo de confirmação da troca.
   const paymentMethodQuery = useQuery({
     queryKey: ['payments', 'payment-method'],
@@ -130,6 +133,19 @@ export function PlanUpgradeDialog({ open, onClose }: PlanUpgradeDialogProps) {
   const canTokenizedChange = canChangeWithSavedCard(subscription)
   const installmentTermActive = isInstallmentTermActive(subscription)
 
+  // A campanha é anunciada para TODA conta que abre o diálogo, inclusive quem
+  // já paga: é chamada de marketing, e some sozinha quando ACTIVE_PROMO virar
+  // null no backend. Não espera a assinatura carregar justamente por não
+  // depender dela.
+  const promo = promoQuery.data ?? null
+  // Quem de fato consegue aplicar o cupom, que é mais restrito do que quem o
+  // vê: o backend (resolvePromoForSubscribe) recusa assinatura ativa e quem já
+  // pagou alguma vez, mesmo tendo cancelado (o cancelamento preserva a linha).
+  const usablePromo =
+    promo && subscriptionReady && isPromoEligible(subscription, subscriptionQuery.data?.payments)
+      ? promo
+      : null
+
   const subscribedCycle = subscription?.billingCycle
   // Abre no ciclo que a conta já assina: abrir sempre no anual fazia o card do
   // plano atual aparecer como "Assinar", com um preço que ela não paga.
@@ -144,7 +160,12 @@ export function PlanUpgradeDialog({ open, onClose }: PlanUpgradeDialogProps) {
       return
     }
     onClose()
-    navigate(`/checkout?plan=${planSlug}&cycle=${selectedCycle}`)
+    // Leva o cupom junto pra ele já chegar preenchido no checkout: quem clicou
+    // vindo do banner não devia ter que digitar o código de novo. Só para quem
+    // se qualifica: pré-preencher um código que o backend vai recusar abriria o
+    // checkout já com mensagem de erro.
+    const coupon = usablePromo ? `&coupon=${encodeURIComponent(usablePromo.code)}` : ''
+    navigate(`/checkout?plan=${planSlug}&cycle=${selectedCycle}${coupon}`)
   }
 
   const confirmInfo = confirmPlan ? plansQuery.data?.[confirmPlan] : undefined
@@ -185,6 +206,8 @@ export function PlanUpgradeDialog({ open, onClose }: PlanUpgradeDialogProps) {
         description={upgradeDescription}
         maxWidth="max-w-4xl"
       >
+        {promo && <PromoBanner promo={promo} billingCycle={selectedCycle} />}
+
         {/* Ciclo de cobrança (mensal / anual) no topo */}
         <div className="mb-5 flex justify-center">
           <BillingCycleToggle
